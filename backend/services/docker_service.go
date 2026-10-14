@@ -90,7 +90,12 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 
 	var envList []string
 	if envVars != "" {
-		envList = strings.Split(envVars, "\n")
+		for _, line := range strings.Split(envVars, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && strings.Contains(line, "=") {
+				envList = append(envList, line)
+			}
+		}
 	}
 
 	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik
