@@ -239,85 +239,89 @@ const DashboardHome = () => {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto relative z-10">
-          <div className="inline-block min-w-full align-middle">
+        <div className="relative z-10">
+          <div className="w-full">
             <div className="overflow-hidden bg-white border border-slate-200 shadow-sm rounded-2xl">
-              <table className="min-w-full divide-y divide-slate-200">
+              <table className="w-full table-auto divide-y divide-slate-200">
                 <thead className="bg-slate-50/50">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">ID</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider max-w-[200px]">Name</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider max-w-[200px]">Image</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Status</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Resources</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">URL</th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Actions</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">ID</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Service / App</th>
+                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Image</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Usage</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">URL</th>
+                    <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {containers.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-200 group">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center text-sm font-mono text-slate-500">
-                          <Terminal className="w-4 h-4 mr-2 text-slate-400 flex-shrink-0" />
-                          {item.id}
+                      {/* ID */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center text-xs font-mono text-slate-500">
+                          <Terminal className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[50px]" title={item.id}>{item.id ? item.id.substring(0, 7) : '-'}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex flex-col gap-1 max-w-[280px]">
-                          {/* Service Type Badge */}
-                          <div className="flex items-center gap-1.5">
+
+                      {/* Service / App */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
-                                <Database className="w-3 h-3 text-emerald-600" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <Database className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                                 Backend API
                               </span>
                             ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-purple-100 text-purple-800 border border-purple-300 shadow-xs">
-                                <Globe className="w-3 h-3 text-purple-600" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300">
+                                <Globe className="w-2.5 h-2.5 text-purple-600 shrink-0" />
                                 Frontend UI
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                                <Layers className="w-3 h-3 text-slate-500" />
-                                Web Service
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                                <Layers className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                Service
                               </span>
                             )}
+
+                            <span 
+                              className="text-xs font-semibold text-slate-900 truncate max-w-[180px] sm:max-w-[240px] md:max-w-[300px]" 
+                              title={item.name}
+                            >
+                              {item.clean_name || item.name?.replace(/\s*\((Backend|Frontend)\)$/, '')}
+                            </span>
                           </div>
 
-                          {/* Repository / Service Name */}
-                          <div 
-                            className="text-sm font-semibold text-slate-900 truncate" 
-                            title={item.name}
-                          >
-                            {item.clean_name || item.name?.replace(/\s*\((Backend|Frontend)\)$/, '')}
-                          </div>
-
-                          {/* Quick helper hint */}
                           <span className="text-[10px] text-slate-400 font-mono truncate">
                             {item.service_type === 'backend' || item.name?.includes('(Backend)') 
                               ? '⚙️ API Server (ตั้งค่า DB_URL ที่นี่)' 
                               : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
-                              ? '🌐 เว็บไซต์ / Web UI'
-                              : '📦 Standalone App'}
+                              ? '🌐 Web UI'
+                              : '📦 Standalone'}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[180px]" title={item.image}>
+
+                      {/* Image (hidden on small screens) */}
+                      <td className="hidden lg:table-cell px-3 py-3">
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-600 bg-slate-100 border border-slate-200 truncate max-w-[130px]" title={item.image}>
                           {item.image || '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+
+                      {/* Status */}
+                      <td className="px-3 py-3">
                         {item.state === 'redeploying' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-blue-50 text-blue-700 border-blue-200">
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                            Updating...
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-blue-50 text-blue-700 border-blue-200">
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                            Updating
                           </span>
                         ) : item.state === 'failed' || item.last_error ? (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-rose-100 text-rose-800 border-rose-300">
-                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-rose-100 text-rose-800 border-rose-300">
+                              <AlertTriangle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
                               Failed
                             </span>
                             {item.last_error && (
@@ -327,113 +331,120 @@ const DashboardHome = () => {
                                   setActiveErrorContainerName(item.name);
                                   setErrorModalOpen(true);
                                 }}
-                                className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-2 py-0.5 rounded font-medium transition-colors shadow-sm inline-flex items-center gap-1"
+                                className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1"
                               >
-                                <AlertCircle className="w-3 h-3" />
+                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
                                 ดู Error
                               </button>
                             )}
                           </div>
                         ) : (
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border
                             ${item.state === 'running' 
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                               : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
                             {item.state === 'running' ? (
-                              <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                              <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                               </span>
                             ) : (
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0"></span>
                             )}
                             {item.state === 'running' ? 'Running' : 'Stopped'}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+
+                      {/* Resources (hidden on mobile) */}
+                      <td className="hidden md:table-cell px-3 py-3">
                         {item.state === 'running' && stats[item.id] ? (
-                          <div className="flex flex-col gap-1 text-[11px] font-mono text-slate-500">
-                            <div className="flex items-center gap-1.5" title="CPU Usage">
-                              <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                          <div className="flex flex-col gap-0.5 text-[10px] font-mono text-slate-500">
+                            <div className="flex items-center gap-1">
+                              <Cpu className="w-3 h-3 text-indigo-400 shrink-0" />
                               <span className={stats[item.id].cpu_percent > 80 ? 'text-rose-500 font-semibold' : ''}>
-                                {stats[item.id].cpu_percent.toFixed(2)}%
+                                {stats[item.id].cpu_percent.toFixed(1)}%
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5" title="Memory Usage">
-                              <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                            <div className="flex items-center gap-1">
+                              <HardDrive className="w-3 h-3 text-emerald-400 shrink-0" />
                               <span>
-                                {stats[item.id].memory_mb.toFixed(0)}MB / {(stats[item.id].memory_limit / 1024).toFixed(1)}GB
+                                {stats[item.id].memory_mb.toFixed(0)}MB
                               </span>
                             </div>
                           </div>
                         ) : item.state === 'running' ? (
-                          <div className="text-[11px] text-slate-400 animate-pulse font-mono">Loading...</div>
+                          <div className="text-[10px] text-slate-400 animate-pulse font-mono">Loading...</div>
                         ) : (
-                          <div className="text-[11px] text-slate-400 font-mono">-</div>
+                          <div className="text-[10px] text-slate-400 font-mono">-</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+
+                      {/* URL */}
+                      <td className="px-3 py-3">
                         {item.state === 'running' && item.domain_name ? (
                           <a 
                             href={`http://${item.domain_name}`} 
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
                           >
-                            Visit Site <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                            Visit <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                           </a>
                         ) : (
-                          <span className="text-xs text-slate-400 italic">Offline</span>
+                          <span className="text-[11px] text-slate-400 italic">Offline</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-1">
-                        {item.state === 'running' ? (
-                          <button 
-                            onClick={() => handleAction(item.id, 'stop')} 
-                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Stop Server"
-                          >
-                            <Square className="w-4 h-4 fill-current" />
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => handleAction(item.id, 'start')} 
-                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
-                            title="Start Server"
-                          >
-                            <Play className="w-4 h-4 fill-current" />
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => handleViewLogs(item.id, item.name)} 
-                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                          title="View Logs"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleOpenEnv(item.id, item.name)} 
-                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
-                          title="Environment Variables (ตั้งค่าตัวแปร)"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {handleRedeploy(item.id)}}
-                          className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Re-deploy (อัปเดตโค้ดใหม่)"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
 
-                        <button 
-                          onClick={() => handleDelete(item.id)} 
-                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete Server"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      {/* Actions */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-0.5">
+                          {item.state === 'running' ? (
+                            <button 
+                              onClick={() => handleAction(item.id, 'stop')} 
+                              className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Stop Server"
+                            >
+                              <Square className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleAction(item.id, 'start')} 
+                              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Start Server"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleViewLogs(item.id, item.name)} 
+                            className="p-1 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="View Logs"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleOpenEnv(item.id, item.name)} 
+                            className="p-1 rounded text-amber-600 hover:bg-amber-50 transition-colors"
+                            title="Environment Variables (ตั้งค่าตัวแปร)"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {handleRedeploy(item.id)}}
+                            className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Re-deploy (อัปเดตโค้ดใหม่)"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(item.id)} 
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Delete Server"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
