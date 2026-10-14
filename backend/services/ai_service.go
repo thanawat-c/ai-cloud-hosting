@@ -128,9 +128,17 @@ GitHub Repository: %s
 	}
 
 	// Clean up markdown syntax if AI still outputs it
-	finalDockerfile = strings.TrimPrefix(finalDockerfile, "```docker\n")
-	finalDockerfile = strings.TrimPrefix(finalDockerfile, "```\n")
-	finalDockerfile = strings.TrimSuffix(finalDockerfile, "```")
+	finalDockerfile = strings.TrimSpace(finalDockerfile)
+	if strings.HasPrefix(finalDockerfile, "```") {
+		// ตัดบรรทัดแรกทิ้ง เช่น ```dockerfile หรือ ```docker หรือ ```
+		if idx := strings.Index(finalDockerfile, "\n"); idx != -1 {
+			finalDockerfile = finalDockerfile[idx+1:]
+		}
+	}
+	if strings.HasSuffix(finalDockerfile, "```") {
+		finalDockerfile = strings.TrimSuffix(finalDockerfile, "```")
+	}
+	finalDockerfile = strings.TrimSpace(finalDockerfile)
 
 	return finalDockerfile, nil
 }
