@@ -95,7 +95,9 @@ GitHub Repository: %s
    - หากเป็น Python: ดูจาก requirements.txt หรือ pyproject.toml ใช้ 'FROM python:3.11-slim' หรือ 'FROM python:3.12-slim'
 
 2. เรื่อง Package Manager:
-   - หากตรวจพบ "pnpm-lock.yaml": ห้ามใช้ npm เด็ดขาด! ให้ลง pnpm ด้วย 'RUN npm install -g pnpm' แล้วใช้ 'pnpm install'
+   - หากตรวจพบ "pnpm-lock.yaml": ห้ามใช้ npm เด็ดขาด! ให้ลง pnpm และตั้งค่าอนุญาต build scripts เสมอ เพื่อป้องกัน error ERR_PNPM_IGNORED_BUILDS:
+     RUN npm install -g pnpm && pnpm config set enable-pre-post-scripts true
+     จากนั้นใช้คำสั่ง: 'pnpm install --no-frozen-lockfile'
    - หากตรวจพบ "yarn.lock": ให้ใช้ 'yarn install'
    - หากใช้ npm: ใช้ 'npm install --legacy-peer-deps'
 
@@ -105,10 +107,10 @@ GitHub Repository: %s
    - ให้สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:20-alpine builder:
      WORKDIR /app/frontend
      COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
-     (ติดตั้ง package manager ให้ตรง แล้ว install dependencies)
+     RUN npm install -g pnpm && pnpm config set enable-pre-post-scripts true && pnpm install --no-frozen-lockfile
      COPY frontend/ ./
-     (สั่ง build หรือ generate เช่น pnpm run generate หรือ pnpm run build)
-   - Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/* จากนั้น COPY ไฟล์ output จากการ build (.output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/ EXPOSE 80
+     RUN pnpm run generate || pnpm run build
+   - Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/* จากนั้น COPY ไฟล์ output จากการ build (มองหา .output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/ EXPOSE 80
 
 4. ข้อห้ามสำคัญ:
    - ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
