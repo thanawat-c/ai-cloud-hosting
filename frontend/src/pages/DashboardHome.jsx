@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database } from 'lucide-react';
 
 const DashboardHome = () => {
   const [containers, setContainers] = useState([]);
@@ -264,11 +264,48 @@ const DashboardHome = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-slate-900 truncate max-w-[250px]" title={item.name}>{item.name}</div>
+                        <div className="flex flex-col gap-1 max-w-[280px]">
+                          {/* Service Type Badge */}
+                          <div className="flex items-center gap-1.5">
+                            {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                                <Database className="w-3 h-3 text-emerald-600" />
+                                Backend API
+                              </span>
+                            ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-purple-100 text-purple-800 border border-purple-300 shadow-xs">
+                                <Globe className="w-3 h-3 text-purple-600" />
+                                Frontend UI
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                                <Layers className="w-3 h-3 text-slate-500" />
+                                Web Service
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Repository / Service Name */}
+                          <div 
+                            className="text-sm font-semibold text-slate-900 truncate" 
+                            title={item.name}
+                          >
+                            {item.clean_name || item.name?.replace(/\s*\((Backend|Frontend)\)$/, '')}
+                          </div>
+
+                          {/* Quick helper hint */}
+                          <span className="text-[10px] text-slate-400 font-mono truncate">
+                            {item.service_type === 'backend' || item.name?.includes('(Backend)') 
+                              ? '⚙️ API Server (ตั้งค่า DB_URL ที่นี่)' 
+                              : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
+                              ? '🌐 เว็บไซต์ / Web UI'
+                              : '📦 Standalone App'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[200px]" title={item.image}>
-                          {item.image}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[180px]" title={item.image}>
+                          {item.image || '-'}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
@@ -46,14 +47,27 @@ func GetContainers(c *gin.Context) {
 			continue
 		}
 
+		// สังเกตประเภท Service จากชื่อ RepoURL
+		serviceType := "standalone"
+		cleanName := d.RepoURL
+		if strings.HasSuffix(d.RepoURL, " (Backend)") {
+			serviceType = "backend"
+			cleanName = strings.TrimSuffix(d.RepoURL, " (Backend)")
+		} else if strings.HasSuffix(d.RepoURL, " (Frontend)") {
+			serviceType = "frontend"
+			cleanName = strings.TrimSuffix(d.RepoURL, " (Frontend)")
+		}
+
 		results = append(results, map[string]interface{}{
-			"id":          d.ContainerID,
-			"name":        d.RepoURL, 
-			"image":       d.ImageName,
-			"state":       actualState,
-			"status":      "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
-			"domain_name": d.DomainName,
-			"last_error":  d.LastError,
+			"id":           d.ContainerID,
+			"name":         d.RepoURL, 
+			"clean_name":   cleanName,
+			"service_type": serviceType,
+			"image":        d.ImageName,
+			"state":        actualState,
+			"status":       "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
+			"domain_name":  d.DomainName,
+			"last_error":   d.LastError,
 		})
 	}
 	
