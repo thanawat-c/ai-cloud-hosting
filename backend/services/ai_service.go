@@ -25,9 +25,9 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string) (s
 	}
 	defer aiClient.Close()
 
-	// 2. ให้ Go สแกนหาโครงสร้างโฟลเดอร์และไฟล์สำคัญทั้งที่ Root และโฟลเดอร์ย่อย 1 ชั้น
+	// 2. ให้ Go สแกนหาโครงสร้างโฟลเดอร์ และ "อ่านเนื้อหาไฟล์ Config สำคัญ" ส่งให้ AI
 	var fileList []string
-	var details []string
+	var configContents []string
 
 	// สแกน Root
 	entries, _ := os.ReadDir(buildDir)
@@ -42,78 +42,72 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string) (s
 			subEntries, _ := os.ReadDir(filepath.Join(buildDir, name))
 			for _, sub := range subEntries {
 				subName := sub.Name()
-				if subName == "package.json" || subName == "go.mod" || subName == "requirements.txt" || subName == "pom.xml" || subName == "nuxt.config.ts" || subName == "vite.config.js" || subName == "vite.config.ts" || subName == "pnpm-lock.yaml" || subName == "yarn.lock" || subName == "package-lock.json" {
-					details = append(details, fmt.Sprintf("พบ %s อยู่ในโฟลเดอร์ %s/", subName, name))
-					if subName == "go.mod" {
-						if content, err := os.ReadFile(filepath.Join(buildDir, name, subName)); err == nil {
-							for _, line := range strings.Split(string(content), "\n") {
-								if strings.HasPrefix(strings.TrimSpace(line), "go ") {
-									details = append(details, fmt.Sprintf("เวอร์ชัน Go ที่ระบุใน %s/go.mod คือ: %s", name, strings.TrimSpace(line)))
-									break
-								}
+				if subName == "package.json" || subName == "go.mod" || subName == "requirements.txt" || subName == "pnpm-lock.yaml" || subName == "yarn.lock" || subName == "nuxt.config.ts" {
+					subPath := filepath.Join(buildDir, name, subName)
+					if subName != "pnpm-lock.yaml" && subName != "yarn.lock" {
+						if data, err := os.ReadFile(subPath); err == nil {
+							// ตัดให้ไม่เกิน 1500 ตัวอักษรเพื่อประหยัด token แต่ได้ข้อมูลครบ
+							contentStr := string(data)
+							if len(contentStr) > 1500 {
+								contentStr = contentStr[:1500] + "\n...(ตัดข้อมูลส่วนที่เหลือ)..."
 							}
+							configContents = append(configContents, fmt.Sprintf("--- เนื้อหาไฟล์ %s/%s ---\n%s", name, subName, contentStr))
 						}
+					} else {
+						configContents = append(configContents, fmt.Sprintf("ตรวจพบไฟล์ Lockfile: %s/%s", name, subName))
 					}
 				}
 			}
 		} else {
 			fileList = append(fileList, name)
-			if name == "package.json" || name == "go.mod" || name == "requirements.txt" || name == "pnpm-lock.yaml" || name == "yarn.lock" || name == "package-lock.json" {
-				details = append(details, fmt.Sprintf("พบ %s อยู่ที่ Root", name))
-				if name == "go.mod" {
-					if content, err := os.ReadFile(filepath.Join(buildDir, name)); err == nil {
-						for _, line := range strings.Split(string(content), "\n") {
-							if strings.HasPrefix(strings.TrimSpace(line), "go ") {
-								details = append(details, fmt.Sprintf("เวอร์ชัน Go ที่ระบุใน Root go.mod คือ: %s", strings.TrimSpace(line)))
-								break
-							}
-						}
+			if name == "package.json" || name == "go.mod" || name == "requirements.txt" {
+				if data, err := os.ReadFile(filepath.Join(buildDir, name)); err == nil {
+					contentStr := string(data)
+					if len(contentStr) > 1500 {
+						contentStr = contentStr[:1500] + "\n...(ตัดข้อมูลส่วนที่เหลือ)..."
 					}
+					configContents = append(configContents, fmt.Sprintf("--- เนื้อหาไฟล์ %s ---\n%s", name, contentStr))
 				}
+			} else if name == "pnpm-lock.yaml" || name == "yarn.lock" {
+				configContents = append(configContents, fmt.Sprintf("ตรวจพบไฟล์ Lockfile: %s", name))
 			}
 		}
 	}
 
 	fileListStr := strings.Join(fileList, ", ")
-	detailStr := strings.Join(details, "\n")
+	configsStr := strings.Join(configContents, "\n\n")
 
 	model := aiClient.GenerativeModel("gemini-2.5-flash")
 
-	prompt := fmt.Sprintf(`คุณคือ DevOps Engineer ระดับ Senior ทำหน้าที่สร้าง Dockerfile คุณภาพสูงสำหรับ Production ให้เหมาะสมกับโปรเจกต์นี้
-GitHub URL: %s
+	prompt := fmt.Sprintf(`คุณคือ DevOps Engineer ระดับ Senior ทำหน้าที่สร้าง Dockerfile สำหรับ Production ให้ถูกต้อง แม่นยำ และทำงานได้จริง 100%%
+GitHub Repository: %s
 
-[โครงสร้างโฟลเดอร์และไฟล์ที่ตรวจพบ]:
+[รายชื่อโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์]:
 %s
 
-[ข้อมูลไฟล์สำคัญที่ตรวจพบ]:
+[เนื้อหาไฟล์ Config สำคัญที่อ่านได้จากในโปรเจกต์จริง]:
 %s
 
 คำแนะนำและกฎเหล็กในการสร้าง Dockerfile:
-1. เรื่อง Package Manager (สำคัญมาก):
-   - หากพบไฟล์ "pnpm-lock.yaml": ห้ามใช้ npm install เด็ดขาด! ให้ติดตั้ง pnpm ก่อนเสมอ เช่น:
-     RUN npm install -g pnpm
-     แล้วใช้ pnpm install และ pnpm run build
-   - หากพบ "yarn.lock": ให้ใช้ yarn install และ yarn build
-   - หากพบ "package-lock.json" หรือไม่มี lockfile: ใช้ npm install --legacy-peer-deps
+1. การเลือก Base Image และเวอร์ชัน (ห้ามเดา ให้ดูจากเนื้อหาไฟล์ Config ด้านบน):
+   - หากเป็น Go: ตรวจสอบบรรทัด 'go x.xx' ใน go.mod เสมอ ถ้าโค้ดต้องการ Go 1.22+ หรือ 1.23+ ให้ใช้ 'FROM golang:1.23-alpine' หรือ 'FROM golang:alpine' ห้ามใช้ golang:1.20 หรือ golang:1.21 เด็ดขาด
+   - หากเป็น Node.js / Frontend: ดูใน package.json ว่าใช้ node หรือเครื่องมืออะไร แนะนำใช้ 'FROM node:20-alpine' เป็น builder
+   - หากเป็น Python: ดูจาก requirements.txt หรือ pyproject.toml ใช้ 'FROM python:3.11-slim' หรือ 'FROM python:3.12-slim'
 
-2. วิธีการ Build สำหรับโปรเจกต์ Go:
-   - หากต้อง build โค้ด Go ให้ใช้ base image golang:alpine หรือระบุเวอร์ชัน Go ให้สอดคล้องกับ go.mod (เช่นถ้า go.mod ต้องการ go 1.22+ หรือ 1.23+ ให้ใช้ golang:1.23-alpine หรือ golang:alpine เวอร์ชันใหม่ล่าสุด ห้ามใช้ golang:1.20 หรือ 1.21 เด็ดขาด)
-   - สั่ง CGO_ENABLED=0 go build เพื่อให้ได้ binary ที่พร้อมรันบน alpine หรือ scratch
+2. เรื่อง Package Manager:
+   - หากตรวจพบ "pnpm-lock.yaml": ห้ามใช้ npm เด็ดขาด! ให้ลง pnpm ด้วย 'RUN npm install -g pnpm' แล้วใช้ 'pnpm install'
+   - หากตรวจพบ "yarn.lock": ให้ใช้ 'yarn install'
+   - หากใช้ npm: ใช้ 'npm install --legacy-peer-deps'
 
-3. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/:
-   - ห้ามใช้ flag --prefix (เช่น ห้ามใช้ npm install --prefix frontend เพราะทำให้เกิด error)
-   - ให้ใช้ WORKDIR เข้าไปทำงานในโฟลเดอร์นั้นโดยตรง เช่น:
-     WORKDIR /app/frontend
-     RUN pnpm install && pnpm run generate (หรือ pnpm run build)
-   - หากเป็น Nuxt: แนะนำให้รัน build หรือ generate (หากเป็น static output ให้ copy โฟลเดอร์ .output/public/ ไปใส่ใน nginx:alpine)
+3. วิธีการ Build สำหรับ Monorepo (มีโฟลเดอร์ frontend/ และ backend/):
+   - ห้ามใช้ flag --prefix
+   - ให้ใช้ WORKDIR เข้าไปทำงานในโฟลเดอร์นั้นๆ โดยตรง
+   - ให้เลือกรัน Frontend เพื่อให้ผู้ใช้งานเข้าชมหน้าเว็บผ่าน Browser พอร์ต 80 ได้ โดยหากเป็น Nuxt หรือ Vite/React เมื่อ build เสร็จแล้ว ให้ copy โฟลเดอร์ผลลัพธ์ (เช่น .output/public หรือ dist) ไปใส่ใน nginx:alpine
+   - ข้อสำคัญของ Nginx: ต้องมีคำสั่ง 'RUN rm -rf /usr/share/nginx/html/*' ก่อนทำการ COPY ไฟล์เว็บลงไป เพื่อไม่ให้ติดหน้า Default Nginx
 
-4. ข้อกำหนดสำหรับ Nginx ปลายทาง:
-   - หากใช้ Nginx ปลายทาง ต้องลบไฟล์ default html ของ nginx ก่อนเสมอ:
-     RUN rm -rf /usr/share/nginx/html/*
-     แล้วค่อย COPY ผลลัพธ์จากการ build (เช่น dist หรือ .output/public) ไปที่ /usr/share/nginx/html/
-
-5. อย่าใส่ markdown format ใดๆ ทั้งสิ้น ห้ามใส่เครื่องหมาย block code ให้ตอบกลับเป็นตัวโค้ด Dockerfile ล้วนๆ เท่านั้น`,
-		repoURL, fileListStr, detailStr)
+4. ข้อห้ามสำคัญ:
+   - ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+		repoURL, fileListStr, configsStr)
 
 	fmt.Println("🤖 กำลังส่ง Prompt พร้อมรายชื่อไฟล์ไปยัง AI...")
 
