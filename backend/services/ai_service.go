@@ -91,7 +91,7 @@ GitHub Repository: %s
 คำแนะนำและกฎเหล็กในการสร้าง Dockerfile:
 1. การเลือก Base Image และเวอร์ชัน (ห้ามเดา ให้ดูจากเนื้อหาไฟล์ Config ด้านบน):
    - หากเป็น Go: ตรวจสอบบรรทัด 'go x.xx' ใน go.mod เสมอ ถ้าโค้ดต้องการ Go 1.22+ หรือ 1.23+ ให้ใช้ 'FROM golang:1.23-alpine' หรือ 'FROM golang:alpine' ห้ามใช้ golang:1.20 หรือ golang:1.21 เด็ดขาด
-   - หากเป็น Node.js / Frontend: ดูใน package.json ว่าใช้ node หรือเครื่องมืออะไร แนะนำใช้ 'FROM node:20-alpine' เป็น builder
+   - หากเป็น Node.js / Frontend: ให้ใช้ 'FROM node:22-alpine' เป็น builder เสมอ เพื่อรองรับ ECMAScript ฟีเจอร์ใหม่ๆ (เช่น Set.prototype.difference ของ Nuxt 4 และ Vite)
    - หากเป็น Python: ดูจาก requirements.txt หรือ pyproject.toml ใช้ 'FROM python:3.11-slim' หรือ 'FROM python:3.12-slim'
 
 2. เรื่อง Package Manager:
@@ -103,7 +103,7 @@ GitHub Repository: %s
 3. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/ (สำคัญที่สุด):
    - หากโปรเจกต์มีโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend เท่านั้น!
    - ห้ามสั่ง build backend (ห้ามสั่ง go build หรือติดตั้ง backend ใดๆ ทั้งสิ้น) เพราะเป้าหมายคือให้ผู้ใช้เข้าใช้งาน UI ทาง Web Browser
-   - ให้สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:20-alpine builder:
+   - ให้สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:22-alpine builder:
      WORKDIR /app/frontend
      COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
      RUN npm install -g pnpm@9 && pnpm install --no-frozen-lockfile
