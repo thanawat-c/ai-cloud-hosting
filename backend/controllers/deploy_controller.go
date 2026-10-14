@@ -43,28 +43,19 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
-		// ตรวจสอบว่าโปรเจกต์นี้มีทั้ง frontend/ และ backend/ แยกกันหรือไม่ (Monorepo)
-		frontendDir := filepath.Join(buildDir, "frontend")
-		backendDir := filepath.Join(buildDir, "backend")
-		hasFrontend := false
-		hasBackend := false
-		if fi, err := os.Stat(frontendDir); err == nil && fi.IsDir() {
-			hasFrontend = true
-		}
-		if fi, err := os.Stat(backendDir); err == nil && fi.IsDir() {
-			hasBackend = true
-		}
+		// ให้ AI ช่วยวิเคราะห์ว่าเป็น Monorepo หรือไม่ และโฟลเดอร์ไหนคือ Frontend / Backend (ไม่ยึดติดกับชื่อโฟลเดอร์)
+		isMonorepo, feDirName, beDirName := services.DetectMonorepoServices(ctx, buildDir)
 
-		if hasFrontend && hasBackend {
-			logChan <- "⚡ ตรวจพบ Monorepo (มีทั้ง frontend/ และ backend/)! ระบบจะทำการแยก Deploy 2 Services ให้โดยอัตโนมัติ...\n"
+		if isMonorepo {
+			logChan <- fmt.Sprintf("⚡ ตรวจพบ Fullstack Monorepo! (Backend: '%s/', Frontend: '%s/')\nระบบจะทำการแยก Deploy 2 Services ให้โดยอัตโนมัติ...\n", beDirName, feDirName)
 
 			// --- 1. DEPLOY BACKEND FIRST ---
 			logChan <- "\n=========================================\n"
-			logChan <- "🚀 ขั้นตอนที่ 1/2: กำลังเตรียม Deploy [Backend Service]...\n"
+			logChan <- fmt.Sprintf("🚀 ขั้นตอนที่ 1/2: กำลังเตรียม Deploy [Backend Service: %s/]...\n", beDirName)
 			logChan <- "=========================================\n"
 
 			backendDockerfile := filepath.Join(buildDir, "Dockerfile.backend")
-			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "backend")
+			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, beDirName)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Backend ไม่สำเร็จ: " + err.Error() + "\n"
 				return
@@ -99,11 +90,11 @@ func TestDeploy(c *gin.Context) {
 
 			// --- 2. DEPLOY FRONTEND AND INJECT BACKEND URL ---
 			logChan <- "\n=========================================\n"
-			logChan <- "🎨 ขั้นตอนที่ 2/2: กำลังเตรียม Deploy [Frontend Service]...\n"
+			logChan <- fmt.Sprintf("🎨 ขั้นตอนที่ 2/2: กำลังเตรียม Deploy [Frontend Service: %s/]...\n", feDirName)
 			logChan <- fmt.Sprintf("🔗 ผูก API Endpoint: NUXT_PUBLIC_API_URL=http://%s\n", beDomainName)
 			logChan <- "=========================================\n"
 
-			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "frontend")
+			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Frontend ไม่สำเร็จ: " + err.Error() + "\n"
 				return
@@ -122,7 +113,7 @@ func TestDeploy(c *gin.Context) {
 			if feEnvVars != "" {
 				feEnvVars += "\n"
 			}
-			feEnvVars += fmt.Sprintf("NUXT_PUBLIC_API_URL=http://%s\nVITE_API_URL=http://%s\nAPI_URL=http://%s", beDomainName, beDomainName, beDomainName)
+			feEnvVars += fmt.Sprintf("NUXT_PUBLIC_API_URL=http://%s\nVITE_API_URL=http://%s\nAPI_URL=http://%s\nREACT_APP_API_URL=http://%s", beDomainName, beDomainName, beDomainName, beDomainName)
 
 			logChan <- "กำลังรัน Frontend Container...\n"
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)

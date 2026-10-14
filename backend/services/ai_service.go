@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -172,3 +173,78 @@ GitHub Repository: %s
 
 	return finalDockerfile, exposedPort, nil
 }
+
+// MonorepoDetectionResult เก็บชื่อโฟลเดอร์ที่ AI วิเคราะห์เจอ
+type MonorepoDetectionResult struct {
+	IsMonorepo  bool   `json:"is_monorepo"`
+	FrontendDir string `json:"frontend_dir"`
+	BackendDir  string `json:"backend_dir"`
+}
+
+// DetectMonorepoServices ให้ AI ช่วยดูโครงสร้างโฟลเดอร์จริงว่าโฟลเดอร์ไหนคือ Frontend และโฟลเดอร์ไหนคือ Backend
+func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string, string) {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return false, "", ""
+	}
+
+	aiClient, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return false, "", ""
+	}
+	defer aiClient.Close()
+
+	var summary []string
+	entries, _ := os.ReadDir(buildDir)
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		subEntries, _ := os.ReadDir(filepath.Join(buildDir, e.Name()))
+		var subNames []string
+		for _, s := range subEntries {
+			subNames = append(subNames, s.Name())
+		}
+		summary = append(summary, fmt.Sprintf("โฟลเดอร์ '%s': มีไฟล์ภายในคือ [%s]", e.Name(), strings.Join(subNames, ", ")))
+	}
+
+	if len(summary) < 2 {
+		return false, "", ""
+	}
+
+	prompt := fmt.Sprintf(`คุณคือ DevOps Architect วิเคราะห์โครงสร้างโฟลเดอร์ของโปรเจกต์ต่อไปนี้:
+%s
+
+คำถาม: โปรเจกต์นี้เป็น Fullstack Monorepo ที่มีทั้งส่วน Frontend (Web/UI) และ Backend (API/Server) แยกโฟลเดอร์กันหรือไม่?
+(หมายเหตุ: ชื่อโฟลเดอร์อาจตั้งเป็น client/server, web/api, frontend/backend, app/api หรือชื่ออื่นๆ ก็ได้ ให้ดูจากไฟล์ภายใน)
+
+ตอบกลับเป็นรูปแบบ JSON สั้นๆ เท่านั้น ตัวอย่าง:
+{"is_monorepo": true, "frontend_dir": "frontend", "backend_dir": "backend"}
+หรือหากไม่ใช่ Monorepo ให้ตอบ:
+{"is_monorepo": false, "frontend_dir": "", "backend_dir": ""}
+
+ห้ามใส่คำอธิบาย ห้ามใส่ markdown block ตอบเฉพาะ raw json ล้วนๆ`, strings.Join(summary, "\n"))
+
+	model := aiClient.GenerativeModel("gemini-2.5-flash")
+	model.ResponseMIMEType = "application/json"
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+		return false, "", ""
+	}
+
+	var jsonStr string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if text, ok := part.(genai.Text); ok {
+			jsonStr += string(text)
+		}
+	}
+
+	var res MonorepoDetectionResult
+	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonStr)), &res); err != nil {
+		return false, "", ""
+	}
+
+	return res.IsMonorepo && res.FrontendDir != "" && res.BackendDir != "", res.FrontendDir, res.BackendDir
+}
+
