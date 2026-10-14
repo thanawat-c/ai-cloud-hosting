@@ -44,12 +44,32 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string) (s
 				subName := sub.Name()
 				if subName == "package.json" || subName == "go.mod" || subName == "requirements.txt" || subName == "pom.xml" || subName == "nuxt.config.ts" || subName == "vite.config.js" || subName == "vite.config.ts" || subName == "pnpm-lock.yaml" || subName == "yarn.lock" || subName == "package-lock.json" {
 					details = append(details, fmt.Sprintf("พบ %s อยู่ในโฟลเดอร์ %s/", subName, name))
+					if subName == "go.mod" {
+						if content, err := os.ReadFile(filepath.Join(buildDir, name, subName)); err == nil {
+							for _, line := range strings.Split(string(content), "\n") {
+								if strings.HasPrefix(strings.TrimSpace(line), "go ") {
+									details = append(details, fmt.Sprintf("เวอร์ชัน Go ที่ระบุใน %s/go.mod คือ: %s", name, strings.TrimSpace(line)))
+									break
+								}
+							}
+						}
+					}
 				}
 			}
 		} else {
 			fileList = append(fileList, name)
 			if name == "package.json" || name == "go.mod" || name == "requirements.txt" || name == "pnpm-lock.yaml" || name == "yarn.lock" || name == "package-lock.json" {
 				details = append(details, fmt.Sprintf("พบ %s อยู่ที่ Root", name))
+				if name == "go.mod" {
+					if content, err := os.ReadFile(filepath.Join(buildDir, name)); err == nil {
+						for _, line := range strings.Split(string(content), "\n") {
+							if strings.HasPrefix(strings.TrimSpace(line), "go ") {
+								details = append(details, fmt.Sprintf("เวอร์ชัน Go ที่ระบุใน Root go.mod คือ: %s", strings.TrimSpace(line)))
+								break
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -76,19 +96,23 @@ GitHub URL: %s
    - หากพบ "yarn.lock": ให้ใช้ yarn install และ yarn build
    - หากพบ "package-lock.json" หรือไม่มี lockfile: ใช้ npm install --legacy-peer-deps
 
-2. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/:
+2. วิธีการ Build สำหรับโปรเจกต์ Go:
+   - หากต้อง build โค้ด Go ให้ใช้ base image golang:alpine หรือระบุเวอร์ชัน Go ให้สอดคล้องกับ go.mod (เช่นถ้า go.mod ต้องการ go 1.22+ หรือ 1.23+ ให้ใช้ golang:1.23-alpine หรือ golang:alpine เวอร์ชันใหม่ล่าสุด ห้ามใช้ golang:1.20 หรือ 1.21 เด็ดขาด)
+   - สั่ง CGO_ENABLED=0 go build เพื่อให้ได้ binary ที่พร้อมรันบน alpine หรือ scratch
+
+3. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/:
    - ห้ามใช้ flag --prefix (เช่น ห้ามใช้ npm install --prefix frontend เพราะทำให้เกิด error)
    - ให้ใช้ WORKDIR เข้าไปทำงานในโฟลเดอร์นั้นโดยตรง เช่น:
      WORKDIR /app/frontend
      RUN pnpm install && pnpm run generate (หรือ pnpm run build)
    - หากเป็น Nuxt: แนะนำให้รัน build หรือ generate (หากเป็น static output ให้ copy โฟลเดอร์ .output/public/ ไปใส่ใน nginx:alpine)
 
-3. ข้อกำหนดสำหรับ Nginx ปลายทาง:
+4. ข้อกำหนดสำหรับ Nginx ปลายทาง:
    - หากใช้ Nginx ปลายทาง ต้องลบไฟล์ default html ของ nginx ก่อนเสมอ:
      RUN rm -rf /usr/share/nginx/html/*
      แล้วค่อย COPY ผลลัพธ์จากการ build (เช่น dist หรือ .output/public) ไปที่ /usr/share/nginx/html/
 
-4. อย่าใส่ markdown format ใดๆ ทั้งสิ้น ห้ามใส่เครื่องหมาย block code ให้ตอบกลับเป็นตัวโค้ด Dockerfile ล้วนๆ เท่านั้น`,
+5. อย่าใส่ markdown format ใดๆ ทั้งสิ้น ห้ามใส่เครื่องหมาย block code ให้ตอบกลับเป็นตัวโค้ด Dockerfile ล้วนๆ เท่านั้น`,
 		repoURL, fileListStr, detailStr)
 
 	fmt.Println("🤖 กำลังส่ง Prompt พร้อมรายชื่อไฟล์ไปยัง AI...")
