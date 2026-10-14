@@ -18,5 +18,7 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/containers/:id/logs", controllers.GetContainerLogs)
 		api.GET("/containers/:id/stats", controllers.GetContainerStats)
 		api.POST("/containers/:id/redeploy", controllers.RedeployContainer)
+		api.GET("/containers/:id/env", controllers.GetContainerEnv)
+		api.POST("/containers/:id/env", controllers.UpdateContainerEnv)
 	}
 }

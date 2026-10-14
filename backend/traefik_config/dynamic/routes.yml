@@ -1,19 +1,10 @@
 http:
   routers:
-    my-app-deploy-1836737632:
-      rule: "Host(`my-app-deploy-1836737632.localhost`)"
-      service: my-app-deploy-1836737632
+    my-app-deploy-853882920:
+      rule: "Host(`my-app-deploy-853882920.localhost`)"
+      service: my-app-deploy-853882920
   services:
-    my-app-deploy-1836737632:
+    my-app-deploy-853882920:
       loadBalancer:
         servers:
-          - url: "http://172.19.0.4:80"
-  routers:
-    my-app-deploy-1836737632:
-      rule: "Host(`my-app-deploy-1836737632.localhost`)"
-      service: my-app-deploy-1836737632
-  services:
-    my-app-deploy-1836737632:
-      loadBalancer:
-        servers:
-          - url: "http://172.19.0.4:80"
+          - url: "http://172.19.0.3:80"

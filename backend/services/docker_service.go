@@ -195,6 +195,57 @@ func DeleteContainer(ctx context.Context, id string) error {
 	return nil
 }
 
+// GetContainerEnv ดึง Environment Variables ที่คอนเทนเนอร์นี้ใช้อยู่
+func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	inspect, err := cli.ContainerInspect(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return inspect.Config.Env, nil
+}
+
+// UpdateContainerEnv สร้างคอนเทนเนอร์ใหม่พร้อมใส่ Env ใหม่ โดยไม่ต้อง Build โค้ดใหม่
+func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	inspect, err := cli.ContainerInspect(ctx, oldID)
+	if err != nil {
+		return "", fmt.Errorf("ไม่พบคอนเทนเนอร์เดิม: %w", err)
+	}
+
+	imageName := inspect.Config.Image
+	labels := inspect.Config.Labels
+	targetPort := "80"
+	for k, v := range labels {
+		if strings.HasSuffix(k, "loadbalancer.server.port") {
+			targetPort = v
+			break
+		}
+	}
+
+	// ลบคอนเทนเนอร์เดิมทิ้ง
+	_ = cli.ContainerStop(ctx, oldID, container.StopOptions{})
+	_ = cli.ContainerRemove(ctx, oldID, container.RemoveOptions{Force: true})
+
+	// รันตัวใหม่ขึ้นมาแทนทันทีด้วย Image เดิม แต่ใส่ Env ใหม่
+	newID, _, err := CreateAndStartContainer(ctx, imageName, newEnvVars, targetPort)
+	if err != nil {
+		return "", fmt.Errorf("เริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
+	}
+
+	return newID, nil
+}
+
 func GetContainerLogs(ctx context.Context, containerID string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

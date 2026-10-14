@@ -147,3 +147,46 @@ func RedeployContainer(c *gin.Context){
 	}()
 	c.JSON(http.StatusOK, gin.H{"message": "กำลังดึงโค้ดและ Re-deploy"})
 }
+
+func GetContainerEnv(c *gin.Context) {
+	id := c.Param("id")
+	ctx := context.Background()
+	envList, err := services.GetContainerEnv(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ดึง Env ไม่สำเร็จ: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"env": envList})
+}
+
+func UpdateContainerEnv(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		EnvVars string `json:"env_vars"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	var deploy models.Deployment
+	if err := config.DB.Where("container_id LIKE ?", id+"%").First(&deploy).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลใน Database"})
+		return
+	}
+
+	ctx := context.Background()
+	newID, err := services.UpdateContainerEnv(ctx, deploy.ContainerID, req.EnvVars)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "อัปเดต Env ไม่สำเร็จ: " + err.Error()})
+		return
+	}
+
+	config.DB.Model(&deploy).Updates(map[string]interface{}{
+		"container_id": newID[:12],
+		"status":       "running",
+		"last_error":   "",
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "อัปเดต Environment Variables และรีสตาร์ตสำเร็จ!", "new_id": newID[:12]})
+}
