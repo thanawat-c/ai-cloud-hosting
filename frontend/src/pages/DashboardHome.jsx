@@ -1,6 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database } from 'lucide-react';
 
+// แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
+const getShortAppName = (rawName, cleanName) => {
+  const nameToParse = cleanName || rawName?.replace(/\s*\((Backend|Frontend)\)$/, '') || '';
+  if (!nameToParse) return 'Unknown App';
+  
+  // ตัด .git ออก
+  let cleaned = nameToParse.replace(/\.git\/?$/, '');
+  
+  // ตัด URL protocol และ domain ออก เช่น https://github.com/user/
+  if (cleaned.includes('/')) {
+    const parts = cleaned.split('/').filter(Boolean);
+    if (parts.length > 0) {
+      cleaned = parts[parts.length - 1]; // เอาส่วนท้ายสุดที่เป็นชื่อ repo
+    }
+  }
+  return cleaned;
+};
+
 const DashboardHome = () => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -287,10 +305,10 @@ const DashboardHome = () => {
                             )}
 
                             <span 
-                              className="text-xs font-semibold text-slate-900 truncate max-w-[180px] sm:max-w-[240px] md:max-w-[300px]" 
-                              title={item.name}
+                              className="text-xs font-bold text-slate-900 tracking-tight" 
+                              title={`Repository: ${item.name}`}
                             >
-                              {item.clean_name || item.name?.replace(/\s*\((Backend|Frontend)\)$/, '')}
+                              {getShortAppName(item.name, item.clean_name)}
                             </span>
                           </div>
 
