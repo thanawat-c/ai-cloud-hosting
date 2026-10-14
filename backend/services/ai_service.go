@@ -99,11 +99,16 @@ GitHub Repository: %s
    - หากตรวจพบ "yarn.lock": ให้ใช้ 'yarn install'
    - หากใช้ npm: ใช้ 'npm install --legacy-peer-deps'
 
-3. วิธีการ Build สำหรับ Monorepo (มีโฟลเดอร์ frontend/ และ backend/):
-   - ห้ามใช้ flag --prefix
-   - ให้ใช้ WORKDIR เข้าไปทำงานในโฟลเดอร์นั้นๆ โดยตรง
-   - ให้เลือกรัน Frontend เพื่อให้ผู้ใช้งานเข้าชมหน้าเว็บผ่าน Browser พอร์ต 80 ได้ โดยหากเป็น Nuxt หรือ Vite/React เมื่อ build เสร็จแล้ว ให้ copy โฟลเดอร์ผลลัพธ์ (เช่น .output/public หรือ dist) ไปใส่ใน nginx:alpine
-   - ข้อสำคัญของ Nginx: ต้องมีคำสั่ง 'RUN rm -rf /usr/share/nginx/html/*' ก่อนทำการ COPY ไฟล์เว็บลงไป เพื่อไม่ให้ติดหน้า Default Nginx
+3. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/ (สำคัญที่สุด):
+   - หากโปรเจกต์มีโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend เท่านั้น!
+   - ห้ามสั่ง build backend (ห้ามสั่ง go build หรือติดตั้ง backend ใดๆ ทั้งสิ้น) เพราะเป้าหมายคือให้ผู้ใช้เข้าใช้งาน UI ทาง Web Browser
+   - ให้สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:20-alpine builder:
+     WORKDIR /app/frontend
+     COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
+     (ติดตั้ง package manager ให้ตรง แล้ว install dependencies)
+     COPY frontend/ ./
+     (สั่ง build หรือ generate เช่น pnpm run generate หรือ pnpm run build)
+   - Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/* จากนั้น COPY ไฟล์ output จากการ build (.output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/ EXPOSE 80
 
 4. ข้อห้ามสำคัญ:
    - ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
