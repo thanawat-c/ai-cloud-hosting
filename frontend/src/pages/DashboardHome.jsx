@@ -1,0 +1,369 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle } from 'lucide-react';
+
+const DashboardHome = () => {
+  const [containers, setContainers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({});
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [currentLogs, setCurrentLogs] = useState('');
+  const [logLoading, setLogLoading] = useState(false);
+  const [activeContainerName, setActiveContainerName] = useState('');
+
+  const fetchContainers = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/containers');
+      const data = await response.json();
+      if (response.ok) {
+        const containerList = data || [];
+        setContainers(containerList);
+        
+        // Fetch stats for all running containers asynchronously
+        containerList.forEach(async (c) => {
+          if (c.state === 'running') {
+            try {
+              const statRes = await fetch(`http://localhost:8080/api/containers/${c.id}/stats`);
+              if (statRes.ok) {
+                const statData = await statRes.json();
+                setStats(prev => ({ ...prev, [c.id]: statData }));
+              }
+            } catch (err) {
+              console.error("Failed to fetch stats for", c.id, err);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error("โหลดข้อมูลล้มเหลว:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // หุ้มด้วยฟังก์ชัน async เพื่อเลี่ยง Linter ที่แจ้งเตือนเรื่องการเรียก State ทันทีใน Effect
+    const initFetch = async () => {
+      await fetchContainers();
+    };
+    initFetch();
+    
+    // ตั้งเวลาให้รีเฟรชอัตโนมัติทุกๆ 5 วินาที
+    const interval = setInterval(() => {
+      fetchContainers();
+    }, 5000);
+    
+    return () => clearInterval(interval); // เคลียร์ timer ตอนปิดหน้าเว็บ
+  }, [fetchContainers]);
+
+  const handleAction = async (id, action) => {
+    try {
+      setLoading(true); // ปรับสถานะเป็นโหลดตอนกำลังกด Stop/Start เพื่อไม่ให้ผู้ใช้กดรัวๆ
+      await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
+      await fetchContainers(); // ดึงข้อมูลใหม่หลังทำเสร็จ
+    } catch (error) {
+      console.error("ดำเนินการล้มเหลว:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลทั้งหมดจะหายไป")) return;
+    try {
+      await fetch(`http://localhost:8080/api/containers/${id}`, { method: 'DELETE' });
+      fetchContainers();
+    } catch (error) {
+      console.log("ลบข้อมูลล้มเหลว", error);
+    }
+  };
+
+  const handleViewLogs = async (id, name) => {
+    setLogModalOpen(true);
+    setLogLoading(true);
+    setActiveContainerName(name);
+    setCurrentLogs('');
+    try {
+      const response = await fetch(`http://localhost:8080/api/containers/${id}/logs`);
+      const text = await response.text();
+      setCurrentLogs(text || 'No logs available for this container.');
+    } catch (error) {
+      console.error("Failed to fetch logs:", error);
+      setCurrentLogs('Error fetching logs. Please try again.');
+    } finally {
+      setLogLoading(false);
+    }
+  };
+
+    // ฟังก์ชันสั่ง Re-deploy
+  // ฟังก์ชันสั่ง Re-deploy
+  const handleRedeploy = async (id) => {
+    if (!confirm("คุณต้องการดึงโค้ดใหม่และ Re-deploy เซิร์ฟเวอร์นี้ใช่ไหม? (ระบบจะรันตัวใหม่ซ้อนขึ้นมาให้ก่อน)")) return;
+    
+    // 1. 🪄 หลอกตาผู้ใช้! สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที
+    setContainers(prev => prev.map(c => 
+      c.id === id ? { ...c, state: 'redeploying' } : c
+    ));
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/containers/${id}/redeploy`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        // 2. 🕵️‍♂️ สั่งให้เบราว์เซอร์แอบยิงไปเช็คข้อมูลใหม่ทุกๆ 3 วินาที (Polling)
+        const checkInterval = setInterval(() => {
+          fetchContainers(); 
+          // (หมายเหตุ: เมื่อเซิร์ฟเวอร์ใหม่สร้างเสร็จ ID จะเปลี่ยนไป ทำให้ตัวเดิมที่หมุนๆ อยู่หายไปเองโดยอัตโนมัติ!)
+        }, 3000);
+
+        // ตั้งเวลาไว้ว่าถ้าเกิน 2 นาที (120000ms) ให้เลิกเช็ค (กันระบบค้างถ้า Build พัง)
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          fetchContainers(); // รีเฟรชรอบสุดท้ายเผื่อกลับไปเป็น running
+        }, 120000);
+
+      } else {
+        const errData = await response.json();
+        alert("Error: " + errData.error);
+        fetchContainers(); // ถ้าพัง ก็ให้รีเฟรชกลับเป็นสถานะเดิม
+      }
+    } catch (error) {
+      alert("Error: " + error.message);
+      fetchContainers();
+    }
+  };
+
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 border-4 border-blue-200 rounded-full animate-ping"></div>
+        <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+      </div>
+      <p className="text-slate-500 font-medium animate-pulse">Connecting to Docker Engine...</p>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 relative overflow-hidden">
+      {/* Decorative Blob */}
+      <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
+            <Server className="w-6 h-6 text-blue-500" />
+            Active Servers
+          </h3>
+          <p className="text-slate-500 text-sm mt-1">Manage your deployed applications and microservices.</p>
+        </div>
+        <span className="bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-full shadow-sm flex items-center gap-2">
+          <Activity className="w-4 h-4 text-blue-500" />
+          Total Running: {containers.length}
+        </span>
+      </div>
+
+      {containers.length === 0 ? (
+        <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-slate-100/50 backdrop-blur-sm relative z-10">
+          <div className="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-6 border border-slate-100">
+            <Box className="w-10 h-10 text-slate-300" />
+          </div>
+          <h4 className="text-xl font-semibold text-slate-700 mb-2">No servers deployed yet</h4>
+          <p className="text-slate-500 max-w-sm mx-auto">
+            Your dashboard is looking a bit empty. Head over to the New Deploy menu to launch your first application.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto relative z-10">
+          <div className="inline-block min-w-full align-middle">
+            <div className="overflow-hidden bg-white border border-slate-200 shadow-sm rounded-2xl">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50/50">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">ID</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider max-w-[200px]">Name</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider max-w-[200px]">Image</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Status</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Resources</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">URL</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {containers.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-200 group">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center text-sm font-mono text-slate-500">
+                          <Terminal className="w-4 h-4 mr-2 text-slate-400 flex-shrink-0" />
+                          {item.id}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-slate-900 truncate max-w-[250px]" title={item.name}>{item.name}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[200px]" title={item.image}>
+                          {item.image}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {item.state === 'redeploying' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-blue-50 text-blue-700 border-blue-200">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            Updating...
+                          </span>
+                        ) : item.state === 'failed' || item.last_error ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-rose-100 text-rose-800 border-rose-300">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              Failed
+                            </span>
+                            {item.last_error && (
+                              <button
+                                onClick={() => alert("🔴 รายละเอียด Error จากระบบ:\n\n" + item.last_error)}
+                                className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-2 py-0.5 rounded font-medium underline transition-colors shadow-sm"
+                              >
+                                View Error
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border
+                            ${item.state === 'running' 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                            {item.state === 'running' ? (
+                              <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                              </span>
+                            ) : (
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                            )}
+                            {item.state === 'running' ? 'Running' : 'Stopped'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {item.state === 'running' && stats[item.id] ? (
+                          <div className="flex flex-col gap-1 text-[11px] font-mono text-slate-500">
+                            <div className="flex items-center gap-1.5" title="CPU Usage">
+                              <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                              <span className={stats[item.id].cpu_percent > 80 ? 'text-rose-500 font-semibold' : ''}>
+                                {stats[item.id].cpu_percent.toFixed(2)}%
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5" title="Memory Usage">
+                              <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>
+                                {stats[item.id].memory_mb.toFixed(0)}MB / {(stats[item.id].memory_limit / 1024).toFixed(1)}GB
+                              </span>
+                            </div>
+                          </div>
+                        ) : item.state === 'running' ? (
+                          <div className="text-[11px] text-slate-400 animate-pulse font-mono">Loading...</div>
+                        ) : (
+                          <div className="text-[11px] text-slate-400 font-mono">-</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {item.state === 'running' && item.domain_name ? (
+                          <a 
+                            href={`http://${item.domain_name}`} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg"
+                          >
+                            Visit Site <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Offline</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-1">
+                        {item.state === 'running' ? (
+                          <button 
+                            onClick={() => handleAction(item.id, 'stop')} 
+                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Stop Server"
+                          >
+                            <Square className="w-4 h-4 fill-current" />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleAction(item.id, 'start')} 
+                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            title="Start Server"
+                          >
+                            <Play className="w-4 h-4 fill-current" />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleViewLogs(item.id, item.name)} 
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="View Logs"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {handleRedeploy(item.id)}}
+                          className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Re-deploy (อัปเดตโค้ดใหม่)"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+
+                        <button 
+                          onClick={() => handleDelete(item.id)} 
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Delete Server"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+
+      {/* Log Modal */}
+      {logModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-700 flex flex-col h-[80vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+              <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                <Terminal className="w-5 h-5 text-blue-400" />
+                Logs: {activeContainerName}
+              </h3>
+              <button 
+                onClick={() => setLogModalOpen(false)} 
+                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 bg-[#0d1117] font-mono text-sm text-slate-300">
+              {logLoading ? (
+                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <p className="text-slate-500 animate-pulse">Fetching latest logs...</p>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap break-words">{currentLogs}</pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default DashboardHome;

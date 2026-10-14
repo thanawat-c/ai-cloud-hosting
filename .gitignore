@@ -1,0 +1,34 @@
+# Binaries & Executables
+backend/ai-cloud-api
+backend/*.exe
+backend/*.dll
+backend/*.so
+backend/*.dylib
+
+# Environment variables & secrets
+.env
+backend/.env
+frontend/.env
+*.env
+*.env.local
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# Temporary / Log files
+*.log
+scratch/
