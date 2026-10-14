@@ -11,17 +11,16 @@ import (
 	"google.golang.org/api/option"
 )
 
-// 1. เพิ่มพารามิเตอร์ buildDir เข้ามา
-
-func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string) (string, error) {
+// GenerateDockerfile generates a production Dockerfile for either the full project or a specific target folder (e.g. backend/ or frontend/)
+func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, targetDir string) (string, string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
-		return "", fmt.Errorf("ไม่พบ GEMINI_API_KEY ในระบบ")
+		return "", "", fmt.Errorf("ไม่พบ GEMINI_API_KEY ในระบบ")
 	}
 
 	aiClient, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return "", fmt.Errorf("เชื่อมต่อ AI ไม่สำเร็จ: %w", err)
+		return "", "", fmt.Errorf("เชื่อมต่อ AI ไม่สำเร็จ: %w", err)
 	}
 	defer aiClient.Close()
 
@@ -79,8 +78,42 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string) (s
 
 	model := aiClient.GenerativeModel("gemini-2.5-flash")
 
+	var targetInstruction string
+	if targetDir == "backend" {
+		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] เท่านั้น!
+- สแกนดูภาษาของ backend (เช่น Go, Python, Node.js)
+- หากเป็น Go: ให้ดูว่า main.go อยู่ที่ไหน เช่นถ้าอยู่ใน ./backend/cmd/api หรือ ./backend ให้ cd/WORKDIR เข้าไป build ให้ถูกที่ เช่น:
+  FROM golang:1.23-alpine AS builder
+  WORKDIR /app/backend
+  COPY backend/go.mod backend/go.sum ./
+  RUN go mod download
+  COPY backend/ ./
+  RUN CGO_ENABLED=0 go build -o /app/server ./cmd/api || CGO_ENABLED=0 go build -o /app/server .
+  FROM alpine:latest
+  WORKDIR /app
+  COPY --from=builder /app/server .
+  EXPOSE 8080
+  CMD ["/app/server"]
+- EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 3000, 5000)`
+	} else if targetDir == "frontend" {
+		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] เท่านั้น!
+- สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:22-alpine builder:
+  WORKDIR /app/frontend
+  COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
+  RUN npm install -g pnpm@9 && pnpm install --no-frozen-lockfile
+  COPY frontend/ ./
+  RUN pnpm run generate || pnpm run build
+- Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/* จากนั้น COPY ไฟล์ output จากการ build (.output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/
+- EXPOSE 80`
+	} else {
+		targetInstruction = `หากพบโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend พอร์ต 80`
+	}
+
 	prompt := fmt.Sprintf(`คุณคือ DevOps Engineer ระดับ Senior ทำหน้าที่สร้าง Dockerfile สำหรับ Production ให้ถูกต้อง แม่นยำ และทำงานได้จริง 100%%
 GitHub Repository: %s
+
+[เป้าหมายการ Build รอบนี้]:
+%s
 
 [รายชื่อโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์]:
 %s
@@ -88,42 +121,21 @@ GitHub Repository: %s
 [เนื้อหาไฟล์ Config สำคัญที่อ่านได้จากในโปรเจกต์จริง]:
 %s
 
-คำแนะนำและกฎเหล็กในการสร้าง Dockerfile:
-1. การเลือก Base Image และเวอร์ชัน (ห้ามเดา ให้ดูจากเนื้อหาไฟล์ Config ด้านบน):
-   - หากเป็น Go: ตรวจสอบบรรทัด 'go x.xx' ใน go.mod เสมอ ถ้าโค้ดต้องการ Go 1.22+ หรือ 1.23+ ให้ใช้ 'FROM golang:1.23-alpine' หรือ 'FROM golang:alpine' ห้ามใช้ golang:1.20 หรือ golang:1.21 เด็ดขาด
-   - หากเป็น Node.js / Frontend: ให้ใช้ 'FROM node:22-alpine' เป็น builder เสมอ เพื่อรองรับ ECMAScript ฟีเจอร์ใหม่ๆ (เช่น Set.prototype.difference ของ Nuxt 4 และ Vite)
-   - หากเป็น Python: ดูจาก requirements.txt หรือ pyproject.toml ใช้ 'FROM python:3.11-slim' หรือ 'FROM python:3.12-slim'
+คำแนะนำและกฎเหล็ก:
+1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ใช้ 1.23-alpine, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
+2. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
+3. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+		repoURL, targetInstruction, fileListStr, configsStr)
 
-2. เรื่อง Package Manager:
-   - หากตรวจพบ "pnpm-lock.yaml": ห้ามใช้ npm เด็ดขาด! ให้เปิดใช้งาน pnpm ด้วย corepack หรือลง pnpm@9 โดยใช้คำสั่ง:
-     RUN npm install -g pnpm@9 && pnpm install --no-frozen-lockfile
-   - หากตรวจพบ "yarn.lock": ให้ใช้ 'yarn install'
-   - หากใช้ npm: ใช้ 'npm install --legacy-peer-deps'
-
-3. วิธีการ Build สำหรับ Monorepo ที่มีโฟลเดอร์ frontend/ (สำคัญที่สุด):
-   - หากโปรเจกต์มีโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend เท่านั้น!
-   - ห้ามสั่ง build backend (ห้ามสั่ง go build หรือติดตั้ง backend ใดๆ ทั้งสิ้น) เพราะเป้าหมายคือให้ผู้ใช้เข้าใช้งาน UI ทาง Web Browser
-   - ให้สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:22-alpine builder:
-     WORKDIR /app/frontend
-     COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
-     RUN npm install -g pnpm@9 && pnpm install --no-frozen-lockfile
-     COPY frontend/ ./
-     RUN pnpm run generate || pnpm run build
-   - Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/* จากนั้น COPY ไฟล์ output จากการ build (มองหา .output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/ EXPOSE 80
-
-4. ข้อห้ามสำคัญ:
-   - ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
-		repoURL, fileListStr, configsStr)
-
-	fmt.Println("🤖 กำลังส่ง Prompt พร้อมรายชื่อไฟล์ไปยัง AI...")
+	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
 
 	aiResp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
-		return "", fmt.Errorf("AI สร้างโค้ดไม่สำเร็จ: %w", err)
+		return "", "80", fmt.Errorf("AI สร้างโค้ดไม่สำเร็จ: %w", err)
 	}
 
 	if len(aiResp.Candidates) == 0 || aiResp.Candidates[0].Content == nil {
-		return "", fmt.Errorf("AI ตอบกลับมาเป็นค่าว่าง (No Content)")
+		return "", "80", fmt.Errorf("AI ตอบกลับมาเป็นค่าว่าง (No Content)")
 	}
 
 	var finalDockerfile string
@@ -136,7 +148,6 @@ GitHub Repository: %s
 	// Clean up markdown syntax if AI still outputs it
 	finalDockerfile = strings.TrimSpace(finalDockerfile)
 	if strings.HasPrefix(finalDockerfile, "```") {
-		// ตัดบรรทัดแรกทิ้ง เช่น ```dockerfile หรือ ```docker หรือ ```
 		if idx := strings.Index(finalDockerfile, "\n"); idx != -1 {
 			finalDockerfile = finalDockerfile[idx+1:]
 		}
@@ -146,5 +157,18 @@ GitHub Repository: %s
 	}
 	finalDockerfile = strings.TrimSpace(finalDockerfile)
 
-	return finalDockerfile, nil
+	// แกะหา EXPOSE port จาก Dockerfile
+	exposedPort := "80"
+	for _, line := range strings.Split(finalDockerfile, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "EXPOSE ") {
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				exposedPort = parts[1]
+				break
+			}
+		}
+	}
+
+	return finalDockerfile, exposedPort, nil
 }

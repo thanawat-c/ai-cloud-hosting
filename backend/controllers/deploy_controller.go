@@ -43,8 +43,112 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
+		// ตรวจสอบว่าโปรเจกต์นี้มีทั้ง frontend/ และ backend/ แยกกันหรือไม่ (Monorepo)
+		frontendDir := filepath.Join(buildDir, "frontend")
+		backendDir := filepath.Join(buildDir, "backend")
+		hasFrontend := false
+		hasBackend := false
+		if fi, err := os.Stat(frontendDir); err == nil && fi.IsDir() {
+			hasFrontend = true
+		}
+		if fi, err := os.Stat(backendDir); err == nil && fi.IsDir() {
+			hasBackend = true
+		}
+
+		if hasFrontend && hasBackend {
+			logChan <- "⚡ ตรวจพบ Monorepo (มีทั้ง frontend/ และ backend/)! ระบบจะทำการแยก Deploy 2 Services ให้โดยอัตโนมัติ...\n"
+
+			// --- 1. DEPLOY BACKEND FIRST ---
+			logChan <- "\n=========================================\n"
+			logChan <- "🚀 ขั้นตอนที่ 1/2: กำลังเตรียม Deploy [Backend Service]...\n"
+			logChan <- "=========================================\n"
+
+			backendDockerfile := filepath.Join(buildDir, "Dockerfile.backend")
+			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "backend")
+			if err != nil {
+				logChan <- "Error: AI สร้าง Dockerfile Backend ไม่สำเร็จ: " + err.Error() + "\n"
+				return
+			}
+			os.WriteFile(backendDockerfile, []byte(aiBackendDocker), 0644)
+			// เอาไปเขียนทับ Dockerfile หลักชั่วคราวเพื่อ build backend
+			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiBackendDocker), 0644)
+
+			logChan <- "กำลัง Build Backend Image...\n"
+			backendImageName, err := services.BuildImage(ctx, buildDir, logChan)
+			if err != nil {
+				logChan <- "Error: " + err.Error() + "\n"
+				return
+			}
+
+			logChan <- fmt.Sprintf("กำลังรัน Backend Container (พอร์ต %s)...\n", backendPort)
+			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort)
+			if err != nil {
+				logChan <- "Error: " + err.Error() + "\n"
+				return
+			}
+
+			config.DB.Create(&models.Deployment{
+				RepoURL:     req.RepoURL + " (Backend)",
+				ImageName:   backendImageName,
+				ContainerID: beContainerID[:12],
+				DomainName:  beDomainName,
+				Status:      "running",
+				ForceAI:     req.ForceAI,
+			})
+			logChan <- fmt.Sprintf("✅ Backend รันสำเร็จที่: http://%s\n", beDomainName)
+
+			// --- 2. DEPLOY FRONTEND AND INJECT BACKEND URL ---
+			logChan <- "\n=========================================\n"
+			logChan <- "🎨 ขั้นตอนที่ 2/2: กำลังเตรียม Deploy [Frontend Service]...\n"
+			logChan <- fmt.Sprintf("🔗 ผูก API Endpoint: NUXT_PUBLIC_API_URL=http://%s\n", beDomainName)
+			logChan <- "=========================================\n"
+
+			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "frontend")
+			if err != nil {
+				logChan <- "Error: AI สร้าง Dockerfile Frontend ไม่สำเร็จ: " + err.Error() + "\n"
+				return
+			}
+			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
+
+			logChan <- "กำลัง Build Frontend Image...\n"
+			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan)
+			if err != nil {
+				logChan <- "Error: " + err.Error() + "\n"
+				return
+			}
+
+			// ส่ง URL ของ Backend เข้าไปให้ Frontend ทั้งรูปแบบ Vite, Nuxt และ Next
+			feEnvVars := req.EnvVars
+			if feEnvVars != "" {
+				feEnvVars += "\n"
+			}
+			feEnvVars += fmt.Sprintf("NUXT_PUBLIC_API_URL=http://%s\nVITE_API_URL=http://%s\nAPI_URL=http://%s", beDomainName, beDomainName, beDomainName)
+
+			logChan <- "กำลังรัน Frontend Container...\n"
+			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
+			if err != nil {
+				logChan <- "Error: " + err.Error() + "\n"
+				return
+			}
+
+			config.DB.Create(&models.Deployment{
+				RepoURL:     req.RepoURL + " (Frontend)",
+				ImageName:   frontendImageName,
+				ContainerID: feContainerID[:12],
+				DomainName:  feDomainName,
+				Status:      "running",
+				ForceAI:     req.ForceAI,
+			})
+
+			logChan <- fmt.Sprintf("\n🎉 สำเร็จครบทั้ง 2 ระบบ!\nBackend API: http://%s\nFrontend UI: http://%s\n", beDomainName, feDomainName)
+			logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", feDomainName, feContainerID[:12])
+			return
+		}
+
+		// --- สำหรับโปรเจกต์เดี่ยวทั่วไป (ไม่ใช่ Monorepo) ---
 		dockerfilePath := filepath.Join(buildDir, "Dockerfile")
-		
+		targetPort := "80"
+
 		if _, err := os.Stat(dockerfilePath); err == nil && !req.ForceAI {
 			logChan <- "พบ Dockerfile ในโปรเจกต์ของลูกค้า ข้ามขั้นตอน AI!\n"
 		} else {
@@ -53,12 +157,13 @@ func TestDeploy(c *gin.Context) {
 			} else {
 				logChan <- "ไม่พบ Dockerfile กำลังให้ AI ช่วยเขียนให้...\n"
 			}
-			aiDocker, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir)
+			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
+			targetPort = port
 			os.WriteFile(dockerfilePath, []byte(aiDocker), 0644)
 			logChan <- "AI เขียน Dockerfile เสร็จแล้ว!\n"
 		}
@@ -71,15 +176,15 @@ func TestDeploy(c *gin.Context) {
 			return
 		}
 
-		logChan <- "กำลังเปิดเซิร์ฟเวอร์จำลอง (Container) และผูกโดเมน...\n"
-		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars)
+		logChan <- fmt.Sprintf("กำลังเปิดเซิร์ฟเวอร์จำลอง (Container) พอร์ต %s และผูกโดเมน...\n", targetPort)
+		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
 			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, ImageName: imageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 
-		// --- เริ่มส่วนที่แทรกใหม่ (บันทึกลง Database) ---
+		// บันทึกลง Database
 		newDeploy := models.Deployment{
 			RepoURL:     req.RepoURL,
 			ImageName:   imageName,
@@ -89,14 +194,12 @@ func TestDeploy(c *gin.Context) {
 			ForceAI:     req.ForceAI,
 		}
 
-		// สั่ง GORM ให้บันทึกตัวแปร newDeploy ลงฐานข้อมูล
 		if err := config.DB.Create(&newDeploy).Error; err != nil {
 			logChan <- "คำเตือน: รันเซิร์ฟเวอร์สำเร็จ แต่บันทึกลงฐานข้อมูลพัง: " + err.Error() + "\n"
 		} else {
 			logChan <- "บันทึกประวัติการ Deploy ลงฐานข้อมูลเรียบร้อยแล้ว!\n"
 		}
 
-		// เมื่อเสร็จทั้งหมด เราส่งข้อมูลโดเมนแนบไปด้วยแบบเนียนๆ
 		logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", domainName, containerID[:12])
 	}()
 

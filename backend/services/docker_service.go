@@ -74,12 +74,16 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string) (st
 }
 
 // CreateAndStartContainer creates a container from the image and starts it, returning ID and public port
-func CreateAndStartContainer(ctx context.Context, imageName string, envVars string) (string, string, error) {
+func CreateAndStartContainer(ctx context.Context, imageName string, envVars string, targetPort string) (string, string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", "", fmt.Errorf("เชื่อมต่อ Docker ไม่สำเร็จ: %w", err)
 	}
 	defer cli.Close()
+
+	if targetPort == "" {
+		targetPort = "80"
+	}
 
 	// 1. สร้างชื่อโดเมนเท่ๆ จากชื่อโปรเจกต์ เช่น my-app-deploy-1234.localhost
 	domainName := imageName + ".localhost"
@@ -96,7 +100,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		Labels: map[string]string{
 			"traefik.enable": "true", // บอก Traefik ว่าให้ช่วยจัดการตัวนี้หน่อย
 			"traefik.http.routers." + imageName + ".rule": "Host(`" + domainName + "`)", // กำหนดชื่อโดเมน
-			"traefik.http.services." + imageName + ".loadbalancer.server.port": "80", // พอร์ตภายในของ Nginx
+			"traefik.http.services." + imageName + ".loadbalancer.server.port": targetPort, // พอร์ตภายในตาม Service จริง
 		},
 	}, &container.HostConfig{
 		NetworkMode: "ai-cloud-network", // พระเอก! จับมันยัดเข้าเครือข่ายเดียวกับ Traefik
@@ -297,11 +301,13 @@ func RedeployApp(ctx context.Context, id string, repoURL string, imageName strin
 	defer os.RemoveAll(buildDir)
 
 	dockerfilePath := filepath.Join(buildDir, "Dockerfile")
+	targetPort := "80"
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceAI {
 		if forceAI {
 			fmt.Println("✨ เปิดโหมด Force AI Override: กำลังให้ AI เขียน Dockerfile ทับของเดิม...")
 		}
-		aiDocker, _ := GenerateDockerfile(ctx, repoURL, buildDir)
+		aiDocker, port, _ := GenerateDockerfile(ctx, repoURL, buildDir, "")
+		targetPort = port
 		os.WriteFile(dockerfilePath, []byte(aiDocker), 0644)
 	}
 
@@ -316,7 +322,7 @@ func RedeployApp(ctx context.Context, id string, repoURL string, imageName strin
 		return "", fmt.Errorf("สร้าง Image ใหม่ไม่สำเร็จ: %w", err)
 	}
 
-	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars)
+	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars, targetPort)
 	if err != nil {
 		return "", fmt.Errorf("เปิดเซิฟร์เวอร์ใหม่ไม่สำเร็จ: %w", err)
 	}
