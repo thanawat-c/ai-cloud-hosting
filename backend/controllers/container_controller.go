@@ -59,15 +59,16 @@ func GetContainers(c *gin.Context) {
 		}
 
 		results = append(results, map[string]interface{}{
-			"id":           d.ContainerID,
-			"name":         d.RepoURL, 
-			"clean_name":   cleanName,
-			"service_type": serviceType,
-			"image":        d.ImageName,
-			"state":        actualState,
-			"status":       "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
-			"domain_name":  d.DomainName,
-			"last_error":   d.LastError,
+			"id":            d.ContainerID,
+			"deployment_id": d.ID,
+			"name":          d.RepoURL, 
+			"clean_name":    cleanName,
+			"service_type":  serviceType,
+			"image":         d.ImageName,
+			"state":         actualState,
+			"status":        "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
+			"domain_name":   d.DomainName,
+			"last_error":    d.LastError,
 		})
 	}
 	
@@ -98,6 +99,21 @@ func StartContainer(c *gin.Context) {
 func DeleteContainer(c *gin.Context) {
 	id := c.Param("id")
 	ctx := context.Background()
+
+	// 1. ลองหาใน Database ก่อนว่าตรงกับ ID (Primary Key) หรือ ContainerID
+	var dep models.Deployment
+	if err := config.DB.Where("id = ? OR container_id = ?", id, id).First(&dep).Error; err == nil {
+		// ถ้ามี ContainerID อยู่จริงใน Docker ให้สั่งลบ Docker container
+		if dep.ContainerID != "" {
+			_ = services.DeleteContainer(ctx, dep.ContainerID)
+		}
+		// ปรับสถานะเป็น deleted ใน database
+		config.DB.Model(&dep).Update("status", "deleted")
+		c.JSON(http.StatusOK, gin.H{"message": "ลบเซิร์ฟเวอร์เรียบร้อย"})
+		return
+	}
+
+	// 2. ถ้าหาใน Database ไม่เจอ ให้ลองลบจาก Docker โดยตรง
 	if err := services.DeleteContainer(ctx, id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ลบไม่สำเร็จ: " + err.Error()})
 		return

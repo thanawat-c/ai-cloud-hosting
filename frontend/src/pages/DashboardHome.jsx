@@ -99,13 +99,22 @@ const DashboardHome = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลทั้งหมดจะหายไป")) return;
+  const handleDelete = async (identifier) => {
+    if (!identifier) {
+      alert("ไม่พบรหัสของเซิร์ฟเวอร์นี้");
+      return;
+    }
+    if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลและประวัตินี้จะถูกลบออก")) return;
     try {
-      await fetch(`http://localhost:8080/api/containers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        alert(errJson.error || "เกิดข้อผิดพลาดในการลบ");
+      }
       fetchContainers();
     } catch (error) {
       console.log("ลบข้อมูลล้มเหลว", error);
+      alert("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ");
     }
   };
 
@@ -456,7 +465,7 @@ const DashboardHome = () => {
                             <RefreshCw className="w-3.5 h-3.5" />
                           </button>
                           <button 
-                            onClick={() => handleDelete(item.id)} 
+                            onClick={() => handleDelete(item.id || item.deployment_id)} 
                             className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             title="Delete Server"
                           >
