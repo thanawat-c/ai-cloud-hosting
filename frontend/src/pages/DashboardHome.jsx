@@ -105,16 +105,21 @@ const DashboardHome = () => {
       return;
     }
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลและประวัตินี้จะถูกลบออก")) return;
+    
+    // อัปเดตหน้าจอทันที (Optimistic UI) ลบแถวนี้ออกจากตารางทันทีไม่ต้องรอ
+    setContainers(prev => prev.filter(c => c.id !== identifier && c.deployment_id !== identifier));
+
     try {
       const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
         alert(errJson.error || "เกิดข้อผิดพลาดในการลบ");
       }
-      fetchContainers();
+      await fetchContainers();
     } catch (error) {
       console.log("ลบข้อมูลล้มเหลว", error);
       alert("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ");
+      await fetchContainers();
     }
   };
 

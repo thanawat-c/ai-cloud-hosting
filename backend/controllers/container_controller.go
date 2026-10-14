@@ -14,9 +14,9 @@ import (
 )
 
 func GetContainers(c *gin.Context) {
-	// 1. ดึงประวัติทั้งหมดจาก Database
+	// 1. ดึงประวัติทั้งหมดจาก Database (ไม่รวมที่ลบทิ้งไปแล้ว)
 	var deployments []models.Deployment
-	config.DB.Order("created_at desc").Find(&deployments)
+	config.DB.Where("status != ?", "deleted").Order("created_at desc").Find(&deployments)
 
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())
@@ -29,16 +29,22 @@ func GetContainers(c *gin.Context) {
 
 	var results []map[string]interface{}
 	for _, d := range deployments {
-		actualState, exists := dockerStateMap[d.ContainerID]
+		if d.Status == "deleted" {
+			continue
+		}
 
-		if d.Status == "failed" {
-			actualState = "failed"
-		} else if !exists {
-			actualState = "deleted"
-			config.DB.Model(&d).Update("status", "deleted")
-		} else {
-			if d.Status != actualState {
-				config.DB.Model(&d).Update("status", actualState)
+		actualState := d.Status
+		if d.ContainerID != "" {
+			state, exists := dockerStateMap[d.ContainerID]
+			if exists {
+				actualState = state
+				if d.Status != actualState {
+					config.DB.Model(&d).Update("status", actualState)
+				}
+			} else if d.Status != "failed" {
+				actualState = "deleted"
+				config.DB.Model(&d).Update("status", "deleted")
+				continue
 			}
 		}
 
