@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText, Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DeployForm = () => {
@@ -15,9 +15,45 @@ const DeployForm = () => {
   const [envVars, setEnvVars] = useState("");
   const [forceAi, setForceAi] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [databases, setDatabases] = useState([]);
+  const [selectedDbId, setSelectedDbId] = useState('');
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/databases')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDatabases(data);
+      })
+      .catch(err => console.error('Failed to load databases in deploy form:', err));
+  }, []);
+
+  const handleSelectDatabase = (dbId) => {
+    setSelectedDbId(dbId);
+    if (!dbId) return;
+
+    const db = databases.find(d => String(d.id) === String(dbId));
+    if (!db) return;
+
+    // แทนที่หรือเพิ่ม DATABASE_URL
+    const dbUrlLine = `DATABASE_URL=${db.internal_url}`;
+    const lines = envVars.split('\n');
+    const existingIndex = lines.findIndex(line => line.trim().startsWith('DATABASE_URL='));
+
+    if (existingIndex >= 0) {
+      lines[existingIndex] = dbUrlLine;
+      setEnvVars(lines.join('\n'));
+    } else {
+      const newEnv = envVars.trim() ? `${envVars.trim()}\n${dbUrlLine}` : dbUrlLine;
+      setEnvVars(newEnv);
+    }
+
+    toast.success(`เชื่อมต่อกับ Database "${db.name}" สำเร็จ!`, {
+      description: 'ระบบระบุ DATABASE_URL (Internal Container URL) ให้ใน Environment Variables แล้ว',
+    });
+  };
 
   // นับจำนวนการตั้งค่า Advanced ที่มีการใส่ค่าไว้
-  const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi)].filter(Boolean).length;
+  const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi), Boolean(selectedDbId)].filter(Boolean).length;
 
   const handleDeploy = async () => {
     const trimmedUrl = repoUrl.trim();
@@ -162,7 +198,39 @@ const DeployForm = () => {
 
             {showAdvanced && (
               <div className="p-4 pt-2 border-t border-slate-200/70 space-y-4 bg-white/70 animate-in fade-in duration-200">
-                {/* 1. Environment Variables */}
+                {/* 1. Managed Database Attachment */}
+                {databases.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-indigo-600" />
+                        เชื่อมต่อ Managed Database <span className="text-[11px] font-normal text-slate-400">(Auto-Inject DATABASE_URL)</span>
+                      </span>
+                      {selectedDbId && (
+                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                          Auto-Linked
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      value={selectedDbId}
+                      onChange={(e) => handleSelectDatabase(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-slate-700"
+                    >
+                      <option value="">-- ไม่เชื่อมต่อ (ระบุ DATABASE_URL เอง หรือไม่ใช้ DB) --</option>
+                      {databases.map(db => (
+                        <option key={db.id} value={db.id}>
+                          📦 {db.name} (PostgreSQL 16 - Host Port :{db.host_port}) [{db.status}]
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      💡 เมื่อเลือก ระบบจะกรอก DATABASE_URL (Internal Container URL) ลงใน .env ให้อัตโนมัติ
+                    </p>
+                  </div>
+                )}
+
+                {/* 2. Environment Variables */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-slate-500" />

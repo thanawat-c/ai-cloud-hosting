@@ -21,5 +21,12 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/containers/:id/env", controllers.GetContainerEnv)
 		api.POST("/containers/:id/env", controllers.UpdateContainerEnv)
 		api.POST("/system/prune", controllers.PruneImages)
+
+		// Managed Databases
+		api.GET("/databases", controllers.GetDatabases)
+		api.POST("/databases", controllers.CreateDatabase)
+		api.POST("/databases/:id/start", controllers.StartDatabase)
+		api.POST("/databases/:id/stop", controllers.StopDatabase)
+		api.DELETE("/databases/:id", controllers.DeleteDatabase)
 	}
 }

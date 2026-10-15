@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
@@ -43,6 +43,13 @@ const DashboardHome = () => {
   const [activeErrorContainerName, setActiveErrorContainerName] = useState('');
   const [activeErrorDetails, setActiveErrorDetails] = useState('');
   const [dismissAlert, setDismissAlert] = useState(false);
+
+  // Managed Databases State
+  const [databases, setDatabases] = useState([]);
+  const [createDbModalOpen, setCreateDbModalOpen] = useState(false);
+  const [newDbName, setNewDbName] = useState('');
+  const [creatingDb, setCreatingDb] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null);
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -137,20 +144,113 @@ const DashboardHome = () => {
     }
   }, []);
 
+  const fetchDatabases = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8080/api/databases');
+      if (res.ok) {
+        const data = await res.json();
+        setDatabases(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch databases:', err);
+    }
+  }, []);
+
   useEffect(() => {
-    // หุ้มด้วยฟังก์ชัน async เพื่อเลี่ยง Linter ที่แจ้งเตือนเรื่องการเรียก State ทันทีใน Effect
     const initFetch = async () => {
-      await fetchContainers();
+      await Promise.all([fetchContainers(), fetchDatabases()]);
     };
     initFetch();
     
-    // ตั้งเวลาให้รีเฟรชอัตโนมัติทุกๆ 5 วินาที
     const interval = setInterval(() => {
       fetchContainers();
+      fetchDatabases();
     }, 5000);
     
-    return () => clearInterval(interval); // เคลียร์ timer ตอนปิดหน้าเว็บ
-  }, [fetchContainers]);
+    return () => clearInterval(interval);
+  }, [fetchContainers, fetchDatabases]);
+
+  const handleCreateDatabase = async (e) => {
+    e.preventDefault();
+    if (!newDbName.trim()) {
+      toast.warning('กรุณาระบุชื่อ Database');
+      return;
+    }
+    setCreatingDb(true);
+    const toastId = toast.loading('กำลังสร้าง Database และผูก Persistent Volume...');
+    try {
+      const res = await fetch('http://localhost:8080/api/databases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newDbName.trim(), type: 'postgres' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('สร้างฐานข้อมูลสำเร็จ!', {
+          id: toastId,
+          description: `PostgreSQL พร้อมใช้งานที่พอร์ตภายนอก ${data.database.host_port}`,
+        });
+        setNewDbName('');
+        setCreateDbModalOpen(false);
+        fetchDatabases();
+      } else {
+        toast.error('สร้าง Database ล้มเหลว', {
+          id: toastId,
+          description: data.error || 'Unknown error',
+        });
+      }
+    } catch (err) {
+      toast.error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', {
+        id: toastId,
+        description: err.message,
+      });
+    } finally {
+      setCreatingDb(false);
+    }
+  };
+
+  const handleToggleDb = async (id, currentStatus) => {
+    const action = currentStatus === 'running' ? 'stop' : 'start';
+    const toastId = toast.loading(action === 'stop' ? 'กำลังหยุด Database...' : 'กำลังเริ่ม Database...');
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${id}/${action}`, { method: 'POST' });
+      if (res.ok) {
+        toast.success(action === 'stop' ? 'หยุด Database สำเร็จ' : 'เริ่ม Database สำเร็จ', { id: toastId });
+        fetchDatabases();
+      } else {
+        const data = await res.json();
+        toast.error('ดำเนินการล้มเหลว', { id: toastId, description: data.error });
+      }
+    } catch (err) {
+      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+    }
+  };
+
+  const handleDeleteDb = async (id, name) => {
+    if (!window.confirm(`คุณแน่ใจหรือไม่ที่จะลบ Database "${name}"? ข้อมูลใน Volume จะถูกลบทิ้งอย่างถาวร`)) {
+      return;
+    }
+    const toastId = toast.loading('กำลังลบ Database และเคลียร์ Volume...');
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('ลบ Database สำเร็จ', { id: toastId });
+        fetchDatabases();
+      } else {
+        const data = await res.json();
+        toast.error('ลบล้มเหลว', { id: toastId, description: data.error });
+      }
+    } catch (err) {
+      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+    }
+  };
+
+  const handleCopyUrl = (text, key) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    toast.success('คัดลอก Connection URL แล้ว!', { description: 'พร้อมนำไปแปะใน .env หรือโปรแกรมฐานข้อมูล' });
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   const handleAction = async (id, action, containerName) => {
     try {
@@ -620,6 +720,176 @@ const DashboardHome = () => {
       )}
       </div>
 
+      {/* Managed Databases Section */}
+      <div className="mt-10">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <Database className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-800">Managed Databases</h2>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                    PostgreSQL 16
+                  </span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    {databases.length} / 5 DBs
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  ฐานข้อมูลพร้อมใช้ทันที • จำกัด RAM 512 MB ต่อก้อน • Persistent Volume ปลอดภัยข้อมูลไม่หาย
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setCreateDbModalOpen(true)}
+              disabled={databases.length >= 5}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>สร้าง Database ใหม่</span>
+            </button>
+          </div>
+
+          {databases.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto mb-3">
+                <Database className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-700">ยังไม่มี Managed Database</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                สร้างฐานข้อมูล PostgreSQL 16 สำหรับใช้ร่วมกับแอปพลิเคชันของคุณได้ใน 1 คลิก พร้อมจำกัดทรัพยากรเพื่อไม่ให้กินสเปกเครื่อง
+              </p>
+              <button
+                onClick={() => setCreateDbModalOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>สร้าง Database ก้อนแรก</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {databases.map((db) => {
+                const isRunning = db.status === 'running';
+                return (
+                  <div 
+                    key={db.id}
+                    className="p-5 rounded-xl border border-slate-200/90 bg-slate-50/40 hover:bg-white hover:border-indigo-200 transition-all shadow-sm flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`p-2 rounded-xl ${isRunning ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <Database className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                              {db.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`inline-block w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                              <span className="text-[11px] font-medium text-slate-500 capitalize">{db.status}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleToggleDb(db.id, db.status)}
+                            title={isRunning ? "หยุด Database (Stop)" : "เริ่มทำงาน (Start)"}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              isRunning 
+                                ? 'text-amber-600 hover:bg-amber-50' 
+                                : 'text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDb(db.id, db.name)}
+                            title="ลบ Database (Delete)"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Specs Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[10px] font-semibold text-slate-600">
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100/60">
+                          ⚡ 512 MB Cap
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100/60">
+                          🔌 Port: {db.host_port}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                          💾 Named Volume
+                        </span>
+                      </div>
+
+                      {/* Connection Strings */}
+                      <div className="space-y-2.5">
+                        {/* Internal URL */}
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                            <span className="font-medium text-indigo-700">Internal URL (สำหรับ App ในระบบ):</span>
+                            <button
+                              onClick={() => handleCopyUrl(db.internal_url, `internal-${db.id}`)}
+                              className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
+                            >
+                              {copiedKey === `internal-${db.id}` ? (
+                                <><Check className="w-3 h-3 text-emerald-600" /> คัดลอกแล้ว</>
+                              ) : (
+                                <><Copy className="w-3 h-3" /> คัดลอก</>
+                              )}
+                            </button>
+                          </div>
+                          <div className="p-2 rounded-lg bg-slate-900 text-slate-300 font-mono text-[11px] truncate select-all border border-slate-800">
+                            {db.internal_url}
+                          </div>
+                        </div>
+
+                        {/* External URL */}
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                            <span className="font-medium text-slate-600">External URL (DBeaver / TablePlus):</span>
+                            <button
+                              onClick={() => handleCopyUrl(db.external_url, `external-${db.id}`)}
+                              className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
+                            >
+                              {copiedKey === `external-${db.id}` ? (
+                                <><Check className="w-3 h-3 text-emerald-600" /> คัดลอกแล้ว</>
+                              ) : (
+                                <><Copy className="w-3 h-3" /> คัดลอก</>
+                              )}
+                            </button>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white text-slate-700 font-mono text-[11px] truncate select-all border border-slate-200 shadow-inner">
+                            {db.external_url}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>DB: <code className="text-slate-600 font-mono">{db.database_name}</code></span>
+                      <span>User: <code className="text-slate-600 font-mono">{db.username}</code></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Env Variables Modal */}
       {envModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -760,6 +1030,107 @@ const DashboardHome = () => {
                 ปิดหน้าต่าง
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Database Modal */}
+      {createDbModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">สร้าง Managed Database ใหม่</h3>
+                  <p className="text-xs text-slate-500">PostgreSQL 16 Alpine • พร้อมใช้ใน 1 คลิก</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setCreateDbModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDatabase}>
+              <div className="p-6 space-y-4">
+                {/* Database Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    ชื่อ Database Identifier <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newDbName}
+                    onChange={(e) => setNewDbName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    placeholder="เช่น prod-db, my-app-db"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    ใช้เฉพาะตัวอักษรภาษาอังกฤษพิมพ์เล็ก ตัวเลข ขีดกลาง (-) และขีดล่าง (_)
+                  </p>
+                </div>
+
+                {/* Resource Summary Specs Card */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <p className="text-xs font-semibold text-slate-700">ข้อกำหนดทรัพยากร (Resource Allocation):</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">RAM HARD CAP</div>
+                      <div className="text-xs font-bold text-indigo-600 mt-0.5">512 MB Max</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">CPU LIMIT</div>
+                      <div className="text-xs font-bold text-slate-700 mt-0.5">1.0 Core</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">PERSISTENT STORAGE</div>
+                      <div className="text-xs font-bold text-emerald-600 mt-0.5">Docker Volume</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">DOCKER NETWORK</div>
+                      <div className="text-xs font-bold text-slate-700 mt-0.5">ai-cloud-network</div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 pt-1 leading-relaxed">
+                    💡 ระบบจะสร้าง Volume ถาวรแยกเฉพาะก้อน และผูกพอร์ตภายนอกอัตโนมัติ (เริ่มที่ 5433)
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCreateDbModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingDb || !newDbName.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                >
+                  {creatingDb ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>กำลังสร้าง Instance...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>สร้าง Database ทันที</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

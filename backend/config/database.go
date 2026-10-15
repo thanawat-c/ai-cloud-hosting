@@ -26,8 +26,8 @@ func ConnectDatabase() {
 	}
 
 	// ฟีเจอร์เด็ดของ GORM: Auto Migrate
-	// มันจะเช็คว่าใน Postgres มีตาราง deployments หรือยัง? ถ้ายัง มันจะสร้างให้เองอัตโนมัติ!
-	err = database.AutoMigrate(&models.Deployment{})
+	// สร้างตาราง deployments และ managed_databases ให้อัตโนมัติ
+	err = database.AutoMigrate(&models.Deployment{}, &models.ManagedDatabase{})
 	if err != nil {
 		log.Fatal("❌ สร้างตารางอัตโนมัติล้มเหลว: ", err)
 	}
