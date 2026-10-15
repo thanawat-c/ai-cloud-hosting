@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing } from 'lucide-react';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
 const getShortAppName = (rawName, cleanName) => {
@@ -42,6 +42,33 @@ const DashboardHome = () => {
   const [activeErrorContainerName, setActiveErrorContainerName] = useState('');
   const [activeErrorDetails, setActiveErrorDetails] = useState('');
 
+  // Notification State
+  const prevStatesRef = useRef({});
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+  );
+
+  const requestNotificationPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      alert('เบราว์เซอร์นี้ไม่รองรับ Desktop Notification');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        setNotificationsEnabled(true);
+        new Notification('🔔 เปิดการแจ้งเตือนสำเร็จ', {
+          body: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง (Crashed)',
+        });
+      } else {
+        setNotificationsEnabled(false);
+        alert('กรุณาอนุญาต Notification ใน Browser Settings เพื่อรับการแจ้งเตือน');
+      }
+    } catch (err) {
+      console.error('Error requesting notification permission:', err);
+    }
+  };
+
   const fetchContainers = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:8080/api/containers');
@@ -50,6 +77,25 @@ const DashboardHome = () => {
         const containerList = data || [];
         setContainers(containerList);
         
+        // ตรวจจับ Container ที่เพิ่งดับ เพื่อส่ง Desktop Alert
+        const prevStates = prevStatesRef.current;
+        containerList.forEach(c => {
+          const key = c.id || String(c.deployment_id);
+          const prevState = prevStates[key];
+          const currentState = c.state;
+
+          if (prevState === 'running' && (currentState === 'exited' || currentState === 'failed')) {
+            const shortName = getShortAppName(c.name, c.clean_name);
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              new Notification(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
+                body: `Service: ${c.name} หยุดทำงานกะทันหัน (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
+              });
+            }
+          }
+          prevStates[key] = currentState;
+        });
+        prevStatesRef.current = prevStates;
+
         // Fetch stats for all running containers asynchronously
         containerList.forEach(async (c) => {
           if (c.state === 'running') {
@@ -239,6 +285,8 @@ const DashboardHome = () => {
     </div>
   );
 
+  const crashedContainers = containers.filter(c => c.state === 'exited' || c.state === 'failed');
+
   return (
     <>
       <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 relative overflow-hidden">
@@ -246,7 +294,7 @@ const DashboardHome = () => {
       <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
             <Server className="w-6 h-6 text-blue-500" />
@@ -254,11 +302,69 @@ const DashboardHome = () => {
           </h3>
           <p className="text-slate-500 text-sm mt-1">Manage your deployed applications and microservices.</p>
         </div>
-        <span className="bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-full shadow-sm flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-500" />
-          Total Running: {containers.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={requestNotificationPermission}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs ${
+              notificationsEnabled
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+            title={notificationsEnabled ? 'เปิดการแจ้งเตือน Desktop Alert อยู่' : 'คลิกเพื่อเปิดแจ้งเตือนบนหน้าจอเมื่อมี Server ดับ'}
+          >
+            {notificationsEnabled ? (
+              <BellRing className="w-3.5 h-3.5 text-emerald-600" />
+            ) : (
+              <Bell className="w-3.5 h-3.5 text-slate-400" />
+            )}
+            {notificationsEnabled ? 'Desktop Alert: เปิด' : 'เปิดแจ้งเตือน Desktop'}
+          </button>
+
+          <span className="bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-full shadow-sm flex items-center gap-2">
+            <Activity className="w-4 h-4 text-blue-500" />
+            Running: {containers.filter(c => c.state === 'running').length} / {containers.length}
+          </span>
+        </div>
       </div>
+
+      {/* Alert Banner สำหรับแจ้งเตือนทันทีเมื่อตรวจพบ Server ดับ (Crashed / Exited) */}
+      {crashedContainers.length > 0 && (
+        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-rose-50/95 border border-rose-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start md:items-center gap-3">
+            <div className="p-2.5 bg-rose-100 rounded-xl text-rose-600 shrink-0 mt-0.5 md:mt-0">
+              <AlertTriangle className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-rose-950 text-sm flex items-center gap-2">
+                ตรวจพบเซิร์ฟเวอร์ขัดข้อง ({crashedContainers.length} Service ดับลงกระทันหัน)
+              </h4>
+              <p className="text-xs text-rose-700 mt-0.5">
+                มีคอนเทนเนอร์ที่หยุดทำงานเอง (Crashed) กรุณาตรวจสอบ Log สาเหตุเพื่อแก้ไขตัวแปร Environment หรือโค้ด
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
+            {crashedContainers.map(c => (
+              <button
+                key={c.id || c.deployment_id}
+                onClick={() => {
+                  if (c.last_error) {
+                    setActiveErrorDetails(c.last_error);
+                    setActiveErrorContainerName(c.name);
+                    setErrorModalOpen(true);
+                  } else {
+                    handleViewLogs(c.id, c.name);
+                  }
+                }}
+                className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                ดูสาเหตุ ({getShortAppName(c.name, c.clean_name)})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {containers.length === 0 ? (
         <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-slate-100/50 backdrop-blur-sm relative z-10">
@@ -350,23 +456,31 @@ const DashboardHome = () => {
                             <RefreshCw className="w-2.5 h-2.5 animate-spin" />
                             Updating
                           </span>
-                        ) : item.state === 'failed' || item.last_error ? (
+                        ) : item.state === 'failed' || item.last_error || item.state === 'exited' ? (
                           <div className="flex flex-col gap-1 items-start">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-rose-100 text-rose-800 border-rose-300">
                               <AlertTriangle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
-                              Failed
+                              {item.state === 'exited' ? 'Crashed' : 'Failed'}
                             </span>
-                            {item.last_error && (
+                            {item.last_error ? (
                               <button
                                 onClick={() => {
                                   setActiveErrorDetails(item.last_error);
                                   setActiveErrorContainerName(item.name);
                                   setErrorModalOpen(true);
                                 }}
-                                className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1"
+                                className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1 shadow-2xs"
                               >
                                 <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                ดู Error
+                                ดูสาเหตุที่ดับ
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleViewLogs(item.id, item.name)}
+                                className="text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1"
+                              >
+                                <FileText className="w-2.5 h-2.5 shrink-0" />
+                                ดู Log
                               </button>
                             )}
                           </div>
@@ -374,14 +488,14 @@ const DashboardHome = () => {
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border
                             ${item.state === 'running' 
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                              : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                             {item.state === 'running' ? (
                               <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                               </span>
                             ) : (
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0"></span>
                             )}
                             {item.state === 'running' ? 'Running' : 'Stopped'}
                           </span>

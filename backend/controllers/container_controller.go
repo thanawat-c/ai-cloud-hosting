@@ -34,12 +34,21 @@ func GetContainers(c *gin.Context) {
 		}
 
 		actualState := d.Status
+		lastError := d.LastError
 		if d.ContainerID != "" {
 			state, exists := dockerStateMap[d.ContainerID]
 			if exists {
 				actualState = state
 				if d.Status != actualState {
 					config.DB.Model(&d).Update("status", actualState)
+				}
+				// ถ้า Container ดับ (exited) แล้วยังไม่มี last_error ให้แอบดึง log ล่าสุดมาใส่ให้ทันที!
+				if actualState == "exited" && lastError == "" {
+					crashLog, err := services.GetContainerLogs(context.Background(), d.ContainerID)
+					if err == nil && strings.TrimSpace(crashLog) != "" {
+						lastError = strings.TrimSpace(crashLog)
+						config.DB.Model(&d).Update("last_error", lastError)
+					}
 				}
 			} else if d.Status != "failed" {
 				actualState = "deleted"
@@ -74,7 +83,7 @@ func GetContainers(c *gin.Context) {
 			"state":         actualState,
 			"status":        "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
 			"domain_name":   d.DomainName,
-			"last_error":    d.LastError,
+			"last_error":    lastError,
 		})
 	}
 	

@@ -121,7 +121,9 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		},
 	}, &container.HostConfig{
 		NetworkMode: "ai-cloud-network", // พระเอก! จับมันยัดเข้าเครือข่ายเดียวกับ Traefik
-		// PublishAllPorts: true, (ลบทิ้งได้เลย เราไม่ต้องสุ่มพอร์ตมั่วๆ ออกมาข้างนอกอีกแล้ว ปลอดภัยขึ้นเยอะ!)
+		RestartPolicy: container.RestartPolicy{
+			Name: "unless-stopped", // ถ้าดับเองเพราะ Crash หรือ Reboot ให้พยายามสตาร์ตกลับขึ้นมาใหม่อัตโนมัติ
+		},
 		Resources: container.Resources{
 			Memory: 256 * 1024 * 1024,
 		},
