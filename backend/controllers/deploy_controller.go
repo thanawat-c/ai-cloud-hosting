@@ -105,9 +105,14 @@ func TestDeploy(c *gin.Context) {
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
 
 			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100% ไม่พึ่งคำสั่ง printf ใน Dockerfile
+			// ใช้ resolver 127.0.0.11 (Docker DNS) และ set ตัวแปร เพื่อไม่ให้ Nginx แครชตอนสตาร์ตถ้า backend ดับอยู่
 			nginxConf := fmt.Sprintf(`server {
     listen 80;
     server_name localhost;
+
+    # ใช้ Docker Internal DNS ในการ Resolve ชื่อเครื่อง
+    resolver 127.0.0.11 valid=30s;
+    set $backend_upstream "http://%s";
 
     location / {
         root   /usr/share/nginx/html;
@@ -116,7 +121,7 @@ func TestDeploy(c *gin.Context) {
     }
 
     location /api/ {
-        proxy_pass http://%s;
+        proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
