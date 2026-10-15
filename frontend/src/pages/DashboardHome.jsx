@@ -93,10 +93,22 @@ const DashboardHome = () => {
 
           if (prevState === 'running' && (currentState === 'exited' || currentState === 'failed')) {
             const shortName = getShortAppName(c.name, c.clean_name);
+
+            // 1. แจ้งเตือนแบบ Toast บนหน้าจอเว็บทันที (ไม่พลาดแน่นอน)
+            toast.error(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
+              description: `Service หยุดทำงานกะทันหัน (${currentState}) กรุณาตรวจสอบ Log`,
+              duration: 8000,
+            });
+
+            // 2. แจ้งเตือนแบบ Desktop Notification บน macOS/Windows
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-              new Notification(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
-                body: `Service: ${c.name} หยุดทำงานกะทันหัน (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
-              });
+              try {
+                new Notification(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
+                  body: `Service: ${c.name} หยุดทำงานกะทันหัน (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
+                });
+              } catch (notifErr) {
+                console.error('Desktop Notification error:', notifErr);
+              }
             }
           }
           prevStates[key] = currentState;
