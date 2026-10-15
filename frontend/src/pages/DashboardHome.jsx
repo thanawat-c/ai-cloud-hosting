@@ -133,13 +133,26 @@ const DashboardHome = () => {
     return () => clearInterval(interval); // เคลียร์ timer ตอนปิดหน้าเว็บ
   }, [fetchContainers]);
 
-  const handleAction = async (id, action) => {
+  const handleAction = async (id, action, containerName) => {
     try {
       setLoading(true); // ปรับสถานะเป็นโหลดตอนกำลังกด Stop/Start เพื่อไม่ให้ผู้ใช้กดรัวๆ
-      await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
+      const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // หาก Start ไม่สำเร็จ หรือแอปพลิเคชัน Crash ดับลงทันที ให้เด้ง Modal สาเหตุให้ดูทันที!
+        const errorTitle = data.error || `คำสั่ง ${action} ไม่สำเร็จ`;
+        const errorDetails = data.details || errorTitle;
+        setActiveErrorContainerName(containerName || id);
+        setActiveErrorDetails(errorDetails);
+        setErrorModalOpen(true);
+      }
       await fetchContainers(); // ดึงข้อมูลใหม่หลังทำเสร็จ
     } catch (error) {
       console.error("ดำเนินการล้มเหลว:", error);
+      setActiveErrorContainerName(containerName || id);
+      setActiveErrorDetails(error.message);
+      setErrorModalOpen(true);
     } finally {
       setLoading(false);
     }
@@ -285,7 +298,7 @@ const DashboardHome = () => {
     </div>
   );
 
-  const crashedContainers = containers.filter(c => c.state === 'exited' || c.state === 'failed');
+  const crashedContainers = containers.filter(c => c.state === 'exited' || c.state === 'failed' || c.state === 'restarting');
 
   return (
     <>
@@ -345,22 +358,31 @@ const DashboardHome = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
             {crashedContainers.map(c => (
-              <button
-                key={c.id || c.deployment_id}
-                onClick={() => {
-                  if (c.last_error) {
-                    setActiveErrorDetails(c.last_error);
-                    setActiveErrorContainerName(c.name);
-                    setErrorModalOpen(true);
-                  } else {
-                    handleViewLogs(c.id, c.name);
-                  }
-                }}
-                className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-              >
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                ดูสาเหตุ ({getShortAppName(c.name, c.clean_name)})
-              </button>
+              <div key={c.id || c.deployment_id} className="inline-flex items-center gap-1.5 bg-rose-100/60 p-1 rounded-xl">
+                <button
+                  onClick={() => {
+                    if (c.last_error) {
+                      setActiveErrorDetails(c.last_error);
+                      setActiveErrorContainerName(c.name);
+                      setErrorModalOpen(true);
+                    } else {
+                      handleViewLogs(c.id, c.name);
+                    }
+                  }}
+                  className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-medium px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  ดูสาเหตุ ({getShortAppName(c.name, c.clean_name)})
+                </button>
+                <button
+                  onClick={() => handleAction(c.id, 'start', c.name)}
+                  className="text-xs bg-white hover:bg-slate-50 text-slate-700 font-medium px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-rose-200 shadow-xs"
+                  title="ลองสตาร์ตใหม่อีกครั้ง"
+                >
+                  <Play className="w-3 h-3 text-emerald-600 fill-current" />
+                  ลอง Start
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -434,7 +456,7 @@ const DashboardHome = () => {
 
                           <span className="text-[10px] text-slate-400 font-mono truncate">
                             {item.service_type === 'backend' || item.name?.includes('(Backend)') 
-                              ? '⚙️ API Server (ตั้งค่า DB_URL ที่นี่)' 
+                              ? '⚙️ API Server' 
                               : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
                               ? '🌐 Web UI'
                               : '📦 Standalone'}
@@ -456,11 +478,15 @@ const DashboardHome = () => {
                             <RefreshCw className="w-2.5 h-2.5 animate-spin" />
                             Updating
                           </span>
-                        ) : item.state === 'failed' || item.last_error || item.state === 'exited' ? (
+                        ) : item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting' ? (
                           <div className="flex flex-col gap-1 items-start">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-rose-100 text-rose-800 border-rose-300">
-                              <AlertTriangle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
-                              {item.state === 'exited' ? 'Crashed' : 'Failed'}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                              item.state === 'restarting'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-rose-100 text-rose-800 border-rose-300'
+                            }`}>
+                              <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                              {item.state === 'restarting' ? 'Crash Looping' : item.state === 'exited' ? 'Crashed' : 'Failed'}
                             </span>
                             {item.last_error ? (
                               <button
@@ -547,7 +573,7 @@ const DashboardHome = () => {
                         <div className="inline-flex items-center justify-end gap-0.5">
                           {item.state === 'running' ? (
                             <button 
-                              onClick={() => handleAction(item.id, 'stop')} 
+                              onClick={() => handleAction(item.id, 'stop', item.name)} 
                               className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-colors"
                               title="Stop Server"
                             >
@@ -555,7 +581,7 @@ const DashboardHome = () => {
                             </button>
                           ) : (
                             <button 
-                              onClick={() => handleAction(item.id, 'start')} 
+                              onClick={() => handleAction(item.id, 'start', item.name)} 
                               className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
                               title="Start Server"
                             >

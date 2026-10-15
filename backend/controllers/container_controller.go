@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
 
+	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,8 +44,8 @@ func GetContainers(c *gin.Context) {
 				if d.Status != actualState {
 					config.DB.Model(&d).Update("status", actualState)
 				}
-				// ถ้า Container ดับ (exited) แล้วยังไม่มี last_error ให้แอบดึง log ล่าสุดมาใส่ให้ทันที!
-				if actualState == "exited" && lastError == "" {
+				// ถ้า Container ดับ (exited หรือ restarting) ให้ดึง log ล่าสุดมาใส่ทันที
+				if actualState == "exited" || actualState == "restarting" {
 					crashLog, err := services.GetContainerLogs(context.Background(), d.ContainerID)
 					if err == nil && strings.TrimSpace(crashLog) != "" {
 						lastError = strings.TrimSpace(crashLog)
@@ -103,12 +105,53 @@ func StopContainer(c *gin.Context) {
 
 func StartContainer(c *gin.Context) {
 	id := c.Param("id")
-	if err := services.StartContainer(context.Background(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Start ไม่สำเร็จ: " + err.Error()})
+	ctx := context.Background()
+
+	// 1. สั่ง Docker ให้เริ่มรัน Container
+	if err := services.StartContainer(ctx, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Docker เริ่มรัน Container ไม่สำเร็จ: " + err.Error(),
+			"details": err.Error(),
+		})
 		return
 	}
-	config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Update("status", "running")
-	c.JSON(http.StatusOK, gin.H{"message": "เซิร์ฟเวอร์กลับมาทำงานแล้ว"})
+
+	// 2. หน่วงเวลา 1.2 วินาที เพื่อเช็คว่าเมื่อแอปพลิเคชันบูตขึ้นมาแล้ว อยู่รอด หรือ Crash ดับทันที
+	time.Sleep(1200 * time.Millisecond)
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err == nil {
+		defer cli.Close()
+		inspect, err := cli.ContainerInspect(ctx, id)
+		if err == nil && inspect.State != nil {
+			if inspect.State.Status != "running" || inspect.State.Restarting || inspect.State.ExitCode != 0 {
+				// แอปดับทันที! ดึง Error Log ล่าสุดมาแสดงผลให้ผู้ใช้ทราบสาเหตุชัดเจน
+				logs, _ := services.GetContainerLogs(ctx, id)
+				cleanLog := strings.TrimSpace(logs)
+				if cleanLog == "" {
+					cleanLog = fmt.Sprintf("แอปพลิเคชันปิดการทำงานทันที (Exit Code: %d)", inspect.State.ExitCode)
+				}
+
+				config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Updates(map[string]interface{}{
+					"status":     "exited",
+					"last_error": cleanLog,
+				})
+
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   fmt.Sprintf("เริ่มเซิร์ฟเวอร์ไม่สำเร็จ! แอปพลิเคชันดับลงทันที (Exit Code: %d)", inspect.State.ExitCode),
+					"details": cleanLog,
+					"state":   "exited",
+				})
+				return
+			}
+		}
+	}
+
+	config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Updates(map[string]interface{}{
+		"status":     "running",
+		"last_error": "",
+	})
+	c.JSON(http.StatusOK, gin.H{"message": "เซิร์ฟเวอร์เริ่มทำงานเรียบร้อยแล้ว"})
 }
 
 func DeleteContainer(c *gin.Context) {
