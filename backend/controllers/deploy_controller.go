@@ -96,7 +96,8 @@ func TestDeploy(c *gin.Context) {
 			logChan <- fmt.Sprintf("🔗 ผูก API Endpoint: NUXT_PUBLIC_API_URL=http://%s\n", beDomainName)
 			logChan <- "=========================================\n"
 
-			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName)
+			backendInternalEndpoint := fmt.Sprintf("%s:%s", backendImageName, backendPort)
+			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName, backendInternalEndpoint)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Frontend ไม่สำเร็จ: " + err.Error() + "\n"
 				return

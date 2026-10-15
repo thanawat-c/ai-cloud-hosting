@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 )
@@ -102,6 +103,14 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	}
 
 	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik
+	networkConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"ai-cloud-network": {
+				Aliases: []string{imageName},
+			},
+		},
+	}
+
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
 		Env:   envList,
@@ -116,7 +125,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		Resources: container.Resources{
 			Memory: 256 * 1024 * 1024,
 		},
-	}, nil, nil, "")
+	}, networkConfig, nil, "")
 
 	if err != nil {
 		return "", "", fmt.Errorf("สร้าง Container ไม่สำเร็จ: %w", err)
