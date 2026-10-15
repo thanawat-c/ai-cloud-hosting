@@ -42,42 +42,7 @@ const DashboardHome = () => {
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [activeErrorContainerName, setActiveErrorContainerName] = useState('');
   const [activeErrorDetails, setActiveErrorDetails] = useState('');
-
-  // Prune Images State
-  const [isPruning, setIsPruning] = useState(false);
-
-  const handlePruneImages = async () => {
-    setIsPruning(true);
-    const toastId = toast.loading('กำลังทำความสะอาด Docker images ที่ไม่ได้ใช้งาน...');
-    try {
-      const response = await fetch('http://localhost:8080/api/system/prune', {
-        method: 'POST',
-      });
-      const data = await response.json();
-      if (response.ok) {
-        const mb = parseFloat(data.space_reclaimed_mb) || 0;
-        const desc = mb > 0 
-          ? `คืนพื้นที่ดิสก์ได้ ${data.space_reclaimed_mb} MB`
-          : 'ระบบสะอาดเรียบร้อย ไม่มี Docker Images ตกค้าง';
-        toast.success('ทำความสะอาด Docker สำเร็จ!', {
-          id: toastId,
-          description: desc,
-        });
-      } else {
-        toast.error('การล้าง Docker ล้มเหลว', {
-          id: toastId,
-          description: data.error || 'Unknown error',
-        });
-      }
-    } catch (err) {
-      toast.error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', {
-        id: toastId,
-        description: err.message,
-      });
-    } finally {
-      setIsPruning(false);
-    }
-  };
+  const [dismissAlert, setDismissAlert] = useState(false);
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -363,22 +328,8 @@ const DashboardHome = () => {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={handlePruneImages}
-            disabled={isPruning}
-            className="px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 cursor-pointer"
-            title="ล้างขยะและ Docker Images ที่ไม่ได้ใช้งาน (Dangling images) เพื่อคืนพื้นที่ดิสก์"
-          >
-            {isPruning ? (
-              <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            )}
-            {isPruning ? 'กำลังล้าง...' : 'ล้างขยะ Docker'}
-          </button>
-
-          <button
             onClick={requestNotificationPermission}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
               notificationsEnabled
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                 : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -401,50 +352,28 @@ const DashboardHome = () => {
       </div>
 
       {/* Alert Banner สำหรับแจ้งเตือนทันทีเมื่อตรวจพบ Server ดับ (Crashed / Exited) */}
-      {crashedContainers.length > 0 && (
-        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-rose-50/95 border border-rose-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start md:items-center gap-3">
-            <div className="p-2.5 bg-rose-100 rounded-xl text-rose-600 shrink-0 mt-0.5 md:mt-0">
+      {crashedContainers.length > 0 && !dismissAlert && (
+        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-rose-50/90 border border-rose-200 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-100 rounded-xl text-rose-600 shrink-0">
               <AlertTriangle className="w-5 h-5 animate-pulse" />
             </div>
             <div>
               <h4 className="font-semibold text-rose-950 text-sm flex items-center gap-2">
-                ตรวจพบเซิร์ฟเวอร์ขัดข้อง ({crashedContainers.length} Service ดับลงกระทันหัน)
+                ตรวจพบเซิร์ฟเวอร์ขัดข้อง ({crashedContainers.length} Service ดับลงกะทันหัน)
               </h4>
               <p className="text-xs text-rose-700 mt-0.5">
-                มีคอนเทนเนอร์ที่หยุดทำงานเอง (Crashed) กรุณาตรวจสอบ Log สาเหตุเพื่อแก้ไขตัวแปร Environment หรือโค้ด
+                โปรดคลิกที่ปุ่ม <span className="font-semibold text-rose-800">[🔴 Crashed Logs]</span> ในตารางด้านล่างเพื่อดูสาเหตุ หรือกดปุ่มสตาร์ตเพื่อเริ่มทำงานใหม่
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
-            {crashedContainers.map(c => (
-              <div key={c.id || c.deployment_id} className="inline-flex items-center gap-1.5 bg-rose-100/60 p-1 rounded-xl">
-                <button
-                  onClick={() => {
-                    if (c.last_error) {
-                      setActiveErrorDetails(c.last_error);
-                      setActiveErrorContainerName(c.name);
-                      setErrorModalOpen(true);
-                    } else {
-                      handleViewLogs(c.id, c.name);
-                    }
-                  }}
-                  className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-medium px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
-                >
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  ดูสาเหตุ ({getShortAppName(c.name, c.clean_name)})
-                </button>
-                <button
-                  onClick={() => handleAction(c.id, 'start', c.name)}
-                  className="text-xs bg-white hover:bg-slate-50 text-slate-700 font-medium px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-rose-200 shadow-xs"
-                  title="ลองสตาร์ตใหม่อีกครั้ง"
-                >
-                  <Play className="w-3 h-3 text-emerald-600 fill-current" />
-                  ลอง Start
-                </button>
-              </div>
-            ))}
-          </div>
+          <button
+            onClick={() => setDismissAlert(true)}
+            className="text-slate-400 hover:text-slate-600 hover:bg-rose-100/60 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+            title="ปิดการแจ้งเตือนนี้"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
