@@ -16,9 +16,12 @@ import (
 )
 
 func GetContainers(c *gin.Context) {
-	// 1. ดึงประวัติทั้งหมดจาก Database (ไม่รวมที่ลบทิ้งไปแล้ว)
+	// ล้างประวัติ Deployment ผีที่ไม่มี Container จริงๆ (เช่น พิมพ์ URL มั่วแล้ว Clone ไม่ผ่าน)
+	config.DB.Where("container_id = '' OR container_id IS NULL").Delete(&models.Deployment{})
+
+	// 1. ดึงประวัติทั้งหมดจาก Database (เฉพาะที่มี ContainerID จริง และไม่รวมที่ลบทิ้งไปแล้ว)
 	var deployments []models.Deployment
-	config.DB.Where("status != ?", "deleted").Order("created_at desc").Find(&deployments)
+	config.DB.Where("status != ? AND container_id != ''", "deleted").Order("created_at desc").Find(&deployments)
 
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())

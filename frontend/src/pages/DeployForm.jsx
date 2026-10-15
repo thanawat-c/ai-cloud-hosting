@@ -20,9 +20,18 @@ const DeployForm = () => {
   const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi)].filter(Boolean).length;
 
   const handleDeploy = async () => {
-    if (!repoUrl.trim()) {
+    const trimmedUrl = repoUrl.trim();
+    if (!trimmedUrl) {
       toast.warning("กรุณาระบุ GitHub Repository", {
         description: "วางลิงก์โปรเจกต์ เช่น https://github.com/username/project",
+      });
+      return;
+    }
+
+    const isLikelyGitUrl = /^https?:\/\/.+/i.test(trimmedUrl) || /^git@.+/i.test(trimmedUrl);
+    if (!isLikelyGitUrl) {
+      toast.warning("รูปแบบ URL ไม่ถูกต้อง", {
+        description: "กรุณาวางลิงก์ที่ถูกต้อง เช่น https://github.com/username/project",
       });
       return;
     }

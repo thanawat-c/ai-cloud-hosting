@@ -38,7 +38,6 @@ func TestDeploy(c *gin.Context) {
 		buildDir, err := services.CloneRepository(req.RepoURL, req.GitToken)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 		defer os.RemoveAll(buildDir)
@@ -58,7 +57,6 @@ func TestDeploy(c *gin.Context) {
 			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, beDirName)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Backend ไม่สำเร็จ: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			os.WriteFile(backendDockerfile, []byte(aiBackendDocker), 0644)
@@ -71,7 +69,6 @@ func TestDeploy(c *gin.Context) {
 			backendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-backend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -79,7 +76,6 @@ func TestDeploy(c *gin.Context) {
 			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", ImageName: backendImageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -104,7 +100,6 @@ func TestDeploy(c *gin.Context) {
 			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName, backendInternalEndpoint)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Frontend ไม่สำเร็จ: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
@@ -142,7 +137,6 @@ func TestDeploy(c *gin.Context) {
 			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-frontend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -157,7 +151,6 @@ func TestDeploy(c *gin.Context) {
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", ImageName: frontendImageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -194,7 +187,6 @@ func TestDeploy(c *gin.Context) {
 			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			targetPort = port
@@ -206,7 +198,6 @@ func TestDeploy(c *gin.Context) {
 		imageName, err := services.BuildImage(ctx, buildDir, logChan)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 
@@ -214,7 +205,6 @@ func TestDeploy(c *gin.Context) {
 		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, ImageName: imageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 
