@@ -83,10 +83,12 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	if targetDir == "backend" {
 		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] เท่านั้น!
 - สแกนดูภาษาของ backend (เช่น Go, Python, Node.js)
-- หากเป็น Go: ให้ดูว่า main.go อยู่ที่ไหน เช่นถ้าอยู่ใน ./backend/cmd/api หรือ ./backend ให้ cd/WORKDIR เข้าไป build ให้ถูกที่ เช่น:
-  FROM golang:1.23-alpine AS builder
+- หากเป็น Go: ให้ตรวจเวอร์ชันจาก go.mod ถ้า go.mod ต้องการเวอร์ชันใหม่ ให้ใช้ FROM golang:alpine AS builder และใส่ ENV GOTOOLCHAIN=auto
+- ให้ดูว่า main.go อยู่ที่ไหน เช่นถ้าอยู่ใน ./backend/cmd/api หรือ ./backend ให้ cd/WORKDIR เข้าไป build ให้ถูกที่ เช่น:
+  FROM golang:alpine AS builder
+  ENV GOTOOLCHAIN=auto
   WORKDIR /app/backend
-  COPY backend/go.mod backend/go.sum ./
+  COPY backend/go.mod backend/go.sum* ./
   RUN go mod download
   COPY backend/ ./
   RUN CGO_ENABLED=0 go build -o /app/server ./cmd/api || CGO_ENABLED=0 go build -o /app/server .
@@ -138,7 +140,7 @@ GitHub Repository: %s
 %s
 
 คำแนะนำและกฎเหล็ก:
-1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ใช้ 1.23-alpine, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
+1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ให้ใช้ golang:alpine พร้อม ENV GOTOOLCHAIN=auto เพื่อรองรับ go.mod เวอร์ชันใหม่ล่าสุด, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
 2. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
 3. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
 		repoURL, targetInstruction, fileListStr, configsStr)
