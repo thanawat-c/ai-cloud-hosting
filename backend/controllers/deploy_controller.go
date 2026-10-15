@@ -104,6 +104,29 @@ func TestDeploy(c *gin.Context) {
 			}
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
 
+			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100% ไม่พึ่งคำสั่ง printf ใน Dockerfile
+			nginxConf := fmt.Sprintf(`server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://%s;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`, backendInternalEndpoint)
+			os.WriteFile(filepath.Join(buildDir, "nginx.conf"), []byte(nginxConf), 0644)
+
 			logChan <- "กำลัง Build Frontend Image...\n"
 			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-frontend")
 			if err != nil {

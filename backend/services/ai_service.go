@@ -99,11 +99,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
   CMD ["/app/server"]
 - EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 3000, 5000)`
 	} else if targetDir == "frontend" {
-		beHost := "backend"
-		if len(backendEndpoint) > 0 && backendEndpoint[0] != "" {
-			beHost = backendEndpoint[0]
-		}
-		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] เท่านั้น!
+		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] เท่านั้น!
 - สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:22-alpine builder:
   WORKDIR /app/frontend
   COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
@@ -112,19 +108,10 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
   RUN pnpm run generate || pnpm run build
 - Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/*
 - COPY ไฟล์ output จากการ build (.output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/
-- [สำคัญมาก]: ให้เขียนไฟล์ /etc/nginx/conf.d/default.conf ใน Dockerfile โดยตรง (ใช้ RUN printf หรือ cat << 'EOF' > /etc/nginx/conf.d/default.conf) เพื่อทำ Reverse Proxy:
-  1. location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/ /index.html; }
-  2. location /api/ {
-       proxy_pass http://%s/;
-       proxy_http_version 1.1;
-       proxy_set_header Host $host;
-       proxy_set_header X-Real-IP $remote_addr;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Forwarded-Proto $scheme;
-     }
-- EXPOSE 80`, beHost)
+- [สำคัญมาก]: ให้ COPY nginx.conf /etc/nginx/conf.d/default.conf (ไฟล์ nginx.conf ได้ถูกสร้างไว้ที่ root แล้ว) เพื่อทำ Reverse Proxy ส่งต่อ /api/ ไปยัง backend ได้ถูกต้อง
+- EXPOSE 80`
 	} else {
-		targetInstruction = `หากพบโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend พอร์ต 80 พร้อม Nginx configuration try_files $uri $uri/ /index.html`
+		targetInstruction = `หากพบโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend พอร์ต 80`
 	}
 
 	prompt := fmt.Sprintf(`คุณคือ DevOps Engineer ระดับ Senior ทำหน้าที่สร้าง Dockerfile สำหรับ Production ให้ถูกต้อง แม่นยำ และทำงานได้จริง 100%%
