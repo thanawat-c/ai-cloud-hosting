@@ -348,8 +348,7 @@ func GetContainerStats( ctx context.Context, containerID string) (map[string]int
 	}, nil
 }
 
-func RedeployApp(ctx context.Context, id string, repoURL string, imageName string, forceAI bool) (string, error) {
-
+func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName string, forceAI bool) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", err
@@ -362,23 +361,71 @@ func RedeployApp(ctx context.Context, id string, repoURL string, imageName strin
 		oldEnvVars = strings.Join(inspect.Config.Env, "\n")
 	}
 
-	buildDir, err := CloneRepository(repoURL)
+	cleanRepoURL := rawRepoURL
+	isBackend := strings.HasSuffix(rawRepoURL, " (Backend)")
+	isFrontend := strings.HasSuffix(rawRepoURL, " (Frontend)")
+	cleanRepoURL = strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(cleanRepoURL, " (Backend)"), " (Frontend)"))
 
-	if	err != nil {
+	buildDir, err := CloneRepository(cleanRepoURL)
+	if err != nil {
 		return "", fmt.Errorf("โหลดโค้ดใหม่ไม่สำเร็จ: %w", err)
 	}
-
 	defer os.RemoveAll(buildDir)
 
-	dockerfilePath := filepath.Join(buildDir, "Dockerfile")
 	targetPort := "80"
-	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceAI {
-		if forceAI {
-			fmt.Println("✨ เปิดโหมด Force AI Override: กำลังให้ AI เขียน Dockerfile ทับของเดิม...")
+	isMonorepo, feDir, beDir := DetectMonorepoServices(ctx, buildDir)
+	if isMonorepo {
+		if isBackend {
+			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, beDir)
+			if err != nil {
+				return "", fmt.Errorf("AI สร้าง Dockerfile Backend ไม่สำเร็จ: %w", err)
+			}
+			targetPort = port
+			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiDocker), 0644)
+		} else if isFrontend {
+			backendName := strings.TrimSuffix(imageName, "-frontend") + "-backend"
+			backendEndpoint := fmt.Sprintf("%s:8080", backendName)
+			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, feDir, backendEndpoint)
+			if err != nil {
+				return "", fmt.Errorf("AI สร้าง Dockerfile Frontend ไม่สำเร็จ: %w", err)
+			}
+			targetPort = port
+			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiDocker), 0644)
+
+			nginxConf := fmt.Sprintf(`server {
+    listen 80;
+    server_name localhost;
+    resolver 127.0.0.11 valid=30s;
+    set $backend_upstream "http://%s";
+
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass $backend_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`, backendEndpoint)
+			os.WriteFile(filepath.Join(buildDir, "nginx.conf"), []byte(nginxConf), 0644)
 		}
-		aiDocker, port, _ := GenerateDockerfile(ctx, repoURL, buildDir, "")
-		targetPort = port
-		os.WriteFile(dockerfilePath, []byte(aiDocker), 0644)
+	} else {
+		dockerfilePath := filepath.Join(buildDir, "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceAI {
+			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, "")
+			if err != nil {
+				return "", fmt.Errorf("สร้าง Dockerfile ไม่สำเร็จ: %w", err)
+			}
+			targetPort = port
+			os.WriteFile(dockerfilePath, []byte(aiDocker), 0644)
+		}
 	}
 
 	logChan := make(chan string)
@@ -387,17 +434,17 @@ func RedeployApp(ctx context.Context, id string, repoURL string, imageName strin
 			fmt.Print(msg)
 		}
 	}()
-	_, err = BuildImage(ctx, buildDir, logChan)
+	_, err = BuildImage(ctx, buildDir, logChan, imageName)
 	if err != nil {
 		return "", fmt.Errorf("สร้าง Image ใหม่ไม่สำเร็จ: %w", err)
 	}
 
 	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars, targetPort)
 	if err != nil {
-		return "", fmt.Errorf("เปิดเซิฟร์เวอร์ใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("เปิดเซิร์ฟเวอร์ใหม่ไม่สำเร็จ: %w", err)
 	}
 
 	cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
 
-	return newID,nil
+	return newID, nil
 }
