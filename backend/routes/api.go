@@ -11,6 +11,7 @@ func SetupRoutes(r *gin.Engine) {
 	api := r.Group("/api")
 	{
 		api.POST("/test-deploy", controllers.TestDeploy)
+		api.POST("/inspect-repo", controllers.InspectRepo)
 		api.GET("/containers", controllers.GetContainers)
 		api.POST("/containers/:id/stop", controllers.StopContainer)
 		api.POST("/containers/:id/start", controllers.StartContainer)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
@@ -238,5 +239,25 @@ func TestDeploy(c *gin.Context) {
 		c.Writer.Write([]byte(msg))
 		c.Writer.Flush() 
 	}
+}
+
+// InspectRepo วิเคราะห์โค้ดและค้นหาตัวแปร Environment Variables ที่แอปต้องการ
+func InspectRepo(c *gin.Context) {
+	var req struct {
+		RepoURL  string `json:"repo_url"`
+		GitToken string `json:"git_token"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RepoURL) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ repo_url ให้ถูกต้อง"})
+		return
+	}
+
+	result, err := services.InspectRepository(strings.TrimSpace(req.RepoURL), req.GitToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "สแกน Repo ไม่สำเร็จ: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
