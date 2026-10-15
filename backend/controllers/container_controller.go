@@ -250,8 +250,9 @@ func PruneImages(c *gin.Context) {
 
 	reclaimedMB := float64(reclaimedBytes) / (1024 * 1024)
 	c.JSON(http.StatusOK, gin.H{
-		"message":            "ทำความสะอาด Docker Image เก่าเรียบร้อยแล้ว",
-		"space_reclaimed_mb": fmt.Sprintf("%.2f", reclaimedMB),
+		"message":               "ทำความสะอาด Docker Image เก่าเรียบร้อยแล้ว",
+		"space_reclaimed_mb":    fmt.Sprintf("%.2f", reclaimedMB),
+		"space_reclaimed_bytes": reclaimedBytes,
 	})
 }
 

@@ -55,9 +55,13 @@ const DashboardHome = () => {
       });
       const data = await response.json();
       if (response.ok) {
+        const mb = parseFloat(data.space_reclaimed_mb) || 0;
+        const desc = mb > 0 
+          ? `คืนพื้นที่ดิสก์ได้ ${data.space_reclaimed_mb} MB`
+          : 'ระบบสะอาดเรียบร้อย ไม่มี Docker Images ตกค้าง';
         toast.success('ทำความสะอาด Docker สำเร็จ!', {
           id: toastId,
-          description: `คืนพื้นที่ดิสก์ได้ ${data.space_reclaimed_mb} MB (${data.space_reclaimed_bytes.toLocaleString()} bytes)`,
+          description: desc,
         });
       } else {
         toast.error('การล้าง Docker ล้มเหลว', {
