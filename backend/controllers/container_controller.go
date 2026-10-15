@@ -51,7 +51,7 @@ func GetContainers(c *gin.Context) {
 				if actualState == "exited" || actualState == "restarting" {
 					crashLog, err := services.GetContainerLogs(context.Background(), d.ContainerID)
 					if err == nil && strings.TrimSpace(crashLog) != "" {
-						lastError = strings.TrimSpace(crashLog)
+						lastError = strings.ReplaceAll(strings.TrimSpace(crashLog), "\x00", "")
 						config.DB.Model(&d).Update("last_error", lastError)
 					}
 				}

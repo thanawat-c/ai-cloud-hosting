@@ -34,21 +34,18 @@ const DeployForm = () => {
     const db = databases.find(d => String(d.id) === String(dbId));
     if (!db) return;
 
-    // แทนที่หรือเพิ่ม DATABASE_URL
-    const dbUrlLine = `DATABASE_URL=${db.internal_url}`;
-    const lines = envVars.split('\n');
-    const existingIndex = lines.findIndex(line => line.trim().startsWith('DATABASE_URL='));
-
-    if (existingIndex >= 0) {
-      lines[existingIndex] = dbUrlLine;
-      setEnvVars(lines.join('\n'));
-    } else {
-      const newEnv = envVars.trim() ? `${envVars.trim()}\n${dbUrlLine}` : dbUrlLine;
-      setEnvVars(newEnv);
-    }
+    // แทนที่หรือเพิ่มทั้ง DATABASE_URL และ DB_URL เพื่อรองรับทั้ง Node.js/Prisma และ Go/Gin
+    const dbLines = [`DATABASE_URL=${db.internal_url}`, `DB_URL=${db.internal_url}`];
+    let lines = envVars.split('\n').filter(line => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('DATABASE_URL=') && !trimmed.startsWith('DB_URL=');
+    });
+    
+    const combined = [...lines.filter(l => l.trim()), ...dbLines].join('\n');
+    setEnvVars(combined);
 
     toast.success(`เชื่อมต่อกับ Database "${db.name}" สำเร็จ!`, {
-      description: 'ระบบระบุ DATABASE_URL (Internal Container URL) ให้ใน Environment Variables แล้ว',
+      description: 'ระบบระบุ DATABASE_URL และ DB_URL ให้ใน Environment Variables แล้ว',
     });
   };
 

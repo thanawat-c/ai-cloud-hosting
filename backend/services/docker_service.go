@@ -215,7 +215,7 @@ func DeleteContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetContainerEnv ดึง Environment Variables ที่คอนเทนเนอร์นี้ใช้อยู่
+// GetContainerEnv ดึง Environment Variables ที่คอนเทนเนอร์นี้ใช้อยู่ (กรองค่า System พื้นฐานของ OS ออก)
 func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -227,7 +227,24 @@ func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return inspect.Config.Env, nil
+
+	// กรองตัวแปรระบบของ Docker / Linux Base Image ออก เช่น PATH, HOSTNAME เพื่อไม่ให้ไปกวนผู้ใช้
+	var userEnvs []string
+	systemPrefixes := []string{"PATH=", "HOSTNAME=", "NODE_VERSION=", "YARN_VERSION=", "GOLANG_VERSION=", "GOPATH=", "HOME="}
+	for _, env := range inspect.Config.Env {
+		isSystem := false
+		for _, prefix := range systemPrefixes {
+			if strings.HasPrefix(env, prefix) {
+				isSystem = true
+				break
+			}
+		}
+		if !isSystem {
+			userEnvs = append(userEnvs, env)
+		}
+	}
+
+	return userEnvs, nil
 }
 
 // UpdateContainerEnv สร้างคอนเทนเนอร์ใหม่พร้อมใส่ Env ใหม่ โดยไม่ต้อง Build โค้ดใหม่
