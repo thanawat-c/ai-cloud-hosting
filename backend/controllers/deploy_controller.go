@@ -35,10 +35,10 @@ func TestDeploy(c *gin.Context) {
 		ctx := context.Background()
 
 		logChan <- "กำลังโคลนโค้ดจาก GitHub...\n"
-		buildDir, err := services.CloneRepository(req.RepoURL)
+		buildDir, err := services.CloneRepository(req.RepoURL, req.GitToken)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
+			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 		defer os.RemoveAll(buildDir)
@@ -85,6 +85,7 @@ func TestDeploy(c *gin.Context) {
 
 			config.DB.Create(&models.Deployment{
 				RepoURL:     req.RepoURL + " (Backend)",
+				GitToken:    req.GitToken,
 				ImageName:   backendImageName,
 				ContainerID: beContainerID[:12],
 				DomainName:  beDomainName,
@@ -162,12 +163,16 @@ func TestDeploy(c *gin.Context) {
 
 			config.DB.Create(&models.Deployment{
 				RepoURL:     req.RepoURL + " (Frontend)",
+				GitToken:    req.GitToken,
 				ImageName:   frontendImageName,
 				ContainerID: feContainerID[:12],
 				DomainName:  feDomainName,
 				Status:      "running",
 				ForceAI:     req.ForceAI,
 			})
+
+			// สั่งเคลียร์ Image เก่าที่ไม่ได้ใช้งานเบื้องหลังอัตโนมัติ
+			go services.PruneUnusedImages(context.Background())
 
 			logChan <- fmt.Sprintf("\n🎉 สำเร็จครบทั้ง 2 ระบบ!\nBackend API: http://%s\nFrontend UI: http://%s\n", beDomainName, feDomainName)
 			logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", feDomainName, feContainerID[:12])
@@ -189,7 +194,7 @@ func TestDeploy(c *gin.Context) {
 			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
-				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			targetPort = port
@@ -201,7 +206,7 @@ func TestDeploy(c *gin.Context) {
 		imageName, err := services.BuildImage(ctx, buildDir, logChan)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
+			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 
@@ -209,13 +214,14 @@ func TestDeploy(c *gin.Context) {
 		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
-			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, ImageName: imageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
+			config.DB.Create(&models.Deployment{RepoURL: req.RepoURL, GitToken: req.GitToken, ImageName: imageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 			return
 		}
 
 		// บันทึกลง Database
 		newDeploy := models.Deployment{
 			RepoURL:     req.RepoURL,
+			GitToken:    req.GitToken,
 			ImageName:   imageName,
 			ContainerID: containerID[:12],
 			DomainName:  domainName,
@@ -228,6 +234,9 @@ func TestDeploy(c *gin.Context) {
 		} else {
 			logChan <- "บันทึกประวัติการ Deploy ลงฐานข้อมูลเรียบร้อยแล้ว!\n"
 		}
+
+		// สั่งเคลียร์ Image เก่าที่ไม่ได้ใช้งานเบื้องหลังอัตโนมัติ
+		go services.PruneUnusedImages(context.Background())
 
 		logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", domainName, containerID[:12])
 	}()

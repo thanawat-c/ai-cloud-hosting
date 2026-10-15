@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -348,7 +349,7 @@ func GetContainerStats( ctx context.Context, containerID string) (map[string]int
 	}, nil
 }
 
-func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName string, forceAI bool) (string, error) {
+func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName string, forceAI bool, gitToken ...string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", err
@@ -366,7 +367,12 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 	isFrontend := strings.HasSuffix(rawRepoURL, " (Frontend)")
 	cleanRepoURL = strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(cleanRepoURL, " (Backend)"), " (Frontend)"))
 
-	buildDir, err := CloneRepository(cleanRepoURL)
+	token := ""
+	if len(gitToken) > 0 {
+		token = gitToken[0]
+	}
+
+	buildDir, err := CloneRepository(cleanRepoURL, token)
 	if err != nil {
 		return "", fmt.Errorf("โหลดโค้ดใหม่ไม่สำเร็จ: %w", err)
 	}
@@ -446,5 +452,24 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 
 	cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
 
+	// ล้างขยะ Image เก่าที่ไม่ได้ใช้งานเบื้องหลังอัตโนมัติ
+	go PruneUnusedImages(context.Background())
+
 	return newID, nil
+}
+
+// PruneUnusedImages สั่งลบ Dangling Docker Images ที่ไม่ได้ใช้งาน คืนพื้นที่ Disk Space
+func PruneUnusedImages(ctx context.Context) (uint64, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return 0, err
+	}
+	defer cli.Close()
+
+	report, err := cli.ImagesPrune(ctx, filters.NewArgs(filters.Arg("dangling", "true")))
+	if err != nil {
+		return 0, err
+	}
+
+	return report.SpaceReclaimed, nil
 }

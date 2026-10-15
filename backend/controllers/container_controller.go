@@ -217,7 +217,7 @@ func RedeployContainer(c *gin.Context){
 
 	go func () {
 		ctx := context.Background()
-		newID, err := services.RedeployApp(ctx, deploy.ContainerID, deploy.RepoURL, deploy.ImageName, deploy.ForceAI)
+		newID, err := services.RedeployApp(ctx, deploy.ContainerID, deploy.RepoURL, deploy.ImageName, deploy.ForceAI, deploy.GitToken)
 		if err != nil {
 			fmt.Println("Redeploy ล้มเหลว:", err)
 			config.DB.Model(&deploy).Updates(map[string]interface{}{
@@ -234,6 +234,22 @@ func RedeployContainer(c *gin.Context){
 		}
 	}()
 	c.JSON(http.StatusOK, gin.H{"message": "กำลังดึงโค้ดและ Re-deploy"})
+}
+
+// PruneImages สั่งลบ Image เก่าที่ไม่ได้ใช้งาน (Dangling) และคืนขนาดพื้นที่ว่าง
+func PruneImages(c *gin.Context) {
+	ctx := context.Background()
+	reclaimedBytes, err := services.PruneUnusedImages(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ล้าง Image ไม่สำเร็จ: " + err.Error()})
+		return
+	}
+
+	reclaimedMB := float64(reclaimedBytes) / (1024 * 1024)
+	c.JSON(http.StatusOK, gin.H{
+		"message":            "ทำความสะอาด Docker Image เก่าเรียบร้อยแล้ว",
+		"space_reclaimed_mb": fmt.Sprintf("%.2f", reclaimedMB),
+	})
 }
 
 func GetContainerEnv(c *gin.Context) {

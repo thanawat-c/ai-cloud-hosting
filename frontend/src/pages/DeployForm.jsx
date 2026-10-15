@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles } from 'lucide-react';
+import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles, Key, Eye, EyeOff, Lock } from 'lucide-react';
 
 const DeployForm = () => {
   const [repoUrl, setRepoUrl] = useState('');
+  const [gitToken, setGitToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [containerId, setContainerId] = useState('');
@@ -29,7 +31,12 @@ const DeployForm = () => {
       const response = await fetch('http://localhost:8080/api/test-deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_url: repoUrl, env_vars: envVars, force_ai: forceAi })
+        body: JSON.stringify({ 
+          repo_url: repoUrl, 
+          env_vars: envVars, 
+          force_ai: forceAi,
+          git_token: gitToken.trim()
+        })
       });
       
       // เครื่องมือสำหรับอ่านข้อมูลแบบ Stream (สตรีมมิ่ง)
@@ -116,6 +123,36 @@ const DeployForm = () => {
                 className="w-full bg-slate-50/50 border border-slate-200 text-slate-800 px-5 py-4 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 transition-all shadow-sm text-base placeholder:text-slate-400" 
               />
             </div>
+          </div>
+
+          {/* GitHub Personal Access Token (for Private Repos) */}
+          <div className="group">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                GitHub Personal Access Token <span className="text-xs font-normal text-slate-400">(Optional - สำหรับ Private Repo)</span>
+              </label>
+            </div>
+            <div className="relative">
+              <input 
+                type={showToken ? "text" : "password"} 
+                value={gitToken}
+                onChange={(e) => setGitToken(e.target.value)}
+                placeholder="ghp_xxxxxxxxxxxx หรือ github_pat_xxxx" 
+                className="w-full bg-slate-50/50 border border-slate-200 text-slate-800 pl-5 pr-12 py-3.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 transition-all shadow-sm text-sm font-mono placeholder:text-slate-400 placeholder:font-sans" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken(!showToken)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                title={showToken ? "ซ่อน Token" : "แสดง Token"}
+              >
+                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
+              <span>🔒 ข้อมูล Token จะถูกเข้ารหัสส่งผ่าน HTTPS และไม่แสดงใน Log ของระบบ (ใช้สิทธิ์ read-only: `repo`)</span>
+            </p>
           </div>
           
           {/* Checkbox Force AI Override */}

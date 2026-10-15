@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles } from 'lucide-react';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
 const getShortAppName = (rawName, cleanName) => {
@@ -41,6 +41,31 @@ const DashboardHome = () => {
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [activeErrorContainerName, setActiveErrorContainerName] = useState('');
   const [activeErrorDetails, setActiveErrorDetails] = useState('');
+
+  // Prune Images State
+  const [isPruning, setIsPruning] = useState(false);
+
+  const handlePruneImages = async () => {
+    if (!window.confirm('คุณต้องการทำความสะอาดและลบ Docker Images เก่าที่ไม่ได้ใช้งาน (Dangling Images) ใช่หรือไม่?')) {
+      return;
+    }
+    setIsPruning(true);
+    try {
+      const response = await fetch('http://localhost:8080/api/system/prune', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`🧹 ทำความสะอาด Docker เรียบร้อย!\n\nคืนพื้นที่ดิสก์ได้ทั้งหมด: ${data.space_reclaimed_mb} MB (${data.space_reclaimed_bytes.toLocaleString()} bytes)`);
+      } else {
+        alert(`เกิดข้อผิดพลาดในการล้าง Docker: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ${err.message}`);
+    } finally {
+      setIsPruning(false);
+    }
+  };
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -316,6 +341,20 @@ const DashboardHome = () => {
           <p className="text-slate-500 text-sm mt-1">Manage your deployed applications and microservices.</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handlePruneImages}
+            disabled={isPruning}
+            className="px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 cursor-pointer"
+            title="ล้างขยะและ Docker Images ที่ไม่ได้ใช้งาน (Dangling images) เพื่อคืนพื้นที่ดิสก์"
+          >
+            {isPruning ? (
+              <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            )}
+            {isPruning ? 'กำลังล้าง...' : 'ล้างขยะ Docker'}
+          </button>
+
           <button
             onClick={requestNotificationPermission}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs ${

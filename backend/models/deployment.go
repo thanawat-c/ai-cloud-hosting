@@ -8,6 +8,7 @@ import (
 type Deployment struct {
 	ID          uint      `gorm:"primaryKey"`          // รหัสลำดับ
 	RepoURL     string    `gorm:"not null"`            // ลิงก์ GitHub ของลูกค้า
+	GitToken    string    `gorm:"type:text"`           // Token สำหรับดึง Private Repo
 	ImageName   string    // ชื่อ Image ที่ Build ได้
 	ContainerID string    // รหัส Container
 	DomainName  string    // ชื่อโดเมนสำหรับเข้าเว็บ
