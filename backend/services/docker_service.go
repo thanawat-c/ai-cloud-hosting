@@ -19,7 +19,7 @@ import (
 )
 
 // BuildImage packages the buildDir and builds a docker image
-func BuildImage(ctx context.Context, buildDir string, logChan chan<- string) (string, error) {
+func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, customImageName ...string) (string, error) {
 
 	logChan <- "กำลังแพ็กโฟลเดอร์เพื่อส่งให้ Docker...\n"
 	tar, err := archive.TarWithOptions(buildDir, &archive.TarOptions{})
@@ -34,6 +34,9 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string) (st
 	defer cli.Close()
 
 	imageName := "my-app-" + filepath.Base(buildDir)
+	if len(customImageName) > 0 && customImageName[0] != "" {
+		imageName = customImageName[0]
+	}
 	logChan <- fmt.Sprintf("กำลัง Build Image ชื่อ: %s\n", imageName)
 
 	buildResponse, err := cli.ImageBuild(ctx, tar, types.ImageBuildOptions{

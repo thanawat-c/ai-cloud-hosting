@@ -64,8 +64,10 @@ func TestDeploy(c *gin.Context) {
 			// เอาไปเขียนทับ Dockerfile หลักชั่วคราวเพื่อ build backend
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiBackendDocker), 0644)
 
+			baseImageName := "my-app-" + filepath.Base(buildDir)
+
 			logChan <- "กำลัง Build Backend Image...\n"
-			backendImageName, err := services.BuildImage(ctx, buildDir, logChan)
+			backendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-backend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return
@@ -102,7 +104,7 @@ func TestDeploy(c *gin.Context) {
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
 
 			logChan <- "กำลัง Build Frontend Image...\n"
-			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan)
+			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-frontend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return
