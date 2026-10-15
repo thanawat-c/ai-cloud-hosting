@@ -474,47 +474,38 @@ const DashboardHome = () => {
                       {/* Status */}
                       <td className="px-3 py-3">
                         {item.state === 'redeploying' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-blue-50 text-blue-700 border-blue-200">
-                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap shadow-2xs">
+                            <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
                             Updating
                           </span>
                         ) : item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting' ? (
-                          <div className="flex flex-col gap-1 items-start">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
-                              item.state === 'restarting'
-                                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                : 'bg-rose-100 text-rose-800 border-rose-300'
-                            }`}>
-                              <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                              {item.state === 'restarting' ? 'Crash Looping' : item.state === 'exited' ? 'Crashed' : 'Failed'}
+                          <button
+                            onClick={() => {
+                              if (item.last_error) {
+                                setActiveErrorDetails(item.last_error);
+                                setActiveErrorContainerName(item.name);
+                                setErrorModalOpen(true);
+                              } else {
+                                handleViewLogs(item.id, item.name);
+                              }
+                            }}
+                            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                            title="คลิกเพื่อดู Log สาเหตุที่ขัดข้อง"
+                          >
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
                             </span>
-                            {item.last_error ? (
-                              <button
-                                onClick={() => {
-                                  setActiveErrorDetails(item.last_error);
-                                  setActiveErrorContainerName(item.name);
-                                  setErrorModalOpen(true);
-                                }}
-                                className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1 shadow-2xs"
-                              >
-                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
-                                ดูสาเหตุที่ดับ
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleViewLogs(item.id, item.name)}
-                                className="text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded font-medium transition-colors inline-flex items-center gap-1"
-                              >
-                                <FileText className="w-2.5 h-2.5 shrink-0" />
-                                ดู Log
-                              </button>
-                            )}
-                          </div>
+                            <span>{item.state === 'restarting' ? 'Crash Loop' : 'Crashed'}</span>
+                            <span className="text-[10px] bg-rose-200/70 group-hover:bg-rose-300 px-1.5 py-0.2 rounded-full font-medium text-rose-800 transition-colors">
+                              Logs
+                            </span>
+                          </button>
                         ) : (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs
                             ${item.state === 'running' 
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                              : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                             {item.state === 'running' ? (
                               <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
