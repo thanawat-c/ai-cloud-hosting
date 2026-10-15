@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
 const getShortAppName = (rawName, cleanName) => {
@@ -46,22 +47,29 @@ const DashboardHome = () => {
   const [isPruning, setIsPruning] = useState(false);
 
   const handlePruneImages = async () => {
-    if (!window.confirm('คุณต้องการทำความสะอาดและลบ Docker Images เก่าที่ไม่ได้ใช้งาน (Dangling Images) ใช่หรือไม่?')) {
-      return;
-    }
     setIsPruning(true);
+    const toastId = toast.loading('กำลังทำความสะอาด Docker images ที่ไม่ได้ใช้งาน...');
     try {
       const response = await fetch('http://localhost:8080/api/system/prune', {
         method: 'POST',
       });
       const data = await response.json();
       if (response.ok) {
-        alert(`🧹 ทำความสะอาด Docker เรียบร้อย!\n\nคืนพื้นที่ดิสก์ได้ทั้งหมด: ${data.space_reclaimed_mb} MB (${data.space_reclaimed_bytes.toLocaleString()} bytes)`);
+        toast.success('ทำความสะอาด Docker สำเร็จ!', {
+          id: toastId,
+          description: `คืนพื้นที่ดิสก์ได้ ${data.space_reclaimed_mb} MB (${data.space_reclaimed_bytes.toLocaleString()} bytes)`,
+        });
       } else {
-        alert(`เกิดข้อผิดพลาดในการล้าง Docker: ${data.error || 'Unknown error'}`);
+        toast.error('การล้าง Docker ล้มเหลว', {
+          id: toastId,
+          description: data.error || 'Unknown error',
+        });
       }
     } catch (err) {
-      alert(`ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ${err.message}`);
+      toast.error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', {
+        id: toastId,
+        description: err.message,
+      });
     } finally {
       setIsPruning(false);
     }
@@ -75,19 +83,24 @@ const DashboardHome = () => {
 
   const requestNotificationPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      alert('เบราว์เซอร์นี้ไม่รองรับ Desktop Notification');
+      toast.error('เบราว์เซอร์นี้ไม่รองรับ Desktop Notification');
       return;
     }
     try {
       const perm = await Notification.requestPermission();
       if (perm === 'granted') {
         setNotificationsEnabled(true);
+        toast.success('เปิด Desktop Alert สำเร็จ!', {
+          description: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง',
+        });
         new Notification('🔔 เปิดการแจ้งเตือนสำเร็จ', {
           body: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง (Crashed)',
         });
       } else {
         setNotificationsEnabled(false);
-        alert('กรุณาอนุญาต Notification ใน Browser Settings เพื่อรับการแจ้งเตือน');
+        toast.warning('กรุณาอนุญาต Notification', {
+          description: 'โปรดเปิดสิทธิ์ Notification ในการตั้งค่าเบราว์เซอร์เพื่อรับการแจ้งเตือน',
+        });
       }
     } catch (err) {
       console.error('Error requesting notification permission:', err);
@@ -185,24 +198,27 @@ const DashboardHome = () => {
 
   const handleDelete = async (identifier) => {
     if (!identifier) {
-      alert("ไม่พบรหัสของเซิร์ฟเวอร์นี้");
+      toast.error("ไม่พบรหัสของเซิร์ฟเวอร์นี้");
       return;
     }
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลและประวัตินี้จะถูกลบออก")) return;
     
     // อัปเดตหน้าจอทันที (Optimistic UI) ลบแถวนี้ออกจากตารางทันทีไม่ต้องรอ
     setContainers(prev => prev.filter(c => c.id !== identifier && c.deployment_id !== identifier));
+    const toastId = toast.loading("กำลังลบเซิร์ฟเวอร์...");
 
     try {
       const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        alert(errJson.error || "เกิดข้อผิดพลาดในการลบ");
+        toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId, description: errJson.error || "ไม่สามารถลบได้" });
+      } else {
+        toast.success("ลบเซิร์ฟเวอร์เรียบร้อย", { id: toastId });
       }
       await fetchContainers();
     } catch (error) {
       console.log("ลบข้อมูลล้มเหลว", error);
-      alert("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ");
+      toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", { id: toastId, description: error.message });
       await fetchContainers();
     }
   };
@@ -224,11 +240,14 @@ const DashboardHome = () => {
     }
   };
 
-    // ฟังก์ชันสั่ง Re-deploy
   // ฟังก์ชันสั่ง Re-deploy
   const handleRedeploy = async (id) => {
     if (!confirm("คุณต้องการดึงโค้ดใหม่และ Re-deploy เซิร์ฟเวอร์นี้ใช่ไหม? (ระบบจะรันตัวใหม่ซ้อนขึ้นมาให้ก่อน)")) return;
     
+    toast.info("เริ่มกระบวนการ Re-deploy...", {
+      description: "กำลังดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่",
+    });
+
     // 1. 🪄 หลอกตาผู้ใช้! สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที
     setContainers(prev => prev.map(c => 
       c.id === id ? { ...c, state: 'redeploying' } : c
@@ -243,22 +262,20 @@ const DashboardHome = () => {
         // 2. 🕵️‍♂️ สั่งให้เบราว์เซอร์แอบยิงไปเช็คข้อมูลใหม่ทุกๆ 3 วินาที (Polling)
         const checkInterval = setInterval(() => {
           fetchContainers(); 
-          // (หมายเหตุ: เมื่อเซิร์ฟเวอร์ใหม่สร้างเสร็จ ID จะเปลี่ยนไป ทำให้ตัวเดิมที่หมุนๆ อยู่หายไปเองโดยอัตโนมัติ!)
         }, 3000);
 
-        // ตั้งเวลาไว้ว่าถ้าเกิน 2 นาที (120000ms) ให้เลิกเช็ค (กันระบบค้างถ้า Build พัง)
         setTimeout(() => {
           clearInterval(checkInterval);
-          fetchContainers(); // รีเฟรชรอบสุดท้ายเผื่อกลับไปเป็น running
+          fetchContainers();
         }, 120000);
 
       } else {
         const errData = await response.json();
-        alert("Error: " + errData.error);
-        fetchContainers(); // ถ้าพัง ก็ให้รีเฟรชกลับเป็นสถานะเดิม
+        toast.error("Re-deploy ล้มเหลว", { description: errData.error });
+        fetchContainers();
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      toast.error("การเชื่อมต่อล้มเหลว", { description: error.message });
     } finally {
       fetchContainers();
     }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'sonner';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -11,6 +12,7 @@ function App() {
 
   return (
     <Router>
+      <Toaster position="top-right" richColors closeButton expand={false} />
       <div className="flex h-screen bg-slate-50 font-sans overflow-hidden selection:bg-blue-200">
         
         {/* Sidebar */}

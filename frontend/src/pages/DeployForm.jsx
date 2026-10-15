@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 
 const DeployForm = () => {
   const [repoUrl, setRepoUrl] = useState('');
@@ -20,7 +21,9 @@ const DeployForm = () => {
 
   const handleDeploy = async () => {
     if (!repoUrl.trim()) {
-      alert("กรุณาใส่ลิงก์ GitHub Repository ก่อนครับ!");
+      toast.warning("กรุณาระบุ GitHub Repository", {
+        description: "วางลิงก์โปรเจกต์ เช่น https://github.com/username/project",
+      });
       return;
     }
 
@@ -30,6 +33,9 @@ const DeployForm = () => {
     setContainerId('');
     setPublicPort('');
     setDeployLogs(''); // ล้างหน้าจอ Terminal
+    toast.info("เริ่มกระบวนการ Deploy...", {
+      description: "กำลังเชื่อมต่อและวิเคราะห์โครงสร้างโค้ด",
+    });
 
     try {
       const response = await fetch('http://localhost:8080/api/test-deploy', {
@@ -67,12 +73,21 @@ const DeployForm = () => {
           if (idMatch) setContainerId(idMatch[1]);
           
           setMessage("Deploy สำเร็จ! เซิร์ฟเวอร์ของคุณพร้อมใช้งานแล้ว");
+          toast.success("Deploy สำเร็จเรียบร้อย!", {
+            description: domainMatch ? `พร้อมเปิดใช้งานที่ ${domainMatch[1]}` : "เซิร์ฟเวอร์เริ่มทำงานแล้ว",
+          });
         } else if (chunk.includes("Error:")) {
           setMessage("การ Deploy ล้มเหลว โปรดดู Log ด้านล่าง");
+          toast.error("การ Deploy ล้มเหลว", {
+            description: "โปรดดูรายละเอียดข้อผิดพลาดใน Terminal ด้านล่าง",
+          });
         }
       }
     } catch (error) {
       setMessage("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: " + error.message);
+      toast.error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", {
+        description: error.message,
+      });
     } finally {
       setIsLoading(false);
     }
