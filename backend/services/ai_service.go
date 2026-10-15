@@ -29,47 +29,81 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	var fileList []string
 	var configContents []string
 
-	// สแกน Root
+	isConfigFile := func(name string) bool {
+		switch name {
+		case "package.json", "go.mod", "go.sum", "requirements.txt", "pyproject.toml", "Pipfile",
+			"pom.xml", "build.gradle", "build.gradle.kts", "Cargo.toml", "composer.json",
+			"vite.config.ts", "vite.config.js", "next.config.js", "next.config.mjs", "next.config.ts",
+			"nuxt.config.ts", "nuxt.config.js", "docker-compose.yml":
+			return true
+		}
+		return false
+	}
+
+	isLockFile := func(name string) bool {
+		switch name {
+		case "pnpm-lock.yaml", "yarn.lock", "package-lock.json", "bun.lockb",
+			"Cargo.lock", "composer.lock", "poetry.lock", "Pipfile.lock":
+			return true
+		}
+		return false
+	}
+
+	addConfigFile := func(relPath string, fullPath string) {
+		if data, err := os.ReadFile(fullPath); err == nil {
+			contentStr := string(data)
+			if len(contentStr) > 1500 {
+				contentStr = contentStr[:1500] + "\n...(ตัดข้อมูลส่วนที่เหลือ)..."
+			}
+			configContents = append(configContents, fmt.Sprintf("--- เนื้อหาไฟล์ %s ---\n%s", relPath, contentStr))
+		}
+	}
+
+	// สแกน Root และโฟลเดอร์ย่อย (รองรับทั้ง mono-repo ปกติ และ monorepo แบบ apps/...)
 	entries, _ := os.ReadDir(buildDir)
 	for _, e := range entries {
 		name := e.Name()
-		if name == ".git" {
+		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		if e.IsDir() {
 			fileList = append(fileList, name+"/")
-			// สแกนโฟลเดอร์ย่อย 1 ชั้น เช่น frontend, backend, client, server
 			subEntries, _ := os.ReadDir(filepath.Join(buildDir, name))
 			for _, sub := range subEntries {
 				subName := sub.Name()
-				if subName == "package.json" || subName == "go.mod" || subName == "requirements.txt" || subName == "pnpm-lock.yaml" || subName == "yarn.lock" || subName == "nuxt.config.ts" {
-					subPath := filepath.Join(buildDir, name, subName)
-					if subName != "pnpm-lock.yaml" && subName != "yarn.lock" {
-						if data, err := os.ReadFile(subPath); err == nil {
-							// ตัดให้ไม่เกิน 1500 ตัวอักษรเพื่อประหยัด token แต่ได้ข้อมูลครบ
-							contentStr := string(data)
-							if len(contentStr) > 1500 {
-								contentStr = contentStr[:1500] + "\n...(ตัดข้อมูลส่วนที่เหลือ)..."
+				if strings.HasPrefix(subName, ".") {
+					continue
+				}
+				relSubPath := filepath.Join(name, subName)
+				if sub.IsDir() {
+					fileList = append(fileList, relSubPath+"/")
+					// สแกนชั้นที่ 2 สำหรับ apps/web, apps/api
+					if name == "apps" || name == "packages" || name == "services" {
+						subSubEntries, _ := os.ReadDir(filepath.Join(buildDir, name, subName))
+						for _, ss := range subSubEntries {
+							ssName := ss.Name()
+							relSSPath := filepath.Join(name, subName, ssName)
+							if isConfigFile(ssName) {
+								addConfigFile(relSSPath, filepath.Join(buildDir, relSSPath))
+							} else if isLockFile(ssName) {
+								configContents = append(configContents, fmt.Sprintf("ตรวจพบ Lockfile: %s", relSSPath))
 							}
-							configContents = append(configContents, fmt.Sprintf("--- เนื้อหาไฟล์ %s/%s ---\n%s", name, subName, contentStr))
 						}
-					} else {
-						configContents = append(configContents, fmt.Sprintf("ตรวจพบไฟล์ Lockfile: %s/%s", name, subName))
+					}
+				} else {
+					if isConfigFile(subName) {
+						addConfigFile(relSubPath, filepath.Join(buildDir, relSubPath))
+					} else if isLockFile(subName) {
+						configContents = append(configContents, fmt.Sprintf("ตรวจพบ Lockfile: %s", relSubPath))
 					}
 				}
 			}
 		} else {
 			fileList = append(fileList, name)
-			if name == "package.json" || name == "go.mod" || name == "requirements.txt" {
-				if data, err := os.ReadFile(filepath.Join(buildDir, name)); err == nil {
-					contentStr := string(data)
-					if len(contentStr) > 1500 {
-						contentStr = contentStr[:1500] + "\n...(ตัดข้อมูลส่วนที่เหลือ)..."
-					}
-					configContents = append(configContents, fmt.Sprintf("--- เนื้อหาไฟล์ %s ---\n%s", name, contentStr))
-				}
-			} else if name == "pnpm-lock.yaml" || name == "yarn.lock" {
-				configContents = append(configContents, fmt.Sprintf("ตรวจพบไฟล์ Lockfile: %s", name))
+			if isConfigFile(name) {
+				addConfigFile(name, filepath.Join(buildDir, name))
+			} else if isLockFile(name) {
+				configContents = append(configContents, fmt.Sprintf("ตรวจพบ Lockfile: %s", name))
 			}
 		}
 	}
@@ -80,38 +114,79 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	model := aiClient.GenerativeModel("gemini-2.5-flash")
 
 	var targetInstruction string
-	if targetDir == "backend" {
-		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] เท่านั้น!
-- สแกนดูภาษาของ backend (เช่น Go, Python, Node.js)
-- หากเป็น Go: ให้ตรวจเวอร์ชันจาก go.mod ถ้า go.mod ต้องการเวอร์ชันใหม่ ให้ใช้ FROM golang:alpine AS builder และใส่ ENV GOTOOLCHAIN=auto
-- ให้ดูว่า main.go อยู่ที่ไหน เช่นถ้าอยู่ใน ./backend/cmd/api หรือ ./backend ให้ cd/WORKDIR เข้าไป build ให้ถูกที่ เช่น:
-  FROM golang:alpine AS builder
-  ENV GOTOOLCHAIN=auto
-  WORKDIR /app/backend
-  COPY backend/go.mod backend/go.sum* ./
-  RUN go mod download
-  COPY backend/ ./
-  RUN CGO_ENABLED=0 go build -o /app/server ./cmd/api || CGO_ENABLED=0 go build -o /app/server .
-  FROM alpine:latest
-  WORKDIR /app
-  COPY --from=builder /app/server .
-  EXPOSE 8080
-  CMD ["/app/server"]
-- EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 3000, 5000)`
-	} else if targetDir == "frontend" {
-		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] เท่านั้น!
-- สโคปการทำงานเฉพาะโฟลเดอร์ frontend/ โดยใช้ node:22-alpine builder:
-  WORKDIR /app/frontend
-  COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/yarn.lock* frontend/package-lock.json* ./
-  RUN npm install -g pnpm@9 && pnpm install --no-frozen-lockfile
-  COPY frontend/ ./
-  RUN pnpm run generate || pnpm run build
-- Stage สุดท้าย: ให้ใช้ nginx:alpine แล้ว RUN rm -rf /usr/share/nginx/html/*
-- COPY ไฟล์ output จากการ build (.output/public หรือ dist) ไปไว้ที่ /usr/share/nginx/html/
-- [สำคัญมาก]: ให้ COPY nginx.conf /etc/nginx/conf.d/default.conf (ไฟล์ nginx.conf ได้ถูกสร้างไว้ที่ root แล้ว) เพื่อทำ Reverse Proxy ส่งต่อ /api/ ไปยัง backend ได้ถูกต้อง
-- EXPOSE 80`
+	isFrontend := len(backendEndpoint) > 0 && backendEndpoint[0] != ""
+	isBackend := targetDir != "" && !isFrontend
+
+	if isBackend {
+		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
+- สแกนดูภาษาและ framework ของโฟลเดอร์ "%s/" (เช่น Go, Python, Node.js, Java, Rust, PHP)
+- เลือก Base Image ให้เหมาะสม (Go: golang:alpine พร้อม ENV GOTOOLCHAIN=auto, Node: node:22-alpine, Python: python:3.11-slim)
+- คัดลอกและ Build จากโฟลเดอร์เป้าหมาย "%s/" ให้ถูกต้อง เช่น:
+  * หากเป็น Go:
+    FROM golang:alpine AS builder
+    ENV GOTOOLCHAIN=auto
+    WORKDIR /app/%s
+    COPY %s/go.mod %s/go.sum* ./
+    RUN go mod download
+    COPY %s/ ./
+    RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
+    FROM alpine:latest
+    WORKDIR /app
+    COPY --from=builder /app/server .
+    EXPOSE <port>
+    CMD ["/app/server"]
+  * หากเป็น Node.js / TypeScript:
+    FROM node:22-alpine AS builder
+    WORKDIR /app/%s
+    COPY %s/package.json %s/*lock* ./
+    RUN (ตรวจ lockfile แล้วรัน pnpm/yarn/npm install)
+    COPY %s/ ./
+    RUN (ถ้ามี build script ให้รัน npm run build หรือ pnpm run build)
+    EXPOSE <port>
+    CMD ["node", ...] หรือ CMD ["npm", "start"]
+  * หากเป็น Python:
+    FROM python:3.11-slim
+    WORKDIR /app/%s
+    COPY %s/requirements.txt* %s/pyproject.toml* ./
+    RUN pip install --no-cache-dir -r requirements.txt
+    COPY %s/ ./
+    EXPOSE <port>
+    CMD ["uvicorn", ...] หรือ CMD ["python", "main.py"]
+- กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
+	} else if isFrontend {
+		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
+- สโคปการทำงานเฉพาะโฟลเดอร์ "%s/"
+- ตรวจสอบ Package Manager จาก lockfile (pnpm, yarn, npm, bun) เพื่อติดตั้ง dependency ให้ตรงรุ่น
+- ขั้นตอนการ Build:
+  WORKDIR /app/%s
+  COPY %s/package.json %s/*lock* ./
+  (รันคำสั่งติดตั้ง dependencies ตาม lockfile เช่น npm ci, pnpm install, yarn install)
+  COPY %s/ ./
+  (รัน build script เช่น pnpm run build หรือ pnpm run generate หรือ npm run build)
+- Stage สุดท้าย:
+  * หากเป็น Static Web App (Vite, React, Vue, Nuxt static):
+    FROM nginx:alpine
+    RUN rm -rf /usr/share/nginx/html/*
+    COPY --from=builder /app/%s/(dist หรือ .output/public หรือ build) /usr/share/nginx/html/
+    COPY nginx.conf /etc/nginx/conf.d/default.conf
+    EXPOSE 80
+    CMD ["nginx", "-g", "daemon off;"]
+  * หากเป็น SSR App (Next.js standalone, Nuxt node-server):
+    EXPOSE 3000
+    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
 	} else {
-		targetInstruction = `หากพบโฟลเดอร์ frontend/ ให้เน้นการสร้าง Dockerfile เพื่อ Build และ Host หน้าเว็บ Frontend พอร์ต 80`
+		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับ [Standalone Project] ที่อยู่ที่ Root directory:
+- สแกนดูไฟล์และ config ใน Root เพื่อระบุประเภทโปรเจกต์ (Go, Node.js, Python, Java, PHP, Rust, หรือ Web Frontend)
+- หากเป็น Backend API:
+  * สร้าง Dockerfile ที่ build และรัน service นั้นอย่างเหมาะสมตาม Best Practice
+  * EXPOSE พอร์ตตามที่แอปพลิเคชันใช้งานจริง (เช่น 8080, 8000, 3000, 5000)
+- หากเป็น Static Web Frontend (Vite, React, Vue, HTML):
+  * Build ด้วย Node แล้วใช้ nginx:alpine host ที่พอร์ต 80
+  * ใส่ Nginx config รองรับ SPA Fallback (try_files $uri $uri/ /index.html)
+  * EXPOSE 80
+- หากเป็น SSR Web Framework (Next.js, Nuxt SSR, Remix, SvelteKit):
+  * Build และรันในโหมด Node.js server
+  * EXPOSE 3000`
 	}
 
 	prompt := fmt.Sprintf(`คุณคือ DevOps Engineer ระดับ Senior ทำหน้าที่สร้าง Dockerfile สำหรับ Production ให้ถูกต้อง แม่นยำ และทำงานได้จริง 100%%
@@ -209,7 +284,21 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 		for _, s := range subEntries {
 			subNames = append(subNames, s.Name())
 		}
-		summary = append(summary, fmt.Sprintf("โฟลเดอร์ '%s': มีไฟล์ภายในคือ [%s]", e.Name(), strings.Join(subNames, ", ")))
+		summary = append(summary, fmt.Sprintf("โฟลเดอร์ '%s': มีไฟล์/โฟลเดอร์ย่อยคือ [%s]", e.Name(), strings.Join(subNames, ", ")))
+
+		// สแกนโฟลเดอร์ชั้นที่ 2 เพิ่มเติมสำหรับ Monorepo ยอดนิยม (เช่น apps/web, apps/api, packages/client, packages/server)
+		if e.Name() == "apps" || e.Name() == "packages" || e.Name() == "services" {
+			for _, sub := range subEntries {
+				if sub.IsDir() && !strings.HasPrefix(sub.Name(), ".") {
+					subSubEntries, _ := os.ReadDir(filepath.Join(buildDir, e.Name(), sub.Name()))
+					var subSubNames []string
+					for _, ss := range subSubEntries {
+						subSubNames = append(subSubNames, ss.Name())
+					}
+					summary = append(summary, fmt.Sprintf("โฟลเดอร์ '%s/%s': มีไฟล์ภายในคือ [%s]", e.Name(), sub.Name(), strings.Join(subSubNames, ", ")))
+				}
+			}
+		}
 	}
 
 	if len(summary) < 2 {

@@ -58,6 +58,7 @@ func TestDeploy(c *gin.Context) {
 			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, beDirName)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Backend ไม่สำเร็จ: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			os.WriteFile(backendDockerfile, []byte(aiBackendDocker), 0644)
@@ -70,6 +71,7 @@ func TestDeploy(c *gin.Context) {
 			backendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-backend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -77,6 +79,7 @@ func TestDeploy(c *gin.Context) {
 			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Backend)", ImageName: backendImageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -100,12 +103,14 @@ func TestDeploy(c *gin.Context) {
 			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName, backendInternalEndpoint)
 			if err != nil {
 				logChan <- "Error: AI สร้าง Dockerfile Frontend ไม่สำเร็จ: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
 
-			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100% ไม่พึ่งคำสั่ง printf ใน Dockerfile
+			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100%
 			// ใช้ resolver 127.0.0.11 (Docker DNS) และ set ตัวแปร เพื่อไม่ให้ Nginx แครชตอนสตาร์ตถ้า backend ดับอยู่
+			// location /api รองรับทั้ง /api, /api/ และ /api/v1/...
 			nginxConf := fmt.Sprintf(`server {
     listen 80;
     server_name localhost;
@@ -120,7 +125,7 @@ func TestDeploy(c *gin.Context) {
         try_files $uri $uri/ /index.html;
     }
 
-    location /api/ {
+    location /api {
         proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -136,6 +141,7 @@ func TestDeploy(c *gin.Context) {
 			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-frontend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
@@ -150,6 +156,7 @@ func TestDeploy(c *gin.Context) {
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				config.DB.Create(&models.Deployment{RepoURL: req.RepoURL + " (Frontend)", ImageName: frontendImageName, Status: "failed", LastError: err.Error(), ForceAI: req.ForceAI})
 				return
 			}
 
