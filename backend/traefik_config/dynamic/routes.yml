@@ -19,7 +19,7 @@ http:
     my-app-deploy-538544472:
       loadBalancer:
         servers:
-          - url: "http://invalid IP:3000"
+          - url: "http://172.19.0.8:3000"
     my-app-deploy-1361158672-frontend:
       loadBalancer:
         servers:
