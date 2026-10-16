@@ -1341,34 +1341,29 @@ const DashboardHome = () => {
         <div className="bg-[#0a0a0a] rounded-xl border border-neutral-800 overflow-hidden">
           <div className="p-6 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-neutral-950/60">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-neutral-900 text-neutral-300 border border-neutral-800">
+              <div className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-300 border border-neutral-800 flex items-center justify-center">
                 <Database className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-white tracking-tight">Managed Databases</h2>
+                  <h2 className="text-base font-semibold text-white tracking-tight">Managed PostgreSQL Instances</h2>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300">
-                    PostgreSQL 16
+                    v16.2
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
-                    {databases.length} / 5 DBs
+                    {databases.length} / 5 Active
                   </span>
                 </div>
                 <p className="text-xs text-neutral-400 mt-0.5 font-mono">
-                  Instant PostgreSQL • 512 MB RAM limit • Persistent Volume storage
+                  Dedicated isolated memory • Persistent Docker Volume storage
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setCreateDbModalOpen(true)}
-              disabled={databases.length >= 5}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Database</span>
-            </button>
+            <div className="flex items-center gap-2 text-xs font-mono text-neutral-400">
+              <span className="w-2 h-2 rounded-full bg-[#00df8f] shadow-[0_0_8px_rgba(0,223,143,0.5)]"></span>
+              <span>Cluster Online</span>
+            </div>
           </div>
 
           {databases.length === 0 ? (
@@ -1396,185 +1391,179 @@ const DashboardHome = () => {
                 return (
                   <div 
                     key={db.id}
-                    className="p-5 rounded-lg border border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-colors flex flex-col justify-between"
+                    className="p-5 rounded-lg border border-neutral-800 bg-black hover:border-neutral-700 transition-colors flex flex-col justify-between text-neutral-200"
                   >
                     <div>
                       {/* Card Header */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-neutral-900">
                         <div className="flex items-center gap-2.5">
-                          <div className={`p-2 rounded-xl ${isRunning ? 'bg-neutral-900 text-neutral-300 border border-neutral-800' : 'bg-slate-100 text-neutral-500'}`}>
-                            <Database className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-md bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-300">
+                            <Database className="w-3.5 h-3.5" />
                           </div>
                           <div>
-                            <h3 className="text-sm font-semibold text-white flex items-center gap-2 font-mono">
+                            <h3 className="text-sm font-semibold text-white tracking-tight font-mono">
                               {db.name}
                             </h3>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={`inline-block w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                              <span className="text-[11px] font-medium text-neutral-400 capitalize">{db.status}</span>
+                              {isRunning ? (
+                                <>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#00df8f] shadow-[0_0_8px_rgba(0,223,143,0.5)]"></span>
+                                  <span className="text-[11px] font-mono text-[#00df8f]">Ready</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>
+                                  <span className="text-[11px] font-mono text-neutral-500">Stopped</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
 
-                        {/* Actions */}
+                        {/* Actions (Toggle/Delete) */}
                         <div className="flex items-center gap-1">
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button
-                              onClick={() => handleToggleDb(db.id, db.status)}
-                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                isRunning 
-                                  ? 'text-amber-600 hover:bg-amber-50' 
-                                  : 'text-emerald-600 hover:bg-emerald-50'
-                              }`}
-                              aria-label={isRunning ? 'Stop Database' : 'Start Database'}
-                            >
-                              {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              {isRunning ? 'Stop Database' : 'Start Database'}
-                            </div>
-                          </div>
-
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button
-                              onClick={() => handleDeleteDb(db.id, db.name)}
-                              className="p-1.5 rounded-md text-neutral-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
-                              aria-label='Delete Database'
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-rose-900 text-rose-300 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              Delete Database
-                            </div>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleDb(db.id, db.status)}
+                            className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
+                            title={isRunning ? 'Stop Database' : 'Start Database'}
+                          >
+                            {isRunning ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDb(db.id, db.name)}
+                            className="p-1.5 rounded-md text-neutral-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+                            title="Delete Database"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Specs Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[10px] font-semibold text-neutral-400">
-                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100/60">
-                          RAM: 512 MB
+                      {/* Specs Tags (Vercel Style) */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[10px] font-mono">
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300">
+                          PostgreSQL 16
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100/60">
-                          Port: {db.host_port}
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300">
+                          Port {db.host_port}
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-neutral-400">
-                          Volume: Persistent
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-400">
+                          512 MB Cap
                         </span>
                       </div>
 
                       {/* Live RAM Stats */}
                       {isRunning && stats[db.container_id] && (
-                        <div className="mb-3.5 p-2.5 rounded-xl bg-white border border-slate-200/70 shadow-2xs space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <div className="flex items-center gap-1.5 text-neutral-400 font-medium">
-                              <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                              <span>Actual RAM:</span>
-                            </div>
-                            <span className="font-mono font-bold text-neutral-300">
-                              {Number(stats[db.container_id].memory_mb || 0).toFixed(1)} MB / {stats[db.container_id].memory_limit || 512} MB
+                        <div className="mb-3 p-2.5 rounded-md bg-neutral-950 border border-neutral-800/80 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="text-neutral-400">RAM Usage</span>
+                            <span className="text-white font-medium">
+                              {Number(stats[db.container_id].memory_mb || 0).toFixed(1)} / {stats[db.container_id].memory_limit || 512} MB
                             </span>
                           </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="w-full bg-neutral-900 rounded-full h-1 overflow-hidden border border-neutral-800">
                             <div 
-                              className="bg-gradient-to-r from-indigo-500 to-blue-500 h-1.5 rounded-full transition-all duration-500"
+                              className="bg-[#00df8f] h-1 rounded-full transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.max(3, ((Number(stats[db.container_id].memory_mb || 0) / (stats[db.container_id].memory_limit || 512)) * 100)))}%` }}
                             ></div>
                           </div>
                         </div>
                       )}
 
-                      {/* Database Quick Tools */}
+                      {/* Unified Geist Action Buttons */}
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <button
                           type="button"
                           onClick={() => handleOpenSqlStudio(db)}
                           disabled={!isRunning}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-200/60 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-200 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
                         >
-                          <Code className="w-3.5 h-3.5" />
+                          <Code className="w-3.5 h-3.5 text-neutral-400" />
                           <span>SQL Studio</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenBindModal(db)}
                           disabled={!isRunning}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 disabled:opacity-40 text-neutral-300 rounded-lg text-xs font-semibold border border-slate-200/60 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-200 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
                         >
-                          <Link2 className="w-3.5 h-3.5" />
-                          <span>Bind to Server</span>
+                          <Link2 className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>Bind Server</span>
                         </button>
                       </div>
 
-                      {/* Backup & Restore Tools */}
-                      <div className="grid grid-cols-2 gap-2 mb-3.5">
+                      <div className="grid grid-cols-2 gap-2 mb-3">
                         <button
                           type="button"
                           onClick={() => handleBackupDb(db)}
                           disabled={!isRunning || backingUpId === db.id}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 text-emerald-700 rounded-lg text-xs font-semibold border border-emerald-200/60 transition-colors cursor-pointer"
-                          title="Download .sql backup file"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-300 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                          title="Download .sql backup"
                         >
-                          <Download className="w-3.5 h-3.5" />
+                          <Download className="w-3.5 h-3.5 text-neutral-400" />
                           <span>{backingUpId === db.id ? 'Exporting...' : 'Backup (.sql)'}</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenRestoreModal(db)}
                           disabled={!isRunning}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-800 rounded-lg text-xs font-semibold border border-amber-200/60 transition-colors cursor-pointer"
-                          title="Upload .sql file to restore data"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-300 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                          title="Restore data from .sql"
                         >
-                          <Upload className="w-3.5 h-3.5" />
+                          <Upload className="w-3.5 h-3.5 text-neutral-400" />
                           <span>Restore</span>
                         </button>
                       </div>
 
-                      {/* Connection Strings */}
-                      <div className="space-y-2.5">
+                      {/* Connection Strings (Clean Geist Dark Box) */}
+                      <div className="space-y-2">
                         {/* Internal URL */}
                         <div>
-                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
-                            <span className="font-medium text-indigo-700">Internal URL (for in-network apps):</span>
+                          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">
+                            <span>Internal URL (Apps)</span>
                             <button
+                              type="button"
                               onClick={() => handleCopyUrl(db.internal_url, `internal-${db.id}`)}
-                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-indigo-600 font-medium"
+                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-white font-mono transition-colors cursor-pointer"
                             >
                               {copiedKey === `internal-${db.id}` ? (
-                                <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
+                                <><Check className="w-3 h-3 text-[#00df8f]" /> Copied</>
                               ) : (
                                 <><Copy className="w-3 h-3" /> Copy</>
                               )}
                             </button>
                           </div>
-                          <div className="p-2 rounded-lg bg-slate-900 text-slate-300 font-mono text-[11px] truncate select-all border border-slate-800">
+                          <div className="p-2 rounded bg-neutral-950 text-neutral-300 font-mono text-[11px] truncate select-all border border-neutral-800">
                             {db.internal_url}
                           </div>
                         </div>
 
                         {/* External URL */}
                         <div>
-                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
-                            <span className="font-medium text-neutral-400">External URL (DBeaver / TablePlus):</span>
+                          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">
+                            <span>External URL (TablePlus / DBeaver)</span>
                             <button
+                              type="button"
                               onClick={() => handleCopyUrl(db.external_url, `external-${db.id}`)}
-                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-indigo-600 font-medium"
+                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-white font-mono transition-colors cursor-pointer"
                             >
                               {copiedKey === `external-${db.id}` ? (
-                                <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
+                                <><Check className="w-3 h-3 text-[#00df8f]" /> Copied</>
                               ) : (
                                 <><Copy className="w-3 h-3" /> Copy</>
                               )}
                             </button>
                           </div>
-                          <div className="p-2 rounded bg-black text-neutral-300 font-mono text-[11px] truncate select-all border border-neutral-800">
+                          <div className="p-2 rounded bg-neutral-950 text-neutral-300 font-mono text-[11px] truncate select-all border border-neutral-800">
                             {db.external_url}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-neutral-900 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
+                    <div className="mt-3 pt-2.5 border-t border-neutral-900 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
                       <span>DB: <code className="text-neutral-400 font-mono">{db.database_name}</code></span>
                       <span>User: <code className="text-neutral-400 font-mono">{db.username}</code></span>
                     </div>
