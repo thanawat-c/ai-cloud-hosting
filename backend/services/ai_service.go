@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
@@ -60,7 +61,8 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 		case "package.json", "go.mod", "go.sum", "requirements.txt", "pyproject.toml", "Pipfile",
 			"pom.xml", "build.gradle", "build.gradle.kts", "Cargo.toml", "composer.json",
 			"vite.config.ts", "vite.config.js", "next.config.js", "next.config.mjs", "next.config.ts",
-			"nuxt.config.ts", "nuxt.config.js", "docker-compose.yml":
+			"nuxt.config.ts", "nuxt.config.js", "docker-compose.yml",
+			"project.json", "nx.json", "turbo.json", "nest-cli.json", "angular.json":
 			return true
 		}
 		return false
@@ -241,8 +243,11 @@ GitHub Repository: %s
 1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ให้ใช้ golang:alpine พร้อม ENV GOTOOLCHAIN=auto เพื่อรองรับ go.mod เวอร์ชันใหม่ล่าสุด, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
 2. หากโปรเจกต์ Node.js มีการใช้ pnpm (มี pnpm-lock.yaml) ต้องใส่คำสั่ง RUN npm install -g pnpm@9 ก่อนเรียกคำสั่ง pnpm เสมอ เพราะ base image ไม่มี pnpm ติดมาด้วย และ pnpm@9 รองรับ lockfile version 9 ได้สมบูรณ์ที่สุด
 3. หากโปรเจกต์ Node.js มีการใช้ yarn (มี yarn.lock) ให้ใส่คำสั่ง RUN corepack enable ก่อนเรียกคำสั่ง yarn เสมอ
-5. ห้ามเขียนคำสั่ง COPY dist/... หรือ COPY build/... จาก host โดยเด็ดขาด เพราะโฟลเดอร์เหล่านี้ถูก .gitignore และไม่มีอยู่ใน repository จริงบน GitHub หากโปรเจกต์ต้องมีการ build (เช่น Node/TypeScript/NestJS/React/Vite/Next) ต้องใส่ขั้นตอน RUN npm run build หรือ multi-stage build (COPY --from=builder ...) ภายใน Dockerfile เสมอ!
-6. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+4. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 หรือ 3000)
+5. ในโปรเจกต์ Node.js/TypeScript/Monorepo หากต้องการสั่ง Build ให้ใช้คำสั่งมาตรฐานตาม scripts ใน package.json เสมอ เช่น RUN npm run build (หรือ pnpm run build หรือ yarn build) ห้ามคิดเดาหรือเรียกคำสั่งเจาะจงเองเช่น RUN npx nx build <ชื่อที่เดา> เด็ดขาด เพราะคำสั่ง npm run build จะเรียก build target ที่ถูกต้องตาม package.json โดยอัตโนมัติ!
+6. ห้ามเขียนคำสั่ง COPY dist/... หรือ COPY build/... จาก host โดยเด็ดขาด เพราะโฟลเดอร์เหล่านี้ถูก .gitignore และไม่มีอยู่ใน repository จริงบน GitHub หากโปรเจกต์ต้องมีการ build (เช่น Node/TypeScript/NestJS/React/Vite/Next) ต้องใส่ขั้นตอน RUN npm run build หรือ multi-stage build (COPY --from=builder ...) ภายใน Dockerfile เสมอ!
+7. หากใน dependencies มี @prisma/client หรือ prisma ให้ใส่คำสั่ง RUN npx prisma generate ก่อนขั้นตอน build เสมอ
+8. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
 		repoURL, targetInstruction, fileListStr, configsStr)
 
 	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
@@ -277,6 +282,37 @@ GitHub Repository: %s
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm install -g pnpm &&", "npm install -g pnpm@9 &&")
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm\n", "npm i -g pnpm@9\n")
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm &&", "npm i -g pnpm@9 &&")
+
+	// Auto-fix: หาก AI ไปเดาคำสั่ง npx nx build <name> ให้สลับมาใช้คำสั่งมาตรฐาน npm run build
+	if strings.Contains(finalDockerfile, "nx build") {
+		reNx := regexp.MustCompile(`(?m)^RUN\s+(npx\s+)?nx\s+build.*$`)
+		finalDockerfile = reNx.ReplaceAllString(finalDockerfile, "RUN npm run build")
+	}
+
+	// Auto-fix: ป้องกันข้อผิดพลาดกรณีใช้ Prisma แต่ AI ลืม npx prisma generate
+	if strings.Contains(configsStr, "prisma") && !strings.Contains(finalDockerfile, "prisma generate") {
+		finalDockerfile = strings.Replace(finalDockerfile, "RUN npm run build", "RUN npx prisma generate || true\nRUN npm run build", 1)
+		finalDockerfile = strings.Replace(finalDockerfile, "RUN pnpm run build", "RUN npx prisma generate || true\nRUN pnpm run build", 1)
+		finalDockerfile = strings.Replace(finalDockerfile, "RUN yarn build", "RUN npx prisma generate || true\nRUN yarn build", 1)
+	}
+
+	// Auto-fix: ป้องกัน Prisma บน Alpine ขาด OpenSSL
+	if strings.Contains(configsStr, "prisma") && strings.Contains(finalDockerfile, "alpine") && !strings.Contains(finalDockerfile, "openssl") {
+		lines := strings.Split(finalDockerfile, "\n")
+		var newLines []string
+		injected := false
+		for _, l := range lines {
+			newLines = append(newLines, l)
+			trimmedL := strings.TrimSpace(l)
+			if !injected && (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ")) {
+				newLines = append(newLines, "RUN apk add --no-cache openssl")
+				injected = true
+			}
+		}
+		if injected {
+			finalDockerfile = strings.Join(newLines, "\n")
+		}
+	}
 
 	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
 	if strings.Contains(finalDockerfile, "pnpm") && !strings.Contains(finalDockerfile, "install -g pnpm") && !strings.Contains(finalDockerfile, "corepack") {
