@@ -9,6 +9,19 @@
   code, pre, kbd {
     font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
+
+  /* Prevent browser Autofill from turning inputs light blue or white in Dark Mode */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus, 
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #000000 inset !important;
+    -webkit-text-fill-color: #ededed !important;
+    caret-color: #ededed !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 /* Vercel Crisp 1px Scrollbar */
