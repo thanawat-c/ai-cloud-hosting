@@ -12,6 +12,23 @@ import (
 	"google.golang.org/api/option"
 )
 
+func generateWithGemini(ctx context.Context, aiClient *genai.Client, prompt string, jsonMode bool) (*genai.GenerateContentResponse, error) {
+	candidateModels := []string{"gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"}
+	var lastErr error
+	for _, modelName := range candidateModels {
+		model := aiClient.GenerativeModel(modelName)
+		if jsonMode {
+			model.ResponseMIMEType = "application/json"
+		}
+		resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+		if err == nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			return resp, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 // GenerateDockerfile generates a production Dockerfile for either the full project or a specific target folder (e.g. backend/ or frontend/)
 func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, targetDir string, backendEndpoint ...string) (string, string, error) {
 	var endpoint string
@@ -116,11 +133,8 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 			}
 		}
 	}
-
 	fileListStr := strings.Join(fileList, ", ")
 	configsStr := strings.Join(configContents, "\n\n")
-
-	model := aiClient.GenerativeModel("gemini-1.5-flash")
 
 	var targetInstruction string
 	isFrontend = len(backendEndpoint) > 0 && backendEndpoint[0] != ""
@@ -227,13 +241,13 @@ GitHub Repository: %s
 1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ให้ใช้ golang:alpine พร้อม ENV GOTOOLCHAIN=auto เพื่อรองรับ go.mod เวอร์ชันใหม่ล่าสุด, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
 2. หากโปรเจกต์ Node.js มีการใช้ pnpm (มี pnpm-lock.yaml) ต้องใส่คำสั่ง RUN npm install -g pnpm@9 ก่อนเรียกคำสั่ง pnpm เสมอ เพราะ base image ไม่มี pnpm ติดมาด้วย และ pnpm@9 รองรับ lockfile version 9 ได้สมบูรณ์ที่สุด
 3. หากโปรเจกต์ Node.js มีการใช้ yarn (มี yarn.lock) ให้ใส่คำสั่ง RUN corepack enable ก่อนเรียกคำสั่ง yarn เสมอ
-4. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
-5. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+5. ห้ามเขียนคำสั่ง COPY dist/... หรือ COPY build/... จาก host โดยเด็ดขาด เพราะโฟลเดอร์เหล่านี้ถูก .gitignore และไม่มีอยู่ใน repository จริงบน GitHub หากโปรเจกต์ต้องมีการ build (เช่น Node/TypeScript/NestJS/React/Vite/Next) ต้องใส่ขั้นตอน RUN npm run build หรือ multi-stage build (COPY --from=builder ...) ภายใน Dockerfile เสมอ!
+6. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
 		repoURL, targetInstruction, fileListStr, configsStr)
 
 	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
 
-	aiResp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	aiResp, err := generateWithGemini(ctx, aiClient, prompt, false)
 	if err != nil || len(aiResp.Candidates) == 0 || aiResp.Candidates[0].Content == nil {
 		fmt.Printf("⚠️ [AI Quota/Generation Error] (%v) กำลังสลับใช้ Smart Fallback Template สำหรับ %s...\n", err, targetDir)
 		return generateFallbackDockerfile(buildDir, targetDir, isBackend, isFrontend, endpoint)
@@ -465,10 +479,7 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 
 ห้ามใส่คำอธิบาย ห้ามใส่ markdown block ตอบเฉพาะ raw json ล้วนๆ`, strings.Join(summary, "\n"))
 
-	model := aiClient.GenerativeModel("gemini-1.5-flash")
-	model.ResponseMIMEType = "application/json"
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := generateWithGemini(ctx, aiClient, prompt, true)
 	if err != nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
 		return false, "", ""
 	}
@@ -507,22 +518,8 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 		workdir = "/app/" + targetDir
 	}
 
-	// 0. ตรวจสอบว่าใน target มี Dockerfile เดิมของผู้ใช้อยู่แล้วหรือไม่
-	existingDockerfile := filepath.Join(fullTarget, "Dockerfile")
-	if info, err := os.Stat(existingDockerfile); err == nil && !info.IsDir() {
-		content, err := os.ReadFile(existingDockerfile)
-		if err == nil && len(content) > 0 {
-			port := "8080"
-			for _, line := range strings.Split(string(content), "\n") {
-				trimmed := strings.TrimSpace(line)
-				if strings.HasPrefix(trimmed, "EXPOSE ") {
-					port = strings.TrimSpace(strings.TrimPrefix(trimmed, "EXPOSE "))
-					break
-				}
-			}
-			return string(content), port, nil
-		}
-	}
+	// หมายเหตุ: เมื่อเข้ามาถึงฟังก์ชันนี้ แสดงว่าระบบต้องการสร้าง Dockerfile ใหม่
+	// (ไม่ใช้ Dockerfile เดิมที่อาจมีปัญหาหรือเขียนผิดพลาดใน repo)
 
 	// 1. ตรวจสอบกรณี Frontend (Nuxt, Vite, React, Vue, Static Web)
 	if isFrontend || targetDir == "frontend" {
@@ -628,14 +625,20 @@ CMD ["python", "main.py"]
 	// 4. Node.js (ตรวจสอบว่ามี package.json อยู่จริง)
 	packageJsonPath := filepath.Join(fullTarget, "package.json")
 	if _, err := os.Stat(packageJsonPath); err == nil {
+		buildStep := ""
+		pkgData, err := os.ReadFile(packageJsonPath)
+		if err == nil && strings.Contains(string(pkgData), "\"build\":") {
+			buildStep = "RUN npm run build || true\n"
+		}
+
 		dockerfile := fmt.Sprintf(`FROM node:22-alpine
 WORKDIR /app
 COPY %spackage.json %s*lock* ./
 RUN npm install
 COPY %s ./
-EXPOSE 3000
+%sEXPOSE 3000
 CMD ["npm", "start"]
-`, cleanPrefix, cleanPrefix, copySource)
+`, cleanPrefix, cleanPrefix, copySource, buildStep)
 
 		return dockerfile, "3000", nil
 	}
