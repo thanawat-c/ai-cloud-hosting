@@ -408,49 +408,59 @@ const DashboardHome = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleOpenSqlStudio = async (db) => {
-    setActiveSqlDb(db);
-    setSqlModalOpen(true);
-    setSqlResult('');
-    setSqlQuery("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';");
-    setSqlTables([]);
-    try {
-      const res = await fetch(`http://localhost:8080/api/databases/${db.id}/tables`);
-      if (res.ok) {
-        const data = await res.json();
-        setSqlTables(data.tables || []);
-      }
-    } catch (err) {
-      console.error('Failed to load tables:', err);
-    }
-  };
-
-  const handleExecuteQuery = async (queryToRun) => {
+  const handleExecuteQuery = async (queryToRun, overrideDb) => {
+    const targetDb = overrideDb || activeSqlDb;
     const q = queryToRun || sqlQuery;
-    if (!q.trim() || !activeSqlDb) return;
+    if (!q || !q.trim() || !targetDb) return;
     setRunningSql(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeSqlDb.id}/query`, {
+      const res = await fetch(`http://localhost:8080/api/databases/${targetDb.id}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q.trim() }),
       });
       const data = await res.json();
       if (res.ok) {
-        setSqlResult(data.result || 'คำสั่งสำเร็จ (ไม่มีข้อความตอบกลับ)');
-        // รีโหลดรายชื่อ Table เผื่อมีการสร้าง/ลบ Table
-        const tblRes = await fetch(`http://localhost:8080/api/databases/${activeSqlDb.id}/tables`);
+        setSqlResult(data.result || 'คำสั่งสำเร็จ (ไม่มีข้อมูลส่งกลับ)');
+        // รีโหลดรายชื่อ Table
+        const tblRes = await fetch(`http://localhost:8080/api/databases/${targetDb.id}/tables`);
         if (tblRes.ok) {
           const tblData = await tblRes.json();
           setSqlTables(tblData.tables || []);
         }
       } else {
-        setSqlResult(`❌ ข้อผิดพลาด:\n${data.error || 'Query failed'}`);
+        setSqlResult(`❌ ข้อผิดพลาด: ${data.error || 'Query failed'}`);
       }
     } catch (err) {
       setSqlResult(`❌ การเชื่อมต่อล้มเหลว: ${err.message}`);
     } finally {
       setRunningSql(false);
+    }
+  };
+
+  const handleOpenSqlStudio = async (db) => {
+    setActiveSqlDb(db);
+    setSqlModalOpen(true);
+    setSqlResult('');
+    setSqlTables([]);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${db.id}/tables`);
+      if (res.ok) {
+        const data = await res.json();
+        const tables = data.tables || [];
+        setSqlTables(tables);
+        if (tables.length > 0) {
+          const autoQuery = `SELECT * FROM ${tables[0]} LIMIT 20;`;
+          setSqlQuery(autoQuery);
+          handleExecuteQuery(autoQuery, db);
+        } else {
+          const defaultQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';";
+          setSqlQuery(defaultQuery);
+          handleExecuteQuery(defaultQuery, db);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load tables:', err);
     }
   };
 
@@ -1654,56 +1664,55 @@ const DashboardHome = () => {
       {sqlModalOpen && activeSqlDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  <Code className="w-5 h-5" />
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Database className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    SQL Studio: <span className="text-indigo-600 font-mono">{activeSqlDb.name}</span>
-                  </h3>
-                  <p className="text-xs text-slate-500">PostgreSQL 16 • ตรวจสอบ Table และรันคำสั่ง SQL ได้ทันทีบนเว็บ</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-800">SQL Studio</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 text-indigo-700 font-mono text-xs font-semibold">
+                    {activeSqlDb.name}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">
+                    PostgreSQL 16
+                  </span>
                 </div>
               </div>
               <button 
                 onClick={() => setSqlModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            <div className="p-5 space-y-3.5 overflow-y-auto flex-1">
               {/* Tables Bar */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2">
-                  <Table className="w-4 h-4 text-indigo-600" />
-                  <span>Tables ในฐานข้อมูล ({sqlTables.length} ตาราง):</span>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-500 text-xs flex items-center gap-1.5 shrink-0">
+                  <Table className="w-3.5 h-3.5 text-indigo-600" />
+                  ตาราง:
+                </span>
                 {sqlTables.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">
-                    ยังไม่มี Table ในฐานข้อมูล (คุณสามารถพิมพ์คำสั่ง CREATE TABLE ด้านล่างเพื่อสร้างได้เลย)
-                  </p>
+                  <span className="text-xs text-slate-400 italic">ไม่มีตารางในฐานข้อมูล</span>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {sqlTables.map((tbl) => (
-                      <button
-                        key={tbl}
-                        type="button"
-                        onClick={() => {
-                          const query = `SELECT * FROM ${tbl} LIMIT 50;`;
-                          setSqlQuery(query);
-                          handleExecuteQuery(query);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 font-mono text-xs font-medium shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5"
-                        title="คลิกเพื่อดูข้อมูลในตารางนี้"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        <span>{tbl}</span>
-                      </button>
-                    ))}
-                  </div>
+                  sqlTables.map((tbl) => (
+                    <button
+                      key={tbl}
+                      type="button"
+                      onClick={() => {
+                        const query = `SELECT * FROM ${tbl} LIMIT 20;`;
+                        setSqlQuery(query);
+                        handleExecuteQuery(query);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 font-mono text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>{tbl}</span>
+                    </button>
+                  ))
                 )}
               </div>
 
@@ -1711,25 +1720,29 @@ const DashboardHome = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700">
-                    คำสั่ง SQL (Query Editor):
+                    คำสั่ง SQL:
                   </label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setSqlQuery("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")}
-                      className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors"
-                    >
-                      ดูรายชื่อตาราง
-                    </button>
+                  <div className="flex items-center gap-2">
                     {sqlTables.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => setSqlQuery(`SELECT * FROM ${sqlTables[0]} LIMIT 20;`)}
-                        className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors"
+                        onClick={() => {
+                          const query = `SELECT * FROM ${sqlTables[0]} LIMIT 20;`;
+                          setSqlQuery(query);
+                          handleExecuteQuery(query);
+                        }}
+                        className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                       >
                         ดูข้อมูล {sqlTables[0]}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setSqlQuery('')}
+                      className="text-[11px] text-slate-400 hover:text-rose-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      ล้างคำสั่ง
+                    </button>
                   </div>
                 </div>
                 <textarea
@@ -1741,12 +1754,14 @@ const DashboardHome = () => {
                       handleExecuteQuery();
                     }
                   }}
-                  rows="4"
-                  placeholder="SELECT * FROM users LIMIT 10;"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
+                  rows="3"
+                  placeholder="พิมพ์คำสั่ง SQL เช่น SELECT * FROM ... หรือ INSERT / UPDATE"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
                 ></textarea>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                  <span>💡 กด <kbd className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Cmd + Enter</kbd> หรือ <kbd className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Ctrl + Enter</kbd> เพื่อรันคำสั่งได้ทันที</span>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[11px] text-slate-400">
+                    กด <kbd className="bg-slate-100 px-1 py-0.5 rounded text-[10px] font-mono border border-slate-200">⌘ + Enter</kbd> เพื่อรัน
+                  </span>
                   <button
                     type="button"
                     onClick={() => handleExecuteQuery()}
@@ -1771,24 +1786,43 @@ const DashboardHome = () => {
               {/* SQL Result View */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  ผลลัพธ์คำสั่ง (Query Output):
+                  ผลลัพธ์:
                 </label>
-                <div className="p-4 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-slate-800 shadow-inner">
-                  {sqlResult || "-- กดปุ่ม Run Query เพื่อดูผลลัพธ์ --"}
+                <div className="p-3.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-slate-800 shadow-inner">
+                  {runningSql ? (
+                    <span className="text-slate-500">กำลังดึงข้อมูล...</span>
+                  ) : (
+                    sqlResult || <span className="text-slate-600">-- ไม่มีข้อมูล --</span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                หรือต่อผ่าน External URL: <code className="font-mono text-slate-600">{activeSqlDb.external_url}</code>
-              </span>
+            {/* Footer */}
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => handleCopyUrl(activeSqlDb.external_url, `ext-sql-${activeSqlDb.id}`)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-200/60 border border-slate-200 transition-colors cursor-pointer"
+              >
+                {copiedKey === `ext-sql-${activeSqlDb.id}` ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>คัดลอก URL สำเร็จ</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>คัดลอก Connection URL</span>
+                  </>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => setSqlModalOpen(false)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
-                ปิดหน้าต่าง
+                ปิด
               </button>
             </div>
           </div>
