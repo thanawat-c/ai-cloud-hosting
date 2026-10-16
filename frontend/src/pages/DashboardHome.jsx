@@ -1026,7 +1026,7 @@ const DashboardHome = () => {
       ) : (
         <div className="relative z-10 w-full">
           <div className="bg-black border border-neutral-800 rounded-lg overflow-x-auto min-h-[200px]">
-            <table className="w-full min-w-[850px] table-auto text-left">
+            <table className="w-full table-auto text-left">
                 <thead className="bg-neutral-950/90 border-b border-neutral-800">
                   <tr>
                     <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
@@ -1071,35 +1071,39 @@ const DashboardHome = () => {
 
                     return (
                       <tr key={item.id} className="hover:bg-neutral-900/40 transition-colors group">
-                        {/* 1. Deployment / Project Name */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2.5">
+                        {/* 1. Deployment / Project Name with Tooltip */}
+                        <td className="px-4 py-3.5 max-w-[180px] sm:max-w-[220px] lg:max-w-[260px]">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-5 h-5 flex items-center justify-center shrink-0">
                               <svg viewBox="0 0 76 65" fill="none" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" className="w-3.5 h-3.5 text-[#00df8f]">
                                 <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
                               </svg>
                             </div>
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               {item.domain_name && isRunning ? (
                                 <a 
                                   href={`http://${item.domain_name}`} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  className="text-sm font-medium text-white hover:underline truncate tracking-tight font-sans"
+                                  title={shortName}
+                                  className="text-sm font-medium text-white hover:underline truncate tracking-tight font-sans block"
                                 >
                                   {shortName}
                                 </a>
                               ) : (
-                                <span className="text-sm font-medium text-white truncate tracking-tight font-sans">
+                                <span 
+                                  title={shortName}
+                                  className="text-sm font-medium text-white truncate tracking-tight font-sans block cursor-help"
+                                >
                                   {shortName}
                                 </span>
                               )}
                               {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
                                   API
                                 </span>
                               ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
                                   UI
                                 </span>
                               ) : null}
@@ -1108,7 +1112,7 @@ const DashboardHome = () => {
                         </td>
 
                         {/* 2. Description / Commit */}
-                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-xs xl:max-w-md font-sans">
+                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-[160px] lg:max-w-[240px] font-sans" title={description}>
                           {description}
                         </td>
 
