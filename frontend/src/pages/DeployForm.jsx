@@ -1,8 +1,17 @@
-import { useState, useEffect } from 'react';
-import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText, Database, Check } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
+  Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
+  FileText, Database, Check, Copy, LayoutDashboard, X 
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 const DeployForm = () => {
+  const navigate = useNavigate();
+  const resultRef = useRef(null);
+  const logsEndRef = useRef(null);
+
   const [repoUrl, setRepoUrl] = useState('');
   const [gitToken, setGitToken] = useState('');
   const [showToken, setShowToken] = useState(false);
@@ -19,6 +28,23 @@ const DeployForm = () => {
   const [selectedDbId, setSelectedDbId] = useState('');
   const [inspecting, setInspecting] = useState(false);
   const [inspectResult, setInspectResult] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const handleCopyUrl = (url) => {
+    if (!url) return;
+    const fullUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `http://${url}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedUrl(true);
+    toast.success('URL copied to clipboard!');
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  useEffect(() => {
+    if (deployLogs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [deployLogs]);
 
   useEffect(() => {
     fetch('http://localhost:8080/api/databases')
@@ -117,6 +143,7 @@ const DeployForm = () => {
 
     setIsLoading(true);
     setMessage('');
+    setShowSuccessModal(false);
     setAiDockerfile('');
     setContainerId('');
     setPublicPort('');
@@ -157,6 +184,7 @@ const DeployForm = () => {
           if (idMatch) setContainerId(idMatch[1]);
           
           setMessage("Deployment successful! Your server is ready.");
+          setShowSuccessModal(true);
           toast.success("Deployment successful!", {
             description: domainMatch ? `Available at ${domainMatch[1]}` : "Server is now running",
           });
@@ -174,6 +202,9 @@ const DeployForm = () => {
       });
     } finally {
       setIsLoading(false);
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 150);
     }
   };
 
@@ -396,10 +427,10 @@ const DeployForm = () => {
           <button 
             onClick={handleDeploy}
             disabled={isLoading}
-            className={`w-full flex items-center justify-center gap-2 font-semibold py-3 px-6 rounded-xl transition-all shadow-xs
+            className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 px-6 rounded-xl transition-all shadow-xs
               ${isLoading 
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                : 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'}`}
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-indigo-500/20 shadow-md'}`}
           >
             {isLoading ? (
               <>
@@ -414,70 +445,140 @@ const DeployForm = () => {
             )}
           </button>
 
+          {/* Success / Error Card (Positioned directly under the button so it is immediately visible!) */}
+          <div ref={resultRef}>
+            {message && (
+              <div className={`mt-5 p-5 md:p-6 rounded-2xl border backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm
+                ${containerId 
+                  ? 'bg-emerald-50/90 border-emerald-200' 
+                  : 'bg-rose-50/90 border-rose-200'}`}>
+                
+                <div className="flex items-start gap-3.5">
+                  {containerId ? (
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/20">
+                      <XCircle className="w-5 h-5" />
+                    </div>
+                  )}
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                      <h4 className={`text-base font-bold ${containerId ? 'text-emerald-900' : 'text-rose-900'}`}>
+                        {containerId ? 'Deployment Successful!' : 'Deployment Failed'}
+                      </h4>
+                      {containerId && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-200">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                          </span>
+                          Live & Running
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs ${containerId ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>
+                    
+                    {containerId && (
+                      <div className="mt-4 space-y-3">
+                        {publicPort && (
+                          <div className="p-3 bg-white/80 rounded-xl border border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Live Gateway Endpoint</span>
+                              <span className="font-mono text-xs font-bold text-slate-900 truncate block">
+                                http://{publicPort}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyUrl(publicPort)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                                title="Copy public URL"
+                              >
+                                {copiedUrl ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Copy URL</span>
+                                  </>
+                                )}
+                              </button>
+                              <a 
+                                href={`http://${publicPort}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm shadow-emerald-500/20 cursor-pointer"
+                              >
+                                <span>Open Site</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                          <code className="px-2.5 py-1 bg-emerald-100/60 text-emerald-800 rounded-md border border-emerald-200 font-mono text-[11px]">
+                            Container ID: {containerId.substring(0, 12)}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md font-semibold text-[11px] transition-colors cursor-pointer"
+                          >
+                            <LayoutDashboard className="w-3 h-3 text-slate-500" />
+                            <span>Go to Dashboard</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Terminal Log View */}
           {deployLogs && (
-            <div className="mt-8 bg-slate-900 rounded-xl p-4 overflow-hidden border border-slate-700 shadow-2xl text-left">
+            <div className="mt-6 bg-slate-900 rounded-xl p-4 overflow-hidden border border-slate-700 shadow-xl text-left">
               {/* Window Header */}
-              <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2">
-                <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                <span className="text-slate-400 text-xs font-mono ml-2">Deploy Terminal</span>
+              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <span className="text-slate-400 text-xs font-mono ml-2">Build & Deploy Logs</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(deployLogs);
+                    toast.success('Logs copied to clipboard');
+                  }}
+                  className="text-slate-400 hover:text-slate-200 text-[11px] font-mono flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy Logs</span>
+                </button>
               </div>
               
               {/* Terminal Logs Content */}
               <div className="h-64 overflow-y-auto font-mono text-xs md:text-sm text-emerald-400 whitespace-pre-wrap">
                 {deployLogs}
-              </div>
-            </div>
-          )}
-
-          {/* Success/Error Message */}
-          {message && (
-            <div className={`mt-8 p-6 rounded-2xl border backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500
-              ${containerId 
-                ? 'bg-emerald-50/80 border-emerald-200/60' 
-                : 'bg-rose-50/80 border-rose-200/60'}`}>
-              
-              <div className="flex items-start gap-4">
-                {containerId ? (
-                  <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-6 h-6 text-rose-500 shrink-0 mt-0.5" />
-                )}
-                
-                <div className="flex-1">
-                  <h4 className={`text-lg font-bold mb-1 ${containerId ? 'text-emerald-800' : 'text-rose-800'}`}>
-                    {containerId ? 'Deployment Successful!' : 'Deployment Failed'}
-                  </h4>
-                  <p className={`font-medium ${containerId ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>
-                  
-                  {containerId && (
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                      <code className="text-sm px-3 py-1.5 bg-emerald-100/50 text-emerald-800 rounded-lg border border-emerald-200 font-mono">
-                        ID: {containerId.substring(0, 12)}
-                      </code>
-                      
-                      {publicPort && (
-                        <a 
-                          href={`http://${publicPort}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:-translate-y-0.5"
-                        >
-                          Open Live Site <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <div ref={logsEndRef} />
               </div>
             </div>
           )}
 
           {/* Dockerfile Output (macOS Terminal Style) */}
           {aiDockerfile && (
-            <div className="mt-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+            <div className="mt-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
               <div className="flex items-center gap-2 mb-3 px-2">
                 <Terminal className="w-5 h-5 text-indigo-500" />
                 <h4 className="text-sm font-bold text-slate-700">AI Generated Dockerfile</h4>
@@ -506,6 +607,115 @@ const DeployForm = () => {
         </div>
         
       </div>
+
+      {/* Deployment Success Modal (Vercel-style: Pops up immediately with 0 scrolling needed) */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-100 overflow-hidden text-center animate-in zoom-in-95 duration-200">
+            
+            {/* Ambient decorative background glow */}
+            <div className="absolute top-0 right-0 -mt-16 -mr-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 -mb-16 -ml-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowSuccessModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Icon / Status badge */}
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25 mb-4 animate-in bounce-in duration-300">
+                <Rocket className="w-7 h-7" />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200/80 mb-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Live & Healthy</span>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-900 mb-1">
+                Your Project is Live!
+              </h3>
+              <p className="text-xs text-slate-500 max-w-xs mb-6">
+                Build and container initialization completed. Your service is now reachable via Traefik gateway.
+              </p>
+
+              {/* Endpoint Display Box */}
+              {publicPort && (
+                <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-left">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Service Endpoint</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-slate-800 truncate select-all">
+                      http://{publicPort}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyUrl(publicPort)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer"
+                    >
+                      {copiedUrl ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Primary Action Buttons */}
+              <div className="w-full space-y-2.5">
+                {publicPort && (
+                  <a
+                    href={`http://${publicPort}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <span>Open Live Site</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+
+                <div className="flex items-center gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    <span>Go to Dashboard</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSuccessModal(false)}
+                    className="flex-1 py-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    View Logs
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
