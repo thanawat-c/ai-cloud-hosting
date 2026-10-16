@@ -34,5 +34,9 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/databases/:id/bind", controllers.BindDatabase)
 		api.GET("/databases/:id/backup", controllers.BackupDatabase)
 		api.POST("/databases/:id/restore", controllers.RestoreDatabase)
+
+		// GitHub Webhooks (Auto-Deploy on Push)
+		api.POST("/webhooks/deploy/:id", controllers.HandleDeploymentWebhook)
+		api.POST("/webhooks/github", controllers.HandleGlobalGitHubWebhook)
 	}
 }

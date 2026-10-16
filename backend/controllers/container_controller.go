@@ -110,6 +110,11 @@ func GetContainers(c *gin.Context) {
 			cleanName = strings.TrimSuffix(d.RepoURL, " (Frontend)")
 		}
 
+		if d.WebhookSecret == "" {
+			d.WebhookSecret = GenerateRandomSecret()
+			config.DB.Model(&d).Update("webhook_secret", d.WebhookSecret)
+		}
+
 		results = append(results, map[string]interface{}{
 			"id":             d.ContainerID,
 			"deployment_id":  d.ID,
@@ -125,6 +130,8 @@ func GetContainers(c *gin.Context) {
 			"linked_db_id":   linkedDBID,
 			"is_db_stopped":  isDBStopped,
 			"db_warning":     dbWarning,
+			"webhook_secret": d.WebhookSecret,
+			"webhook_url":    fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),
 		})
 	}
 	

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
@@ -73,6 +73,11 @@ const DashboardHome = () => {
   const [restoreFile, setRestoreFile] = useState(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState('');
+
+  // Webhook State
+  const [webhookModalOpen, setWebhookModalOpen] = useState(false);
+  const [activeWebhookContainer, setActiveWebhookContainer] = useState(null);
+  const [pingingWebhook, setPingingWebhook] = useState(false);
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -473,6 +478,38 @@ const DashboardHome = () => {
       setRestoreResult(`Network Error: ${err.message}`);
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const handleOpenWebhookModal = (container) => {
+    setActiveWebhookContainer(container);
+    setWebhookModalOpen(true);
+  };
+
+  const handleTestWebhookPing = async () => {
+    if (!activeWebhookContainer?.deployment_id) return;
+    setPingingWebhook(true);
+    const toastId = toast.loading('กำลังส่ง Ping Test ไปยัง Webhook...');
+    try {
+      const res = await fetch(`http://localhost:8080/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`, {
+        method: 'POST',
+        headers: {
+          'X-GitHub-Event': 'ping',
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Webhook ตอบกลับสำเร็จ (Pong!)', {
+          id: toastId,
+          description: data.message || 'ระบบพร้อมรับ Push Event จาก GitHub แล้ว',
+        });
+      } else {
+        toast.error('ทดสอบล้มเหลว', { id: toastId, description: data.error });
+      }
+    } catch (err) {
+      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+    } finally {
+      setPingingWebhook(false);
     }
   };
 
@@ -984,6 +1021,13 @@ const DashboardHome = () => {
                             title="Re-deploy (อัปเดตโค้ดใหม่)"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenWebhookModal(item)}
+                            className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
+                            title="GitHub Webhook (Auto-deploy on Push)"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
                           </button>
                           <button 
                             onClick={() => handleDelete(item.id || item.deployment_id)} 
@@ -1798,6 +1842,141 @@ const DashboardHome = () => {
                     <span>เริ่มกู้คืน (Restore Now)</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* GitHub Webhook Setup Modal */}
+      {webhookModalOpen && activeWebhookContainer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">GitHub Auto-Deploy Webhook</h3>
+                  <p className="text-xs text-slate-500">
+                    Service: {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setWebhookModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-purple-50/80 border border-purple-100 text-xs text-purple-900 leading-relaxed">
+                <p className="font-bold mb-1">⚡ เมื่อคุณ Git Push โค้ดใหม่เข้า GitHub:</p>
+                <p className="text-purple-800">
+                  GitHub จะส่งสัญญาณมาที่ URL ด้านล่าง เพื่อสั่งให้ AI-Cloud Platform ดึงโค้ดล่าสุด บิลด์ Image ใหม่ และสลับรันให้อัตโนมัติในทันที (Zero-effort CI/CD)
+                </p>
+              </div>
+
+              {/* Step 1: Payload URL */}
+              <div>
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                  <span>1. Payload URL:</span>
+                  <button
+                    onClick={() => handleCopyUrl(activeWebhookContainer.webhook_url, `wh-url-${activeWebhookContainer.deployment_id}`)}
+                    className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    {copiedKey === `wh-url-${activeWebhookContainer.deployment_id}` ? (
+                      <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
+                    ) : (
+                      <><Copy className="w-3.5 h-3.5" /> คัดลอก URL</>
+                    )}
+                  </button>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 text-purple-300 font-mono text-xs select-all border border-slate-800 break-all">
+                  {activeWebhookContainer.webhook_url}
+                </div>
+              </div>
+
+              {/* Step 2: Content type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-700 mb-1.5">2. Content type:</span>
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200">
+                    application/json
+                  </div>
+                </div>
+
+                {/* Step 3: Secret */}
+                <div>
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>3. Secret (แนะนำ):</span>
+                    <button
+                      onClick={() => handleCopyUrl(activeWebhookContainer.webhook_secret, `wh-sec-${activeWebhookContainer.deployment_id}`)}
+                      className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      {copiedKey === `wh-sec-${activeWebhookContainer.deployment_id}` ? (
+                        <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
+                      ) : (
+                        <><Copy className="w-3.5 h-3.5" /> คัดลอก</>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 font-mono text-xs truncate border border-slate-200">
+                    {activeWebhookContainer.webhook_secret}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 4: Event Trigger */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                <span className="font-semibold text-slate-800">4. Which events would you like to trigger this webhook?</span>
+                <p>เลือก: <span className="font-bold text-indigo-700">Just the push event</span> (สั่ง Deploy เมื่อมีคน Push โค้ด)</p>
+              </div>
+
+              {/* GitHub Link Guide */}
+              {activeWebhookContainer.clean_name?.startsWith('http') && (
+                <div className="text-right">
+                  <a
+                    href={`${activeWebhookContainer.clean_name.replace(/\.git$/, '')}/settings/hooks`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium underline"
+                  >
+                    <span>เปิดหน้า GitHub Webhooks ของ Repo นี้</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleTestWebhookPing}
+                disabled={pingingWebhook}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-semibold border border-purple-200 transition-colors cursor-pointer"
+              >
+                {pingingWebhook ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>กำลังทดสอบ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>ทดสอบยิง Ping (Test Ping)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setWebhookModalOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                เสร็จสิ้น
               </button>
             </div>
           </div>
