@@ -14,14 +14,23 @@ import (
 
 // GenerateDockerfile generates a production Dockerfile for either the full project or a specific target folder (e.g. backend/ or frontend/)
 func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, targetDir string, backendEndpoint ...string) (string, string, error) {
+	var endpoint string
+	if len(backendEndpoint) > 0 {
+		endpoint = backendEndpoint[0]
+	}
+	isBackend := targetDir == "backend" || strings.HasSuffix(targetDir, "/backend")
+	isFrontend := targetDir == "frontend" || strings.HasSuffix(targetDir, "/frontend")
+
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
-		return "", "", fmt.Errorf("ไม่พบ GEMINI_API_KEY ในระบบ")
+		fmt.Printf("⚠️ [No GEMINI_API_KEY] กำลังสลับใช้ Smart Fallback Template สำหรับ %s...\n", targetDir)
+		return generateFallbackDockerfile(buildDir, targetDir, isBackend, isFrontend, endpoint)
 	}
 
 	aiClient, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return "", "", fmt.Errorf("เชื่อมต่อ AI ไม่สำเร็จ: %w", err)
+		fmt.Printf("⚠️ [AI Client Error] (%v) กำลังสลับใช้ Smart Fallback Template สำหรับ %s...\n", err, targetDir)
+		return generateFallbackDockerfile(buildDir, targetDir, isBackend, isFrontend, endpoint)
 	}
 	defer aiClient.Close()
 
@@ -114,8 +123,8 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	model := aiClient.GenerativeModel("gemini-2.5-flash")
 
 	var targetInstruction string
-	isFrontend := len(backendEndpoint) > 0 && backendEndpoint[0] != ""
-	isBackend := targetDir != "" && !isFrontend
+	isFrontend = len(backendEndpoint) > 0 && backendEndpoint[0] != ""
+	isBackend = targetDir != "" && !isFrontend
 
 	if isBackend {
 		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
@@ -203,7 +212,7 @@ GitHub Repository: %s
 
 คำแนะนำและกฎเหล็ก:
 1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ให้ใช้ golang:alpine พร้อม ENV GOTOOLCHAIN=auto เพื่อรองรับ go.mod เวอร์ชันใหม่ล่าสุด, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
-2. หากโปรเจกต์ Node.js มีการใช้ pnpm (มี pnpm-lock.yaml) ต้องใส่คำสั่ง RUN npm install -g pnpm ก่อนเรียกคำสั่ง pnpm เสมอ เพราะ base image ไม่มี pnpm ติดมาด้วย
+2. หากโปรเจกต์ Node.js มีการใช้ pnpm (มี pnpm-lock.yaml) ต้องใส่คำสั่ง RUN npm install -g pnpm@9 ก่อนเรียกคำสั่ง pnpm เสมอ เพราะ base image ไม่มี pnpm ติดมาด้วย และ pnpm@9 รองรับ lockfile version 9 ได้สมบูรณ์ที่สุด
 3. หากโปรเจกต์ Node.js มีการใช้ yarn (มี yarn.lock) ให้ใส่คำสั่ง RUN corepack enable ก่อนเรียกคำสั่ง yarn เสมอ
 4. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
 5. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
@@ -212,12 +221,9 @@ GitHub Repository: %s
 	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
 
 	aiResp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", "80", fmt.Errorf("AI สร้างโค้ดไม่สำเร็จ: %w", err)
-	}
-
-	if len(aiResp.Candidates) == 0 || aiResp.Candidates[0].Content == nil {
-		return "", "80", fmt.Errorf("AI ตอบกลับมาเป็นค่าว่าง (No Content)")
+	if err != nil || len(aiResp.Candidates) == 0 || aiResp.Candidates[0].Content == nil {
+		fmt.Printf("⚠️ [AI Quota/Generation Error] (%v) กำลังสลับใช้ Smart Fallback Template สำหรับ %s...\n", err, targetDir)
+		return generateFallbackDockerfile(buildDir, targetDir, isBackend, isFrontend, endpoint)
 	}
 
 	var finalDockerfile string
@@ -239,6 +245,12 @@ GitHub Repository: %s
 	}
 	finalDockerfile = strings.TrimSpace(finalDockerfile)
 
+	// แปลงให้ใช้ pnpm@9 เสมอ เพื่อป้องกันปัญหา ERR_PNPM_IGNORED_BUILDS ของ pnpm v10
+	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm install -g pnpm\n", "npm install -g pnpm@9\n")
+	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm install -g pnpm &&", "npm install -g pnpm@9 &&")
+	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm\n", "npm i -g pnpm@9\n")
+	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm &&", "npm i -g pnpm@9 &&")
+
 	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
 	if strings.Contains(finalDockerfile, "pnpm") && !strings.Contains(finalDockerfile, "install -g pnpm") && !strings.Contains(finalDockerfile, "corepack") {
 		lines := strings.Split(finalDockerfile, "\n")
@@ -248,7 +260,7 @@ GitHub Repository: %s
 			newLines = append(newLines, l)
 			trimmedL := strings.TrimSpace(l)
 			if !injected && (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ")) {
-				newLines = append(newLines, "RUN npm install -g pnpm")
+				newLines = append(newLines, "RUN npm install -g pnpm@9")
 				injected = true
 			}
 		}
@@ -377,5 +389,106 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 	}
 
 	return res.IsMonorepo && res.FrontendDir != "" && res.BackendDir != "", res.FrontendDir, res.BackendDir
+}
+
+// generateFallbackDockerfile สร้าง Dockerfile มาตรฐานโดยอัตโนมัติเมื่อ AI Rate Limit หรือ Quota หมด
+func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFrontend bool, backendEndpoint string) (string, string, error) {
+	fullTarget := filepath.Join(buildDir, targetDir)
+
+	cleanPrefix := targetDir
+	if cleanPrefix != "" && !strings.HasSuffix(cleanPrefix, "/") {
+		cleanPrefix += "/"
+	}
+
+	// 1. ตรวจสอบกรณี Frontend (Nuxt, Vite, React, Vue, Static Web)
+	if isFrontend || targetDir == "frontend" {
+		pnpmLockPath := filepath.Join(fullTarget, "pnpm-lock.yaml")
+		yarnLockPath := filepath.Join(fullTarget, "yarn.lock")
+
+		setupPkgManager := "RUN npm install -g pnpm@9"
+		installCmd := "pnpm install"
+		buildCmd := "pnpm run generate || pnpm run build || npm run build"
+
+		if _, err := os.Stat(pnpmLockPath); err == nil {
+			setupPkgManager = "RUN npm install -g pnpm@9"
+			installCmd = "pnpm install"
+			buildCmd = "pnpm run generate || pnpm run build || npm run build"
+		} else if _, err := os.Stat(yarnLockPath); err == nil {
+			setupPkgManager = "RUN corepack enable"
+			installCmd = "yarn install"
+			buildCmd = "yarn generate || yarn build || npm run build"
+		} else {
+			setupPkgManager = ""
+			installCmd = "npm install"
+			buildCmd = "npm run generate || npm run build || true"
+		}
+
+		dockerfile := fmt.Sprintf(`FROM node:22-alpine AS builder
+WORKDIR /app/%s
+%s
+COPY %spackage.json %s*lock* ./
+RUN %s
+COPY %s ./
+RUN %s
+RUN mkdir -p /app/dist && (cp -r .output/public/* /app/dist/ 2>/dev/null || cp -r dist/* /app/dist/ 2>/dev/null || cp -r build/* /app/dist/ 2>/dev/null || true)
+
+FROM nginx:alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=builder /app/dist /usr/share/nginx/html/
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`, targetDir, setupPkgManager, cleanPrefix, cleanPrefix, installCmd, cleanPrefix, buildCmd)
+
+		return dockerfile, "80", nil
+	}
+
+	// 2. ตรวจสอบกรณี Go (มี go.mod)
+	goModPath := filepath.Join(fullTarget, "go.mod")
+	if _, err := os.Stat(goModPath); err == nil {
+		dockerfile := fmt.Sprintf(`FROM golang:alpine AS builder
+ENV GOTOOLCHAIN=auto
+WORKDIR /app
+COPY %sgo.mod %sgo.sum* ./
+RUN go mod download
+COPY %s ./
+RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/server .
+EXPOSE 8080
+CMD ["/app/server"]
+`, cleanPrefix, cleanPrefix, cleanPrefix)
+
+		return dockerfile, "8080", nil
+	}
+
+	// 3. กรณี Python
+	reqPath := filepath.Join(fullTarget, "requirements.txt")
+	if _, err := os.Stat(reqPath); err == nil {
+		dockerfile := fmt.Sprintf(`FROM python:3.11-slim
+WORKDIR /app
+COPY %srequirements.txt* ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY %s ./
+EXPOSE 8000
+CMD ["python", "main.py"]
+`, cleanPrefix, cleanPrefix)
+
+		return dockerfile, "8000", nil
+	}
+
+	// 4. Default Node.js
+	dockerfile := fmt.Sprintf(`FROM node:22-alpine
+WORKDIR /app
+COPY %spackage.json %s*lock* ./
+RUN npm install
+COPY %s ./
+EXPOSE 3000
+CMD ["npm", "start"]
+`, cleanPrefix, cleanPrefix, cleanPrefix)
+
+	return dockerfile, "3000", nil
 }
 
