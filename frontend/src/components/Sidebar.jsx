@@ -1,89 +1,121 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Rocket, X, Cloud } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Rocket, X, Database, Plus, Terminal } from 'lucide-react';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
+  const location = useLocation();
+
   return (
     <>
       {/* Mobile backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-20 lg:hidden"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar container */}
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-30
-        w-72 bg-slate-900/95 backdrop-blur-xl text-slate-300 flex flex-col
-        border-r border-slate-800 shadow-2xl lg:shadow-none
-        transform transition-transform duration-300 ease-in-out
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-40
+        w-64 bg-black text-neutral-300 flex flex-col
+        border-r border-neutral-800
+        transform transition-transform duration-200 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Logo Area */}
-        <div className="h-20 flex items-center justify-between px-8 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
-              <Cloud className="w-6 h-6" />
+        {/* Vercel-style Logo Area */}
+        <div className="h-16 flex items-center justify-between px-6 border-b border-neutral-800">
+          <div className="flex items-center gap-2.5">
+            {/* Vercel Triangle Icon */}
+            <div className="w-7 h-7 bg-white text-black flex items-center justify-center rounded-md font-black shadow-sm">
+              <svg viewBox="0 0 76 65" fill="currentColor" className="w-4 h-4">
+                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+              </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-wide">AI-Cloud</h1>
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Platform</p>
+              <span className="text-sm font-semibold text-white tracking-tight">AI Cloud</span>
+              <span className="ml-1.5 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-400">
+                PRO
+              </span>
             </div>
           </div>
-          <button onClick={() => setIsOpen(false)} className="lg:hidden p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
+          <button 
+            onClick={() => setIsOpen(false)} 
+            className="lg:hidden p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
-          <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Menu</p>
+        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+          <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+            Platform
+          </div>
           
           <NavLink 
             to="/" 
+            end
             onClick={() => setIsOpen(false)}
             className={({ isActive }) => `
-              flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
-              ${isActive 
-                ? 'bg-blue-500/10 text-blue-400 font-medium border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'}
+              flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-colors
+              ${isActive && !location.search.includes('tab=storage')
+                ? 'bg-neutral-900 text-white border border-neutral-800' 
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'}
             `}
           >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Deployments</span>
           </NavLink>
-          
+
+          <NavLink 
+            to="/?tab=storage" 
+            onClick={() => setIsOpen(false)}
+            className={() => `
+              flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-colors
+              ${location.search.includes('tab=storage')
+                ? 'bg-neutral-900 text-white border border-neutral-800' 
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'}
+            `}
+          >
+            <Database className="w-4 h-4" />
+            <span>Storage & Databases</span>
+          </NavLink>
+
+          <div className="pt-4 px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+            Compute
+          </div>
+
           <NavLink 
             to="/deploy" 
             onClick={() => setIsOpen(false)}
             className={({ isActive }) => `
-              flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+              flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors
               ${isActive 
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-lg shadow-blue-500/25 border border-transparent' 
-                : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 hover:border-white/20'}
+                ? 'bg-white text-black font-semibold' 
+                : 'text-neutral-300 hover:text-white hover:bg-neutral-900 border border-neutral-800/80'}
             `}
           >
-            <Rocket className={`w-5 h-5 ${!location.pathname.includes('/deploy') && 'text-blue-400 group-hover:text-blue-300'}`} />
-            New Deploy
-            {!location.pathname.includes('/deploy') && (
-              <span className="ml-auto flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-            )}
+            <div className="flex items-center gap-2.5">
+              <Rocket className="w-4 h-4" />
+              <span>Deploy Service</span>
+            </div>
+            <Plus className="w-3.5 h-3.5 opacity-60" />
           </NavLink>
         </nav>
 
         {/* Bottom Profile Area */}
-        <div className="p-4 m-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
-          <img src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff" alt="User" className="w-10 h-10 rounded-full border-2 border-slate-700" />
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-slate-200 truncate">Kan (Admin)</p>
-            <p className="text-xs text-slate-500 truncate">Pro Plan</p>
+        <div className="p-3 border-t border-neutral-800">
+          <div className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800/80 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center font-mono text-xs font-bold text-white">
+              K
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-xs font-medium text-white truncate font-mono">kan (admin)</p>
+              <p className="text-[10px] text-neutral-500 truncate font-mono">localhost:8080</p>
+            </div>
           </div>
         </div>
-      </div>
+      </aside>
     </>
   );
 };

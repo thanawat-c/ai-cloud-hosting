@@ -235,20 +235,20 @@ const DeployForm = () => {
 
   return (
     <div className="max-w-2xl mx-auto mt-4">
-      <div className="bg-white/80 backdrop-blur-2xl p-8 md:p-10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden">
+      <div className="bg-[#0a0a0a] p-8 md:p-10 rounded-xl border border-neutral-800 relative text-white">
         
         {/* Decorative subtle ambient glows */}
-        <div className="absolute top-0 right-0 -mt-24 -mr-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 -mb-24 -ml-24 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        
+        
         
         <div className="relative z-10 text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20 mb-3">
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 text-white mb-3">
             <Rocket className="w-6 h-6" />
           </div>
-          <h3 className="text-2xl font-bold text-slate-800 mb-1.5">
+          <h3 className="text-xl font-semibold text-white tracking-tight mb-1">
             Deploy New Project
           </h3>
-          <p className="text-slate-500 text-xs max-w-sm mx-auto">
+          <p className="text-neutral-400 text-xs max-w-sm mx-auto font-mono">
             Paste your GitHub repository link to automatically build and run your project.
           </p>
         </div>
@@ -256,8 +256,8 @@ const DeployForm = () => {
         <div className="relative z-10 space-y-4">
           {/* Main Hero Input: GitHub URL */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-              <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
+            <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1.5 flex items-center gap-1.5">
+              <GitBranch className="w-3.5 h-3.5 text-neutral-300" />
               GitHub Repository URL
             </label>
             <div className="relative">
@@ -266,13 +266,13 @@ const DeployForm = () => {
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
                 placeholder="https://github.com/username/project" 
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-3.5 pr-28 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-xs font-mono placeholder:text-slate-400 placeholder:font-sans" 
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-3.5 pr-28 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-xs font-mono placeholder:text-neutral-500 font-mono placeholder:font-sans" 
               />
               <button
                 type="button"
                 onClick={() => handleInspectRepo()}
                 disabled={inspecting || !repoUrl.trim()}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black border border-white rounded-md text-xs font-medium transition-colors cursor-pointer"
               >
                 {inspecting ? (
                   <>
@@ -291,11 +291,11 @@ const DeployForm = () => {
 
           {/* Repository Insights Card */}
           {inspectResult && (
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5 animate-in fade-in duration-150">
+            <div className="p-3.5 rounded-md bg-neutral-950 border border-neutral-800 text-xs space-y-2.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-700">Framework:</span>
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-bold">
+                  <span className="font-semibold text-neutral-300 font-mono">Framework:</span>
+                  <span className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-200 font-mono font-medium">
                     {inspectResult.detected_framework}
                   </span>
                 </div>
@@ -307,7 +307,7 @@ const DeployForm = () => {
                       if (inspectResult.env_template) setEnvVars(inspectResult.env_template);
                       toast.success('Added variables to .env');
                     }}
-                    className="text-indigo-600 hover:text-indigo-800 font-medium text-[11px] cursor-pointer"
+                    className="text-neutral-300 hover:text-indigo-800 font-medium text-[11px] cursor-pointer"
                   >
                     Copy to .env
                   </button>
@@ -319,20 +319,20 @@ const DeployForm = () => {
                   {inspectResult.detected_envs.map(envKey => (
                     <span 
                       key={envKey} 
-                      className="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-[11px] text-slate-700"
+                      className="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-[11px] text-neutral-300 font-mono"
                     >
                       {envKey}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-neutral-500 font-mono text-[11px]">
                   No special environment variables required. Ready to deploy.
                 </p>
               )}
 
               {inspectResult.has_database && (
-                <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-2 text-xs text-indigo-900">
+                <div className="p-2.5 rounded-md bg-black border border-neutral-800 flex items-center justify-between gap-2 text-xs text-neutral-300 font-mono">
                   <span>This app requires a database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})</span>
                   {databases.length > 0 && (
                     <button
@@ -341,7 +341,7 @@ const DeployForm = () => {
                         setShowAdvanced(true);
                         if (databases[0]) handleSelectDatabase(databases[0].id);
                       }}
-                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-semibold cursor-pointer shrink-0"
+                      className="px-2.5 py-1 bg-white hover:bg-neutral-200 text-black border border-white rounded-md text-[11px] font-medium cursor-pointer shrink-0"
                     >
                       Bind with {databases[0].name}
                     </button>
@@ -352,36 +352,36 @@ const DeployForm = () => {
           )}
 
           {/* Collapsible Advanced Configuration */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+          <div className="border border-neutral-800 rounded-md overflow-hidden bg-neutral-950">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-100/60 transition-colors select-none cursor-pointer"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-neutral-900/80 transition-colors select-none cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-xs font-semibold text-slate-700">Advanced Settings</span>
+                <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-500 font-mono" />
+                <span className="text-xs font-semibold text-neutral-300 font-mono">Advanced Settings</span>
                 {activeAdvancedCount > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700">
                     {activeAdvancedCount}
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-neutral-500 font-mono transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
             </button>
 
             {showAdvanced && (
-              <div className="p-4 pt-2 border-t border-slate-200 space-y-3 bg-white">
+              <div className="p-4 pt-2 border-t border-neutral-800 space-y-3 bg-neutral-950">
                 {/* 1. Managed Database Attachment */}
                 {databases.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
                       Connect Database:
                     </label>
                     <select
                       value={selectedDbId}
                       onChange={(e) => handleSelectDatabase(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-slate-700"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-neutral-300 font-mono"
                     >
                       <option value="">-- No Database Attached --</option>
                       {databases.map(db => (
@@ -395,21 +395,21 @@ const DeployForm = () => {
 
                 {/* 2. Environment Variables */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
                     Environment Variables (.env):
                   </label>
                   <textarea
                     value={envVars}
                     onChange={(e) => setEnvVars(e.target.value)}
                     placeholder={"PORT=3000\nDATABASE_URL=postgres://..."}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs text-slate-800 placeholder:text-slate-400"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs text-slate-800 placeholder:text-neutral-500 font-mono"
                     rows="3"
                   ></textarea>
                 </div>
 
                 {/* 3. GitHub Token */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
                     Personal Access Token (for Private Repositories):
                   </label>
                   <div className="relative">
@@ -418,12 +418,12 @@ const DeployForm = () => {
                       value={gitToken}
                       onChange={(e) => setGitToken(e.target.value)}
                       placeholder="ghp_xxxxxxxxxxxx" 
-                      className="w-full bg-slate-50/50 focus:bg-white border border-slate-200 text-slate-800 pl-3 pr-9 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono placeholder:text-slate-400" 
+                      className="w-full bg-slate-50/50 focus:bg-white border border-slate-200 text-slate-800 pl-3 pr-9 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono placeholder:text-neutral-500 font-mono" 
                     />
                     <button
                       type="button"
                       onClick={() => setShowToken(!showToken)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 font-mono hover:text-neutral-400 font-mono transition-colors p-1"
                       title={showToken ? "Hide token" : "Show token"}
                     >
                       {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -438,9 +438,9 @@ const DeployForm = () => {
                     id="forceAi"
                     checked={forceAi}
                     onChange={(e) => setForceAi(e.target.checked)}
-                    className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                    className="w-3.5 h-3.5 text-neutral-300 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
                   />
-                  <label htmlFor="forceAi" className="text-xs text-slate-600 cursor-pointer select-none">
+                  <label htmlFor="forceAi" className="text-xs text-neutral-400 font-mono cursor-pointer select-none">
                     Always generate new Dockerfile (override repository Dockerfile)
                   </label>
                 </div>
@@ -454,7 +454,7 @@ const DeployForm = () => {
             disabled={isLoading}
             className={`w-full flex items-center justify-center gap-2 font-semibold py-3.5 px-6 rounded-xl transition-all shadow-xs
               ${isLoading 
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                ? 'bg-slate-200 text-neutral-500 font-mono cursor-not-allowed' 
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-indigo-500/20 shadow-md'}`}
           >
             {isLoading ? (
@@ -475,8 +475,8 @@ const DeployForm = () => {
             {message && (
               <div className={`mt-5 p-5 md:p-6 rounded-2xl border backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm
                 ${containerId 
-                  ? 'bg-emerald-50/90 border-emerald-200' 
-                  : 'bg-rose-50/90 border-rose-200'}`}>
+                  ? 'bg-neutral-950 border-emerald-900/60' 
+                  : 'bg-neutral-950 border-rose-900/60'}`}>
                 
                 <div className="flex items-start gap-3.5">
                   {containerId ? (
@@ -491,7 +491,7 @@ const DeployForm = () => {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                      <h4 className={`text-base font-bold ${containerId ? 'text-emerald-900' : 'text-rose-900'}`}>
+                      <h4 className={`text-base font-bold ${containerId ? 'text-emerald-300 font-mono' : 'text-rose-300 font-mono'}`}>
                         {containerId ? 'Deployment Successful!' : 'Deployment Failed'}
                       </h4>
                       {containerId ? (
@@ -509,7 +509,7 @@ const DeployForm = () => {
                         </span>
                       )}
                     </div>
-                    <p className={`text-xs ${containerId ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>
+                    <p className={`text-xs ${containerId ? 'text-neutral-400 font-mono' : 'text-neutral-400 font-mono'}`}>{message}</p>
                     
                     {!containerId && lastError && (
                       <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
@@ -543,9 +543,9 @@ const DeployForm = () => {
                             onClick={() => {
                               terminalBoxRef.current?.scrollTo({ top: terminalBoxRef.current.scrollHeight, behavior: 'smooth' });
                             }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-neutral-300 font-mono rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
                           >
-                            <Terminal className="w-3.5 h-3.5 text-slate-500" />
+                            <Terminal className="w-3.5 h-3.5 text-neutral-500 font-mono" />
                             <span>Jump to Terminal Bottom</span>
                           </button>
                           <button
@@ -564,7 +564,7 @@ const DeployForm = () => {
                         {publicPort && (
                           <div className="p-3 bg-white/80 rounded-xl border border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0 flex-1">
-                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Live Gateway Endpoint</span>
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-neutral-500 font-mono mb-0.5">Live Gateway Endpoint</span>
                               <span className="font-mono text-xs font-bold text-slate-900 truncate block">
                                 http://{publicPort}
                               </span>
@@ -573,7 +573,7 @@ const DeployForm = () => {
                               <button
                                 type="button"
                                 onClick={() => handleCopyUrl(publicPort)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-neutral-300 font-mono rounded-lg text-xs font-semibold transition-all cursor-pointer"
                                 title="Copy public URL"
                               >
                                 {copiedUrl ? (
@@ -583,7 +583,7 @@ const DeployForm = () => {
                                   </>
                                 ) : (
                                   <>
-                                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                                    <Copy className="w-3.5 h-3.5 text-neutral-500 font-mono" />
                                     <span>Copy URL</span>
                                   </>
                                 )}
@@ -608,9 +608,9 @@ const DeployForm = () => {
                           <button
                             type="button"
                             onClick={() => navigate('/')}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md font-semibold text-[11px] transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-neutral-300 font-mono rounded-md font-semibold text-[11px] transition-colors cursor-pointer"
                           >
-                            <LayoutDashboard className="w-3 h-3 text-slate-500" />
+                            <LayoutDashboard className="w-3 h-3 text-neutral-500 font-mono" />
                             <span>Go to Dashboard</span>
                           </button>
                         </div>
@@ -624,14 +624,14 @@ const DeployForm = () => {
 
           {/* Terminal Log View */}
           {deployLogs && (
-            <div className="mt-6 bg-slate-900 rounded-xl p-4 overflow-hidden border border-slate-700 shadow-xl text-left">
+            <div className="mt-6 bg-black rounded-lg p-4 overflow-hidden border border-neutral-800 text-left">
               {/* Window Header */}
-              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+              <div className="flex items-center justify-between mb-3 border-b border-neutral-900 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-rose-500"></div>
                   <div className="w-3 h-3 rounded-full bg-amber-500"></div>
                   <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                  <span className="text-slate-400 text-xs font-mono ml-2">Build & Deploy Logs</span>
+                  <span className="text-neutral-500 font-mono text-xs font-mono ml-2">Build & Deploy Logs</span>
                 </div>
                 <button
                   type="button"
@@ -639,7 +639,7 @@ const DeployForm = () => {
                     navigator.clipboard.writeText(deployLogs);
                     toast.success('Logs copied to clipboard');
                   }}
-                  className="text-slate-400 hover:text-slate-200 text-[11px] font-mono flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 transition-colors"
+                  className="text-neutral-500 font-mono hover:text-slate-200 text-[11px] font-mono flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-colors"
                 >
                   <Copy className="w-3 h-3" />
                   <span>Copy Logs</span>
@@ -662,7 +662,7 @@ const DeployForm = () => {
             <div className="mt-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
               <div className="flex items-center gap-2 mb-3 px-2">
                 <Terminal className="w-5 h-5 text-indigo-500" />
-                <h4 className="text-sm font-bold text-slate-700">AI Generated Dockerfile</h4>
+                <h4 className="text-sm font-bold text-neutral-300 font-mono">AI Generated Dockerfile</h4>
               </div>
               
               <div className="rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/20 border border-slate-800 bg-[#1e1e1e]">
@@ -673,7 +673,7 @@ const DeployForm = () => {
                     <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]"></div>
                     <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]"></div>
                   </div>
-                  <div className="flex-1 text-center text-xs text-slate-400 font-medium">Dockerfile</div>
+                  <div className="flex-1 text-center text-xs text-neutral-500 font-mono font-medium">Dockerfile</div>
                 </div>
                 
                 <div className="p-5 overflow-x-auto">
@@ -692,7 +692,7 @@ const DeployForm = () => {
       {/* Deployment Success Modal (Vercel-style: Pops up immediately with 0 scrolling needed) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-white rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-100 overflow-hidden text-center animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-md bg-[#0a0a0a] rounded-xl p-6 md:p-8 shadow-2xl border border-neutral-800 overflow-hidden text-center animate-in zoom-in-95 duration-200 text-white">
             
             {/* Ambient decorative background glow */}
             <div className="absolute top-0 right-0 -mt-16 -mr-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -702,7 +702,7 @@ const DeployForm = () => {
             <button
               type="button"
               onClick={() => setShowSuccessModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-neutral-500 font-mono hover:text-neutral-400 font-mono p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
@@ -714,7 +714,7 @@ const DeployForm = () => {
                 <Rocket className="w-7 h-7" />
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200/80 mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-neutral-400 font-mono text-xs font-semibold border border-emerald-200/80 mb-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -722,25 +722,25 @@ const DeployForm = () => {
                 <span>Live & Healthy</span>
               </div>
 
-              <h3 className="text-xl font-bold text-slate-900 mb-1">
+              <h3 className="text-xl font-bold text-white mb-1 tracking-tight">
                 Your Project is Live!
               </h3>
-              <p className="text-xs text-slate-500 max-w-xs mb-6">
+              <p className="text-xs text-neutral-500 font-mono max-w-xs mb-6">
                 Build and container initialization completed. Your service is now reachable via Traefik gateway.
               </p>
 
               {/* Endpoint Display Box */}
               {publicPort && (
-                <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-left">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Service Endpoint</span>
+                <div className="w-full bg-black border border-neutral-800 rounded-md p-3.5 mb-5 text-left">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 font-mono mb-1">Service Endpoint</span>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs font-bold text-slate-800 truncate select-all">
+                    <span className="font-mono text-xs font-bold text-white truncate select-all font-mono">
                       http://{publicPort}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleCopyUrl(publicPort)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-neutral-300 font-mono rounded-lg text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer"
                     >
                       {copiedUrl ? (
                         <>
@@ -749,7 +749,7 @@ const DeployForm = () => {
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <Copy className="w-3.5 h-3.5 text-neutral-500 font-mono" />
                           <span>Copy</span>
                         </>
                       )}
@@ -765,7 +765,7 @@ const DeployForm = () => {
                     href={`http://${publicPort}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-3 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white hover:bg-neutral-200 text-black border border-white rounded-md font-medium text-xs transition-colors cursor-pointer"
                   >
                     <span>Open Live Site</span>
                     <ExternalLink className="w-4 h-4" />
@@ -776,7 +776,7 @@ const DeployForm = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/')}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-neutral-300 font-mono rounded-xl font-semibold text-xs transition-colors cursor-pointer"
                   >
                     <LayoutDashboard className="w-3.5 h-3.5" />
                     <span>Go to Dashboard</span>
@@ -784,7 +784,7 @@ const DeployForm = () => {
                   <button
                     type="button"
                     onClick={() => setShowSuccessModal(false)}
-                    className="flex-1 py-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                    className="flex-1 py-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-neutral-400 font-mono rounded-xl font-semibold text-xs transition-colors cursor-pointer"
                   >
                     View Logs
                   </button>

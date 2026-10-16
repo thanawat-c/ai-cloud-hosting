@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,6 +59,8 @@ const formatDateTime = (dateStr) => {
 };
 
 const DashboardHome = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'storage' ? 'storage' : 'deployments';
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
@@ -787,11 +790,11 @@ const DashboardHome = () => {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
-      <div className="relative w-16 h-16">
-        <div className="absolute inset-0 border-4 border-blue-200 rounded-full animate-ping"></div>
-        <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+      <div className="relative w-10 h-10">
+        <div className="absolute inset-0 border border-neutral-800 rounded-full"></div>
+        <div className="absolute inset-0 border border-white rounded-full border-t-transparent animate-spin"></div>
       </div>
-      <p className="text-slate-500 font-medium animate-pulse">Connecting to Docker Engine...</p>
+      <p className="text-neutral-500 font-mono text-xs animate-pulse">Connecting to Docker Engine...</p>
     </div>
   );
 
@@ -799,64 +802,128 @@ const DashboardHome = () => {
   const dbDisconnectedContainers = containers.filter(c => c.state === 'running' && c.is_db_stopped);
 
   return (
-    <>
-      <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 relative overflow-hidden">
-      {/* Decorative Blob */}
-      <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
-            <Server className="w-6 h-6 text-blue-500" />
-            Active Servers
-          </h3>
-          <p className="text-slate-500 text-sm mt-1">Manage your deployed applications and microservices.</p>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="space-y-6">
+      {/* Vercel Geist Subnavigation Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-800 pb-3">
+        <div className="flex items-center gap-1.5">
           <button
-            onClick={requestNotificationPermission}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-              notificationsEnabled
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            type="button"
+            onClick={() => setSearchParams({ tab: 'deployments' })}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === 'deployments'
+                ? 'bg-neutral-900 text-white border border-neutral-800'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'
             }`}
-            title={notificationsEnabled ? 'Desktop alerts enabled' : 'Click to enable desktop alerts when servers stop'}
           >
-            {notificationsEnabled ? (
-              <BellRing className="w-3.5 h-3.5 text-emerald-600" />
-            ) : (
-              <Bell className="w-3.5 h-3.5 text-slate-400" />
-            )}
-            {notificationsEnabled ? 'Desktop Alerts: On' : 'Enable Desktop Alerts'}
+            <Server className="w-3.5 h-3.5 text-neutral-400" />
+            <span>Deployments</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+              activeTab === 'deployments' ? 'bg-neutral-800 text-white' : 'bg-neutral-950 text-neutral-500'
+            }`}>
+              {containers.length}
+            </span>
           </button>
 
-          <span className="bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-full shadow-sm flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-500" />
-            Running: {containers.filter(c => c.state === 'running').length} / {containers.length}
-          </span>
+          <button
+            type="button"
+            onClick={() => setSearchParams({ tab: 'storage' })}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === 'storage'
+                ? 'bg-neutral-900 text-white border border-neutral-800'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-neutral-400" />
+            <span>Storage & Databases</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+              activeTab === 'storage' ? 'bg-neutral-800 text-white' : 'bg-neutral-950 text-neutral-500'
+            }`}>
+              {databases.length}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          {activeTab === 'deployments' ? (
+            <Link
+              to="/deploy"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-neutral-200 text-black border border-white rounded-md text-xs font-medium transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Deploy Service</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreateDbModalOpen(true)}
+              disabled={databases.length >= 5}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black border border-white rounded-md text-xs font-medium transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Database</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Tab 1: Deployments (Server / Microservices) */}
+      {activeTab === 'deployments' && (
+        <div className="bg-[#0a0a0a] p-6 rounded-xl border border-neutral-800 relative">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-white tracking-tight flex items-center gap-2">
+                <Server className="w-4 h-4 text-neutral-300" />
+                Active Deployments
+              </h3>
+              <p className="text-neutral-400 text-xs mt-0.5">Manage deployed microservices, APIs, and frontends.</p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={requestNotificationPermission}
+                className={`px-3 py-1 rounded-md text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  notificationsEnabled
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-white'
+                }`}
+                title={notificationsEnabled ? 'Desktop alerts enabled' : 'Click to enable desktop alerts when servers stop'}
+              >
+                {notificationsEnabled ? (
+                  <BellRing className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Bell className="w-3.5 h-3.5 text-neutral-400" />
+                )}
+                {notificationsEnabled ? 'Desktop Alerts: On' : 'Alerts: Off'}
+              </button>
+
+              <span className="bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-mono px-3 py-1 rounded-md flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Running: {containers.filter(c => c.state === 'running').length} / {containers.length}
+              </span>
+            </div>
+          </div>
+
       {/* Alert Banner for stopped/crashed servers */}
       {crashedContainers.length > 0 && !dismissAlert && (
-        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-rose-50/90 border border-rose-200 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
+        <div className="mb-6 p-3.5 rounded-lg bg-neutral-950 border border-rose-900/60 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-rose-100 rounded-xl text-rose-600 shrink-0">
-              <AlertTriangle className="w-5 h-5 animate-pulse" />
-            </div>
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            </span>
             <div>
-              <h4 className="font-semibold text-rose-950 text-sm">
-                Servers stopped ({crashedContainers.length} service{crashedContainers.length > 1 ? 's' : ''})
+              <h4 className="font-medium text-rose-300 text-xs font-mono">
+                Stopped Services ({crashedContainers.length})
               </h4>
-              <p className="text-xs text-rose-700 mt-0.5">
-                Click <span className="font-semibold text-rose-800">[Logs]</span> in the table to view error details, or click start to resume.
+              <p className="text-neutral-400 text-xs mt-0.5">
+                Click <span className="text-neutral-200 font-mono">[Logs]</span> to view error details, or resume container.
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setDismissAlert(true)}
-            className="text-slate-400 hover:text-slate-600 hover:bg-rose-100/60 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+            className="text-neutral-500 hover:text-white p-1 rounded hover:bg-neutral-900 transition-colors cursor-pointer"
             title="Dismiss alert"
           >
             <X className="w-4 h-4" />
@@ -866,33 +933,36 @@ const DashboardHome = () => {
 
       {/* Alert Banner for disconnected databases */}
       {dbDisconnectedContainers.length > 0 && !dismissDbAlert && (
-        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-amber-50/95 border border-amber-300 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
+        <div className="mb-6 p-3.5 rounded-lg bg-neutral-950 border border-amber-900/60 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
-              <Database className="w-5 h-5 animate-pulse text-amber-600" />
-            </div>
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
             <div>
-              <h4 className="font-semibold text-amber-950 text-sm">
-                Database offline ({dbDisconnectedContainers.length} service{dbDisconnectedContainers.length > 1 ? 's' : ''} affected)
+              <h4 className="font-medium text-amber-300 text-xs font-mono">
+                Database Offline ({dbDisconnectedContainers.length} service affected)
               </h4>
-              <p className="text-xs text-amber-800 mt-0.5">
-                Database <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> is offline. Services may return 500 errors.
+              <p className="text-neutral-400 text-xs mt-0.5">
+                Database <span className="text-neutral-200 font-mono">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> is offline.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {dbDisconnectedContainers[0]?.linked_db_id && (
               <button
+                type="button"
                 onClick={() => handleToggleDb(dbDisconnectedContainers[0].linked_db_id, 'stopped')}
-                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                Start Database Now
+                <Play className="w-3 h-3 fill-current" />
+                Resume DB
               </button>
             )}
             <button
+              type="button"
               onClick={() => setDismissDbAlert(true)}
-              className="text-slate-400 hover:text-slate-600 hover:bg-amber-100/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+              className="text-neutral-500 hover:text-white p-1 rounded hover:bg-neutral-900 transition-colors cursor-pointer"
               title="Dismiss alert"
             >
               <X className="w-4 h-4" />
@@ -902,39 +972,46 @@ const DashboardHome = () => {
       )}
 
       {containers.length === 0 ? (
-        <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-slate-100/50 backdrop-blur-sm relative z-10">
-          <div className="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-6 border border-slate-100">
-            <Box className="w-10 h-10 text-slate-300" />
+        <div className="text-center py-16 bg-neutral-950 rounded-lg border border-neutral-800">
+          <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-3 text-neutral-400">
+            <Box className="w-6 h-6" />
           </div>
-          <h4 className="text-xl font-semibold text-slate-700 mb-2">No servers deployed yet</h4>
-          <p className="text-slate-500 max-w-sm mx-auto">
-            Your dashboard is looking a bit empty. Head over to the New Deploy menu to launch your first application.
+          <h4 className="text-sm font-medium text-white mb-1">No services deployed yet</h4>
+          <p className="text-xs text-neutral-500 max-w-sm mx-auto mb-4 font-mono">
+            Deploy your first git repository or microservice to get started.
           </p>
+          <Link
+            to="/deploy"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black hover:bg-neutral-200 border border-white rounded-md text-xs font-medium transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Deploy First Service</span>
+          </Link>
         </div>
       ) : (
         <div className="relative z-10">
           <div className="w-full">
-            <div className="overflow-hidden bg-white border border-slate-200 shadow-sm rounded-2xl">
-              <table className="w-full table-auto divide-y divide-slate-200">
-                <thead className="bg-slate-50/50">
+            <div className="overflow-hidden bg-black border border-neutral-800 rounded-lg">
+              <table className="w-full table-auto divide-y divide-neutral-800 text-left">
+                <thead className="bg-neutral-950/90">
                   <tr>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">ID</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Service / App</th>
-                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Image</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
-                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Last Deployed</th>
-                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Usage</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 whitespace-nowrap">URL</th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-20">ID</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">Service / App</th>
+                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-36">Image</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-28">Status</th>
+                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-36">Last Deployed</th>
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32">Usage</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32 whitespace-nowrap">URL</th>
+                    <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
+                <tbody className="divide-y divide-neutral-900 bg-black">
                   {containers.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-200 group">
+                    <tr key={item.id} className="hover:bg-neutral-900/50 transition-colors group">
                       {/* ID */}
                       <td className="px-3 py-3">
-                        <div className="flex items-center text-xs font-mono text-slate-500">
-                          <Terminal className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
+                        <div className="flex items-center text-xs font-mono text-neutral-400">
+                          <Terminal className="w-3.5 h-3.5 mr-1 text-neutral-500 shrink-0" />
                           <span className="truncate max-w-[50px]" title={item.id}>{item.id ? item.id.substring(0, 7) : '-'}</span>
                         </div>
                       </td>
@@ -944,31 +1021,31 @@ const DashboardHome = () => {
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 <Database className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                                 Backend API
                               </span>
                             ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
                                 <Globe className="w-2.5 h-2.5 text-purple-600 shrink-0" />
                                 Frontend UI
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                                <Layers className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-neutral-900 text-neutral-300 border border-neutral-800">
+                                <Layers className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
                                 Service
                               </span>
                             )}
 
                             <span 
-                              className="text-xs font-bold text-slate-900 tracking-tight" 
+                              className="text-xs font-medium text-white tracking-tight font-mono" 
                               title={`Repository: ${item.name}`}
                             >
                               {getShortAppName(item.name, item.clean_name)}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5 flex-wrap">
+                          <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono mt-0.5 flex-wrap">
                             <span>
                               {item.service_type === 'backend' || item.name?.includes('(Backend)') 
                                 ? 'API Server' 
@@ -978,7 +1055,7 @@ const DashboardHome = () => {
                             </span>
                             <span>•</span>
                             <span 
-                              className="inline-flex items-center gap-1 text-slate-600 font-sans font-medium bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/60"
+                              className="inline-flex items-center gap-1 text-neutral-400 font-sans font-medium bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800 font-mono"
                               title={item.deployed_at ? `Last deployed: ${new Date(item.deployed_at).toLocaleString('en-US')}` : ''}
                             >
                               <Clock className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
@@ -990,7 +1067,7 @@ const DashboardHome = () => {
 
                       {/* Image (hidden on small screens) */}
                       <td className="hidden lg:table-cell px-3 py-3">
-                        <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-600 bg-slate-100 border border-slate-200 truncate max-w-[130px]" title={item.image}>
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono text-neutral-400 bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono truncate max-w-[130px]" title={item.image}>
                           {item.image || '-'}
                         </span>
                       </td>
@@ -998,7 +1075,7 @@ const DashboardHome = () => {
                       {/* Status */}
                       <td className="px-3 py-3">
                         {item.state === 'redeploying' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap shadow-2xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap font-mono">
                             <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
                             Updating
                           </span>
@@ -1013,7 +1090,7 @@ const DashboardHome = () => {
                                 handleViewLogs(item.id, item.name);
                               }
                             }}
-                            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors cursor-pointer whitespace-nowrap font-mono"
                             title="Click to view crash logs"
                           >
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -1021,14 +1098,14 @@ const DashboardHome = () => {
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
                             </span>
                             <span>{item.state === 'restarting' ? 'Crash Loop' : 'Crashed'}</span>
-                            <span className="text-[10px] bg-rose-200/70 group-hover:bg-rose-300 px-1.5 py-0.2 rounded-full font-medium text-rose-800 transition-colors">
+                            <span className="text-[10px] bg-rose-950 border border-rose-800/80 px-1.5 py-0.2 rounded text-[10px] text-rose-300 font-mono transition-colors">
                               Logs
                             </span>
                           </button>
                         ) : item.state === 'running' && item.is_db_stopped ? (
                           <div className="flex flex-col gap-1 items-start">
                             <span 
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs bg-amber-50 text-amber-800 border-amber-300"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono"
                               title={item.db_warning || `Cannot connect to ${item.linked_db_name || 'database'}; database is stopped`}
                             >
                               <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -1050,8 +1127,8 @@ const DashboardHome = () => {
                         ) : (
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs
                             ${item.state === 'running' 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono' 
+                              : 'bg-neutral-900 text-neutral-400 border border-neutral-800 font-mono'}`}>
                             {item.state === 'running' ? (
                               <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1072,7 +1149,7 @@ const DashboardHome = () => {
                             <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                             <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
                           </div>
-                          <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-5">
+                          <span className="text-[10px] text-neutral-500 font-mono mt-0.5 ml-5">
                             {formatDateTime(item.deployed_at || item.updated_at || item.created_at)}
                           </span>
                         </div>
@@ -1081,7 +1158,7 @@ const DashboardHome = () => {
                       {/* Resources (hidden on mobile) */}
                       <td className="hidden md:table-cell px-3 py-3">
                         {item.state === 'running' && stats[item.id] ? (
-                          <div className="flex flex-col gap-0.5 text-[10px] font-mono text-slate-500">
+                          <div className="flex flex-col gap-0.5 text-[10px] font-mono text-neutral-400">
                             <div className="flex items-center gap-1">
                               <Cpu className="w-3 h-3 text-indigo-400 shrink-0" />
                               <span className={stats[item.id].cpu_percent > 80 ? 'text-rose-500 font-semibold' : ''}>
@@ -1096,9 +1173,9 @@ const DashboardHome = () => {
                             </div>
                           </div>
                         ) : item.state === 'running' ? (
-                          <div className="text-[10px] text-slate-400 animate-pulse font-mono">Loading...</div>
+                          <div className="text-[10px] text-neutral-500 animate-pulse font-mono">Loading...</div>
                         ) : (
-                          <div className="text-[10px] text-slate-400 font-mono">-</div>
+                          <div className="text-[10px] text-neutral-500 font-mono">-</div>
                         )}
                       </td>
 
@@ -1133,7 +1210,7 @@ const DashboardHome = () => {
                                 href={`http://${item.domain_name}`} 
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+                                className="p-1 rounded text-neutral-500 hover:text-neutral-400 hover:bg-slate-100 transition-colors shrink-0"
                                 title="Open in browser"
                               >
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -1150,7 +1227,7 @@ const DashboardHome = () => {
                             </a>
                           )
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">Offline</span>
+                          <span className="text-[11px] text-neutral-500 italic">Offline</span>
                         )}
                       </td>
 
@@ -1161,12 +1238,12 @@ const DashboardHome = () => {
                             <div className="relative group/tip flex items-center justify-center">
                               <button 
                                 onClick={() => handleAction(item.id, 'stop', item.name)} 
-                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-md text-neutral-400 hover:text-rose-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
                                 aria-label="Stop Server"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                               </button>
-                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                                 Stop Server
                               </div>
                             </div>
@@ -1174,12 +1251,12 @@ const DashboardHome = () => {
                             <div className="relative group/tip flex items-center justify-center">
                               <button 
                                 onClick={() => handleAction(item.id, 'start', item.name)} 
-                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-md text-neutral-400 hover:text-emerald-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
                                 aria-label="Start Server"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current" />
                               </button>
-                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                                 Start Server
                               </div>
                             </div>
@@ -1188,12 +1265,12 @@ const DashboardHome = () => {
                           <div className="relative group/tip flex items-center justify-center">
                             <button 
                               onClick={() => handleViewLogs(item.id, item.name)} 
-                              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
                               aria-label="View Logs"
                             >
                               <FileText className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               View Logs
                             </div>
                           </div>
@@ -1201,12 +1278,12 @@ const DashboardHome = () => {
                           <div className="relative group/tip flex items-center justify-center">
                             <button 
                               onClick={() => handleOpenEnv(item.id, item.name)} 
-                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md text-neutral-400 hover:text-amber-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
                               aria-label="Environment Variables (.env)"
                             >
                               <Settings className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Environment (.env)
                             </div>
                           </div>
@@ -1219,7 +1296,7 @@ const DashboardHome = () => {
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Re-deploy
                             </div>
                           </div>
@@ -1232,7 +1309,7 @@ const DashboardHome = () => {
                             >
                               <Webhook className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Auto-Deploy (Webhook)
                             </div>
                           </div>
@@ -1240,12 +1317,12 @@ const DashboardHome = () => {
                           <div className="relative group/tip flex items-center justify-center">
                             <button 
                               onClick={() => handleDelete(item.id || item.deployment_id)} 
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md text-neutral-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
                               aria-label="Delete Server"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-rose-900 text-rose-300 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Delete Server
                             </div>
                           </div>
@@ -1260,53 +1337,56 @@ const DashboardHome = () => {
         </div>
       )}
       </div>
+      )}
 
-      {/* Managed Databases Section */}
-      <div className="mt-10">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Tab 2: Storage & Databases (Managed PostgreSQL) */}
+      {activeTab === 'storage' && (
+        <div className="bg-[#0a0a0a] rounded-xl border border-neutral-800 overflow-hidden">
+          <div className="p-6 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-neutral-950/60">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                <Database className="w-5 h-5" />
+              <div className="p-2 rounded-lg bg-neutral-900 text-neutral-300 border border-neutral-800">
+                <Database className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-800">Managed Databases</h2>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                  <h2 className="text-base font-semibold text-white tracking-tight">Managed Databases</h2>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300">
                     PostgreSQL 16
                   </span>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
                     {databases.length} / 5 DBs
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Instant PostgreSQL • 512 MB RAM limit per instance • Persistent Volume storage
+                <p className="text-xs text-neutral-400 mt-0.5 font-mono">
+                  Instant PostgreSQL • 512 MB RAM limit • Persistent Volume storage
                 </p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => setCreateDbModalOpen(true)}
               disabled={databases.length >= 5}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Create Database</span>
             </button>
           </div>
 
           {databases.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto mb-3">
-                <Database className="w-6 h-6" />
+            <div className="p-16 text-center bg-black">
+              <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 flex items-center justify-center mx-auto mb-3">
+                <Database className="w-5 h-5" />
               </div>
-              <h3 className="text-sm font-semibold text-slate-700">No Managed Databases yet</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                Deploy a PostgreSQL 16 database for your applications in 1 click with isolated resources and persistent storage.
+              <h3 className="text-sm font-medium text-white mb-1">No Managed Databases yet</h3>
+              <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto font-mono">
+                Deploy a PostgreSQL 16 instance with 1 click, isolated memory, and persistent disk volume.
               </p>
               <button
+                type="button"
                 onClick={() => setCreateDbModalOpen(true)}
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-all"
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black hover:bg-neutral-200 border border-white rounded-md text-xs font-medium transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create First Database</span>
@@ -1319,22 +1399,22 @@ const DashboardHome = () => {
                 return (
                   <div 
                     key={db.id}
-                    className="p-5 rounded-xl border border-slate-200/90 bg-slate-50/40 hover:bg-white hover:border-indigo-200 transition-all shadow-sm flex flex-col justify-between"
+                    className="p-5 rounded-lg border border-neutral-800 bg-neutral-950 hover:border-neutral-700 transition-colors flex flex-col justify-between"
                   >
                     <div>
                       {/* Card Header */}
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-center gap-2.5">
-                          <div className={`p-2 rounded-xl ${isRunning ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                          <div className={`p-2 rounded-xl ${isRunning ? 'bg-neutral-900 text-neutral-300 border border-neutral-800' : 'bg-slate-100 text-neutral-500'}`}>
                             <Database className="w-4 h-4" />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-white flex items-center gap-2 font-mono">
                               {db.name}
                             </h3>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className={`inline-block w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                              <span className="text-[11px] font-medium text-slate-500 capitalize">{db.status}</span>
+                              <span className="text-[11px] font-medium text-neutral-400 capitalize">{db.status}</span>
                             </div>
                           </div>
                         </div>
@@ -1353,7 +1433,7 @@ const DashboardHome = () => {
                             >
                               {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               {isRunning ? 'Stop Database' : 'Start Database'}
                             </div>
                           </div>
@@ -1361,12 +1441,12 @@ const DashboardHome = () => {
                           <div className="relative group/tip flex items-center justify-center">
                             <button
                               onClick={() => handleDeleteDb(db.id, db.name)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md text-neutral-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
                               aria-label='Delete Database'
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-rose-900 text-rose-300 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Delete Database
                             </div>
                           </div>
@@ -1374,14 +1454,14 @@ const DashboardHome = () => {
                       </div>
 
                       {/* Specs Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[10px] font-semibold text-slate-600">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[10px] font-semibold text-neutral-400">
                         <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100/60">
                           RAM: 512 MB
                         </span>
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100/60">
                           Port: {db.host_port}
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-neutral-400">
                           Volume: Persistent
                         </span>
                       </div>
@@ -1390,11 +1470,11 @@ const DashboardHome = () => {
                       {isRunning && stats[db.container_id] && (
                         <div className="mb-3.5 p-2.5 rounded-xl bg-white border border-slate-200/70 shadow-2xs space-y-1.5">
                           <div className="flex items-center justify-between text-[11px]">
-                            <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                            <div className="flex items-center gap-1.5 text-neutral-400 font-medium">
                               <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
                               <span>Actual RAM:</span>
                             </div>
-                            <span className="font-mono font-bold text-slate-700">
+                            <span className="font-mono font-bold text-neutral-300">
                               {Number(stats[db.container_id].memory_mb || 0).toFixed(1)} MB / {stats[db.container_id].memory_limit || 512} MB
                             </span>
                           </div>
@@ -1422,7 +1502,7 @@ const DashboardHome = () => {
                           type="button"
                           onClick={() => handleOpenBindModal(db)}
                           disabled={!isRunning}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200/60 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 disabled:opacity-40 text-neutral-300 rounded-lg text-xs font-semibold border border-slate-200/60 transition-colors cursor-pointer"
                         >
                           <Link2 className="w-3.5 h-3.5" />
                           <span>Bind to Server</span>
@@ -1457,11 +1537,11 @@ const DashboardHome = () => {
                       <div className="space-y-2.5">
                         {/* Internal URL */}
                         <div>
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
                             <span className="font-medium text-indigo-700">Internal URL (for in-network apps):</span>
                             <button
                               onClick={() => handleCopyUrl(db.internal_url, `internal-${db.id}`)}
-                              className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
+                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-indigo-600 font-medium"
                             >
                               {copiedKey === `internal-${db.id}` ? (
                                 <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
@@ -1477,11 +1557,11 @@ const DashboardHome = () => {
 
                         {/* External URL */}
                         <div>
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                            <span className="font-medium text-slate-600">External URL (DBeaver / TablePlus):</span>
+                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+                            <span className="font-medium text-neutral-400">External URL (DBeaver / TablePlus):</span>
                             <button
                               onClick={() => handleCopyUrl(db.external_url, `external-${db.id}`)}
-                              className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
+                              className="inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-indigo-600 font-medium"
                             >
                               {copiedKey === `external-${db.id}` ? (
                                 <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
@@ -1490,16 +1570,16 @@ const DashboardHome = () => {
                               )}
                             </button>
                           </div>
-                          <div className="p-2 rounded-lg bg-white text-slate-700 font-mono text-[11px] truncate select-all border border-slate-200 shadow-inner">
+                          <div className="p-2 rounded bg-black text-neutral-300 font-mono text-[11px] truncate select-all border border-neutral-800">
                             {db.external_url}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>DB: <code className="text-slate-600 font-mono">{db.database_name}</code></span>
-                      <span>User: <code className="text-slate-600 font-mono">{db.username}</code></span>
+                    <div className="mt-4 pt-3 border-t border-neutral-900 flex items-center justify-between text-[11px] text-neutral-500 font-mono">
+                      <span>DB: <code className="text-neutral-400 font-mono">{db.database_name}</code></span>
+                      <span>User: <code className="text-neutral-400 font-mono">{db.username}</code></span>
                     </div>
                   </div>
                 );
@@ -1507,25 +1587,25 @@ const DashboardHome = () => {
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Env Variables Modal */}
       {envModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
                   <Settings className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Environment Variables</h3>
-                  <p className="text-xs text-slate-500">{activeEnvContainerName}</p>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Environment Variables</h3>
+                  <p className="text-xs text-neutral-400 font-mono">{activeEnvContainerName}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setEnvModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1546,8 +1626,8 @@ const DashboardHome = () => {
                 </div>
               )}
 
-              <p className="text-xs text-slate-500">
-                Add or edit environment variables (one per line, e.g. <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">DB_URL=host=...</code>). The server will restart automatically:
+              <p className="text-xs text-neutral-400 font-mono">
+                Add or edit environment variables (one per line, e.g. <code className="bg-slate-100 px-1 py-0.5 rounded text-neutral-300 font-mono">DB_URL=host=...</code>). The server will restart automatically:
               </p>
 
               <textarea 
@@ -1556,15 +1636,15 @@ const DashboardHome = () => {
                 rows="7"
                 disabled={envSaving}
                 placeholder={"DB_URL=host=localhost user=postgres dbname=app\nPORT=8080\nAPI_KEY=secret123"}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-md border border-neutral-800 bg-black text-white font-mono text-xs focus:border-neutral-600 focus:outline-none"
               ></textarea>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setEnvModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors"
               >
                 Cancel
               </button>
@@ -1572,7 +1652,7 @@ const DashboardHome = () => {
                 type="button"
                 onClick={handleSaveEnv}
                 disabled={envSaving}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-50 text-black rounded-md text-xs font-medium border border-white transition-colors"
               >
                 {envSaving ? 'Saving & Restarting...' : 'Save & Restart'}
               </button>
@@ -1583,7 +1663,7 @@ const DashboardHome = () => {
 
       {/* Log Modal */}
       {logModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-700 flex flex-col h-[80vh] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
               <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
@@ -1592,7 +1672,7 @@ const DashboardHome = () => {
               </h3>
               <button 
                 onClick={() => setLogModalOpen(false)} 
-                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-800"
+                className="text-neutral-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1601,7 +1681,7 @@ const DashboardHome = () => {
               {logLoading ? (
                 <div className="flex flex-col items-center justify-center h-full space-y-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  <p className="text-slate-500 animate-pulse">Fetching latest logs...</p>
+                  <p className="text-neutral-400 animate-pulse">Fetching latest logs...</p>
                 </div>
               ) : (
                 <pre className="whitespace-pre-wrap break-words">{currentLogs}</pre>
@@ -1613,34 +1693,34 @@ const DashboardHome = () => {
 
       {/* Error Details Modal */}
       {errorModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-rose-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-rose-100 bg-rose-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Deployment Error Details</h3>
-                  <p className="text-xs text-slate-500">{activeErrorContainerName}</p>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Deployment Error Details</h3>
+                  <p className="text-xs text-neutral-400 font-mono">{activeErrorContainerName}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setErrorModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-3">
-              <p className="text-xs text-slate-600 font-medium">System error message:</p>
+              <p className="text-xs text-neutral-400 font-medium">System error message:</p>
               <div className="p-4 rounded-xl bg-slate-900 text-rose-300 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto whitespace-pre-wrap break-words border border-slate-800 shadow-inner">
                 {activeErrorDetails}
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+            <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setErrorModalOpen(false)}
@@ -1655,21 +1735,21 @@ const DashboardHome = () => {
 
       {/* Create Database Modal */}
       {createDbModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <div className="p-2 rounded-xl bg-neutral-900 text-neutral-300 border border-neutral-800 border border-indigo-100">
                   <Database className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Create Managed Database</h3>
-                  <p className="text-xs text-slate-500">PostgreSQL 16 Alpine • Ready in 1-click</p>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Create Managed Database</h3>
+                  <p className="text-xs text-neutral-400 font-mono">PostgreSQL 16 Alpine • Ready in 1-click</p>
                 </div>
               </div>
               <button 
                 onClick={() => setCreateDbModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1679,7 +1759,7 @@ const DashboardHome = () => {
               <div className="p-6 space-y-4">
                 {/* Database Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                     Database Name <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1688,53 +1768,53 @@ const DashboardHome = () => {
                     value={newDbName}
                     onChange={(e) => setNewDbName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                     placeholder="e.g. prod-db, my-app-db"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 rounded-md border border-neutral-800 bg-black text-white text-xs font-mono focus:border-neutral-600 focus:outline-none"
                     autoFocus
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-neutral-500 mt-1">
                     Use lowercase alphanumeric characters, hyphens (-), and underscores (_)
                   </p>
                 </div>
 
                 {/* Resource Summary Specs Card */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <p className="text-xs font-semibold text-slate-700">Specifications:</p>
+                <div className="p-3.5 rounded-md bg-neutral-950 border border-neutral-800 space-y-2">
+                  <p className="text-xs font-semibold text-neutral-300">Specifications:</p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">RAM CAP</div>
+                    <div className="p-2 rounded-md bg-black border border-neutral-800">
+                      <div className="text-[10px] text-neutral-500 font-medium">RAM CAP</div>
                       <div className="text-xs font-bold text-indigo-600 mt-0.5">512 MB Max</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">CPU LIMIT</div>
-                      <div className="text-xs font-bold text-slate-700 mt-0.5">1.0 Core</div>
+                    <div className="p-2 rounded-md bg-black border border-neutral-800">
+                      <div className="text-[10px] text-neutral-500 font-medium">CPU LIMIT</div>
+                      <div className="text-xs font-bold text-neutral-300 mt-0.5">1.0 Core</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">STORAGE</div>
+                    <div className="p-2 rounded-md bg-black border border-neutral-800">
+                      <div className="text-[10px] text-neutral-500 font-medium">STORAGE</div>
                       <div className="text-xs font-bold text-emerald-600 mt-0.5">Docker Volume</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">NETWORK</div>
-                      <div className="text-xs font-bold text-slate-700 mt-0.5">ai-cloud-network</div>
+                    <div className="p-2 rounded-md bg-black border border-neutral-800">
+                      <div className="text-[10px] text-neutral-500 font-medium">NETWORK</div>
+                      <div className="text-xs font-bold text-neutral-300 mt-0.5">ai-cloud-network</div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 pt-0.5 leading-relaxed">
+                  <p className="text-[11px] text-neutral-500 pt-0.5 leading-relaxed">
                     A persistent volume will be attached and an external port automatically allocated (from 5433).
                   </p>
                 </div>
               </div>
 
-              <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setCreateDbModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
+                  className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingDb || !newDbName.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer"
                 >
                   {creatingDb ? (
                     <>
@@ -1757,26 +1837,26 @@ const DashboardHome = () => {
       {/* Web SQL Studio Modal */}
       {sqlModalOpen && activeSqlDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+          <div className="bg-[#0a0a0a] w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col max-h-[90vh] text-white">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <div className="p-2 rounded-xl bg-neutral-900 text-neutral-300 border border-neutral-800 border border-indigo-100">
                   <Database className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">SQL Studio</h3>
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 text-indigo-700 font-mono text-xs font-semibold">
+                  <h3 className="text-base font-semibold text-white tracking-tight">SQL Studio</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-neutral-900 text-neutral-300 border border-neutral-800 font-mono text-xs">
                     {activeSqlDb.name}
                   </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">
+                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-neutral-900 text-neutral-400 border border-neutral-800 font-mono text-xs">
                     PostgreSQL 16
                   </span>
                 </div>
               </div>
               <button 
                 onClick={() => setSqlModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1785,12 +1865,12 @@ const DashboardHome = () => {
             <div className="p-5 space-y-3.5 overflow-y-auto flex-1">
               {/* Tables Bar */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-slate-500 text-xs flex items-center gap-1.5 shrink-0">
+                <span className="font-semibold text-neutral-400 text-xs flex items-center gap-1.5 shrink-0">
                   <Table className="w-3.5 h-3.5 text-indigo-600" />
                   Tables:
                 </span>
                 {sqlTables.length === 0 ? (
-                  <span className="text-xs text-slate-400 italic">No tables in database</span>
+                  <span className="text-xs text-neutral-500 italic">No tables in database</span>
                 ) : (
                   sqlTables.map((tbl) => (
                     <button
@@ -1801,7 +1881,7 @@ const DashboardHome = () => {
                         setSqlQuery(query);
                         handleExecuteQuery(query);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 font-mono text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 font-mono text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       <span>{tbl}</span>
@@ -1813,7 +1893,7 @@ const DashboardHome = () => {
               {/* SQL Query Editor */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
+                  <label className="text-xs font-semibold text-neutral-300">
                     SQL Query:
                   </label>
                   <div className="flex items-center gap-2">
@@ -1825,7 +1905,7 @@ const DashboardHome = () => {
                           setSqlQuery(query);
                           handleExecuteQuery(query);
                         }}
-                        className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="text-[11px] text-neutral-400 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                       >
                         View {sqlTables[0]}
                       </button>
@@ -1833,7 +1913,7 @@ const DashboardHome = () => {
                     <button
                       type="button"
                       onClick={() => setSqlQuery('')}
-                      className="text-[11px] text-slate-400 hover:text-rose-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                      className="text-[11px] text-neutral-500 hover:text-rose-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       Clear
                     </button>
@@ -1850,17 +1930,17 @@ const DashboardHome = () => {
                   }}
                   rows="3"
                   placeholder="Enter SQL query, e.g. SELECT * FROM ... or INSERT / UPDATE"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
+                  className="w-full px-3.5 py-2.5 rounded-md border border-neutral-800 font-mono text-xs text-neutral-100 bg-black focus:border-neutral-600 focus:outline-none leading-relaxed"
                 ></textarea>
                 <div className="flex items-center justify-between mt-1.5">
-                  <span className="text-[11px] text-slate-400">
-                    Press <kbd className="bg-slate-100 px-1 py-0.5 rounded text-[10px] font-mono border border-slate-200">⌘ + Enter</kbd> to run
+                  <span className="text-[11px] text-neutral-500">
+                    Press <kbd className="bg-neutral-900 px-1 py-0.5 rounded text-[10px] font-mono border border-neutral-800 text-neutral-400">⌘ + Enter</kbd> to run
                   </span>
                   <button
                     type="button"
                     onClick={() => handleExecuteQuery()}
                     disabled={runningSql || !sqlQuery.trim()}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer"
                   >
                     {runningSql ? (
                       <>
@@ -1879,25 +1959,25 @@ const DashboardHome = () => {
 
               {/* SQL Result View */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                   Result:
                 </label>
-                <div className="p-3.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-slate-800 shadow-inner">
+                <div className="p-3.5 rounded-md bg-black text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-neutral-800">
                   {runningSql ? (
-                    <span className="text-slate-500">Loading data...</span>
+                    <span className="text-neutral-400">Loading data...</span>
                   ) : (
-                    sqlResult || <span className="text-slate-600">-- No rows returned --</span>
+                    sqlResult || <span className="text-neutral-400">-- No rows returned --</span>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => handleCopyUrl(activeSqlDb.external_url, `ext-sql-${activeSqlDb.id}`)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-200/60 border border-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-colors cursor-pointer"
               >
                 {copiedKey === `ext-sql-${activeSqlDb.id}` ? (
                   <>
@@ -1914,7 +1994,7 @@ const DashboardHome = () => {
               <button
                 type="button"
                 onClick={() => setSqlModalOpen(false)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 rounded-md text-xs font-medium transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -1925,23 +2005,23 @@ const DashboardHome = () => {
 
       {/* Bind Database to Server Modal */}
       {bindModalOpen && activeBindDb && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <div className="p-2 rounded-xl bg-neutral-900 text-neutral-300 border border-neutral-800 border border-indigo-100">
                   <Link2 className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">Bind Database to Server</h3>
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 text-indigo-700 font-mono text-xs font-semibold">
+                  <h3 className="text-base font-semibold text-white tracking-tight">Bind Database to Server</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-neutral-900 text-neutral-300 border border-neutral-800 font-mono text-xs">
                     {activeBindDb.name}
                   </span>
                 </div>
               </div>
               <button 
                 onClick={() => setBindModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1949,7 +2029,7 @@ const DashboardHome = () => {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                <label className="block text-xs font-semibold text-neutral-300 mb-2">
                   Select Target Server:
                 </label>
                 {containers.filter(c => c.state === 'running').length === 0 ? (
@@ -1960,7 +2040,7 @@ const DashboardHome = () => {
                   <select
                     value={selectedTargetContainer}
                     onChange={(e) => setSelectedTargetContainer(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-colors"
+                    className="w-full px-3.5 py-2 rounded-md border border-neutral-800 bg-black text-xs font-mono text-neutral-200 focus:border-neutral-600 focus:outline-none transition-colors"
                   >
                     {containers.filter(c => c.state === 'running').map((c) => (
                       <option key={c.id} value={c.id}>
@@ -1969,17 +2049,17 @@ const DashboardHome = () => {
                     ))}
                   </select>
                 )}
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                <p className="text-[11px] text-neutral-500 mt-2 leading-relaxed">
                   The system will inject <code className="font-mono text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">DATABASE_URL</code> into the server and restart it automatically.
                 </p>
               </div>
             </div>
 
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setBindModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1987,7 +2067,7 @@ const DashboardHome = () => {
                 type="button"
                 onClick={handleConfirmBind}
                 disabled={bindingServer || !selectedTargetContainer}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer"
               >
                 {bindingServer ? (
                   <>
@@ -2007,15 +2087,15 @@ const DashboardHome = () => {
       )}
       {/* Restore Database Modal */}
       {restoreModalOpen && activeRestoreDb && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
                   <Upload className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">Restore Database</h3>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Restore Database</h3>
                   <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono text-xs font-semibold">
                     {activeRestoreDb.name}
                   </span>
@@ -2023,7 +2103,7 @@ const DashboardHome = () => {
               </div>
               <button 
                 onClick={() => setRestoreModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2035,14 +2115,14 @@ const DashboardHome = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                <label className="block text-xs font-semibold text-neutral-300 mb-2">
                   Select backup file (.sql):
                 </label>
                 <input
                   type="file"
                   accept=".sql,.dump"
                   onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
-                  className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 border border-slate-200 rounded-xl p-1 bg-slate-50 cursor-pointer"
+                  className="block w-full text-xs text-neutral-400 font-mono file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-mono file:bg-neutral-800 file:text-white hover:file:bg-neutral-700 border border-neutral-800 rounded-md p-1 bg-black cursor-pointer"
                 />
                 {restoreFile && (
                   <p className="text-[11px] text-emerald-600 mt-1 font-medium">
@@ -2053,7 +2133,7 @@ const DashboardHome = () => {
 
               {restoreResult && (
                 <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-600">Execution output:</span>
+                  <span className="text-[11px] font-semibold text-neutral-400">Execution output:</span>
                   <div className="p-3 rounded-xl bg-slate-900 text-slate-200 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
                     {restoreResult}
                   </div>
@@ -2061,11 +2141,11 @@ const DashboardHome = () => {
               )}
             </div>
 
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setRestoreModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -2073,7 +2153,7 @@ const DashboardHome = () => {
                 type="button"
                 onClick={handleExecuteRestore}
                 disabled={restoring || !restoreFile}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-medium border border-white transition-colors cursor-pointer"
               >
                 {restoring ? (
                   <>
@@ -2093,15 +2173,15 @@ const DashboardHome = () => {
       )}
       {/* GitHub Webhook Setup Modal */}
       {webhookModalOpen && activeWebhookContainer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-neutral-800 bg-neutral-950">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
                   <Webhook className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">Webhook Auto-Deploy</h3>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Webhook Auto-Deploy</h3>
                   <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-mono text-xs font-semibold">
                     {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}
                   </span>
@@ -2109,7 +2189,7 @@ const DashboardHome = () => {
               </div>
               <button 
                 onClick={() => setWebhookModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2118,7 +2198,7 @@ const DashboardHome = () => {
             <div className="p-6 space-y-4">
               {/* Step 1: Payload URL */}
               <div>
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-neutral-300 mb-1.5">
                   <span>1. Payload URL:</span>
                   <button
                     type="button"
@@ -2139,16 +2219,16 @@ const DashboardHome = () => {
                     )}
                   </button>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-900 text-purple-300 font-mono text-xs select-all border border-slate-800 break-all">
+                <div className="p-2.5 rounded-md bg-black text-neutral-200 font-mono text-xs select-all border border-neutral-800 break-all">
                   {activeWebhookContainer && (customPublicUrl.trim() 
                     ? `${customPublicUrl.trim().replace(/\/$/, '')}/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`
                     : activeWebhookContainer.webhook_url)}
                 </div>
 
                 {/* Localhost Tunnel Helper */}
-                <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+                <div className="mt-2.5 p-3 rounded-md bg-neutral-950 border border-neutral-800 text-xs space-y-2">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-600 font-medium">Public Tunnel Command (for Localhost):</span>
+                    <span className="text-neutral-400 font-medium">Public Tunnel Command (for Localhost):</span>
                     <button
                       type="button"
                       onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
@@ -2158,7 +2238,7 @@ const DashboardHome = () => {
                       Copy Command
                     </button>
                   </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800">
+                  <div className="p-2 bg-black rounded-md border border-neutral-800 font-mono text-[11px] text-neutral-300">
                     <code>npx localtunnel --port 8080</code>
                   </div>
                   <input
@@ -2166,7 +2246,7 @@ const DashboardHome = () => {
                     value={customPublicUrl}
                     onChange={(e) => handleUpdatePublicUrl(e.target.value)}
                     placeholder="Paste your Public URL, e.g. https://xxxx.loca.lt"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-1.5 rounded-md border border-neutral-800 bg-black text-xs font-mono text-neutral-200 focus:outline-none focus:border-neutral-600"
                   />
                 </div>
               </div>
@@ -2174,14 +2254,14 @@ const DashboardHome = () => {
               {/* Step 2 & 3 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <span className="block text-xs font-semibold text-slate-700 mb-1.5">2. Content type:</span>
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200">
+                  <span className="block text-xs font-semibold text-neutral-300 mb-1.5">2. Content type:</span>
+                  <div className="p-2.5 rounded-md bg-black text-neutral-300 font-mono text-xs border border-neutral-800">
                     application/json
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-neutral-300 mb-1.5">
                     <span>3. Secret:</span>
                     <button
                       type="button"
@@ -2195,15 +2275,15 @@ const DashboardHome = () => {
                       )}
                     </button>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-100 text-slate-800 font-mono text-xs truncate border border-slate-200">
+                  <div className="p-2.5 rounded-md bg-black text-neutral-300 font-mono text-xs truncate border border-neutral-800">
                     {activeWebhookContainer.webhook_secret}
                   </div>
                 </div>
               </div>
 
               {/* Step 4: Event */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-                <span className="font-medium text-slate-700">4. Event:</span>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-neutral-400 flex items-center justify-between">
+                <span className="font-medium text-neutral-300">4. Event:</span>
                 <span className="font-semibold text-indigo-700">Just the push event</span>
               </div>
 
@@ -2223,12 +2303,12 @@ const DashboardHome = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between">
               <button
                 type="button"
                 onClick={handleTestWebhookPing}
                 disabled={pingingWebhook}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-semibold border border-purple-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
               >
                 {pingingWebhook ? (
                   <>
@@ -2246,7 +2326,7 @@ const DashboardHome = () => {
               <button
                 type="button"
                 onClick={() => setWebhookModalOpen(false)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 rounded-md text-xs font-medium transition-colors cursor-pointer"
               >
                 Done
               </button>
@@ -2257,15 +2337,15 @@ const DashboardHome = () => {
 
       {/* Universal Confirmation Modal */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col p-6 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white p-6 animate-in zoom-in-95 duration-150">
             <div className="flex items-start gap-3.5">
               <div className={`p-3 rounded-2xl shrink-0 ${
                 confirmModal.variant === 'danger' 
                   ? 'bg-rose-50 text-rose-600 border border-rose-100' 
                   : confirmModal.variant === 'warning'
                   ? 'bg-amber-50 text-amber-600 border border-amber-100'
-                  : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                  : 'bg-neutral-900 text-neutral-300 border border-neutral-800 border border-indigo-100'
               }`}>
                 {confirmModal.variant === 'danger' ? (
                   <AlertTriangle className="w-6 h-6" />
@@ -2276,16 +2356,16 @@ const DashboardHome = () => {
                 )}
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-slate-800">{confirmModal.title}</h3>
-                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{confirmModal.message}</p>
+                <h3 className="text-base font-semibold text-white tracking-tight">{confirmModal.title}</h3>
+                <p className="text-xs text-neutral-400 font-mono mt-1.5 leading-relaxed">{confirmModal.message}</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-neutral-800">
               <button
                 type="button"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 {confirmModal.cancelText || 'Cancel'}
               </button>
@@ -2296,7 +2376,7 @@ const DashboardHome = () => {
                   setConfirmModal(prev => ({ ...prev, isOpen: false }));
                   if (action) action();
                 }}
-                className={`px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 text-xs font-medium rounded-md text-white transition-colors cursor-pointer flex items-center gap-1.5 ${
                   confirmModal.variant === 'danger'
                     ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
                     : confirmModal.variant === 'warning'
@@ -2310,7 +2390,7 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

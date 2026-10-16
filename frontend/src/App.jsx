@@ -12,20 +12,20 @@ function App() {
 
   return (
     <Router>
-      <Toaster position="top-right" richColors closeButton expand={false} />
-      <div className="flex h-screen bg-slate-50 font-sans overflow-hidden selection:bg-blue-200">
+      <Toaster position="top-right" theme="dark" richColors closeButton expand={false} />
+      <div className="flex h-screen bg-black text-neutral-100 font-sans overflow-hidden selection:bg-neutral-800 selection:text-white">
         
         {/* Sidebar */}
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-black">
           
           {/* Topbar */}
           <Header setIsSidebarOpen={setIsSidebarOpen} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 bg-slate-50/50">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 bg-black">
             <div className="max-w-7xl mx-auto pb-20">
               <Routes>
                 <Route path="/" element={<DashboardHome />} />

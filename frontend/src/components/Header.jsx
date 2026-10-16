@@ -1,41 +1,62 @@
-import { Menu, Bell, Search } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Menu, Bell, Search, Command } from 'lucide-react';
+import { useLocation, Link } from 'react-router-dom';
 
 const Header = ({ setIsSidebarOpen }) => {
   const location = useLocation();
-  const title = location.pathname === '/' ? 'Dashboard' : 'New Deploy';
+  const currentPath = location.pathname === '/' ? 'overview' : location.pathname.replace('/', '');
 
   return (
-    <header className="bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-10">
-      <div className="px-6 h-20 flex justify-between items-center gap-4">
-        <div className="flex items-center gap-4">
+    <header className="bg-black/80 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-20">
+      <div className="px-6 h-16 flex justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2 rounded-xl text-slate-500 hover:bg-slate-200/50 transition-colors"
+            className="lg:hidden p-1.5 -ml-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors"
+            aria-label="Open navigation menu"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
           
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
-            <p className="text-xs font-medium text-slate-500 hidden sm:block">Welcome back, let's build something awesome today.</p>
+          {/* Vercel Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <Link to="/" className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+              <span className="font-semibold text-neutral-200">ai-cloud</span>
+            </Link>
+            <span className="text-neutral-600">/</span>
+            <span className="text-neutral-400 uppercase tracking-wider">{currentPath}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-5">
-          <div className="hidden md:flex relative group">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" />
+        <div className="flex items-center gap-3">
+          {/* Search bar with ⌘K */}
+          <div className="hidden sm:flex items-center relative">
+            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
-              placeholder="Search resources..." 
-              className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+              placeholder="Search resources, apps..." 
+              className="pl-8 pr-12 py-1.5 bg-neutral-950 border border-neutral-800 rounded-md text-xs text-neutral-200 placeholder:text-neutral-600 w-56 focus:outline-none focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600 transition-all font-mono"
             />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[10px] text-neutral-500 bg-neutral-900 border border-neutral-800 px-1 py-0.5 rounded">
+              <Command className="w-2.5 h-2.5" />
+              <span>K</span>
+            </div>
           </div>
 
-          <button className="relative p-2.5 rounded-full text-slate-500 hover:bg-slate-200/50 hover:text-slate-700 transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+          {/* Notifications */}
+          <button 
+            className="relative p-2 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors"
+            title="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
           </button>
+
+          {/* Quick status pill */}
+          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Gateway 8080</span>
+          </div>
         </div>
       </div>
     </header>
