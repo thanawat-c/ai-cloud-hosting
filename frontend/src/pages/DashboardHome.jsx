@@ -1155,60 +1155,100 @@ const DashboardHome = () => {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-3 py-3 text-right">
-                        <div className="inline-flex items-center justify-end gap-0.5">
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1">
                           {item.state === 'running' ? (
-                            <button 
-                              onClick={() => handleAction(item.id, 'stop', item.name)} 
-                              className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Stop Server"
-                            >
-                              <Square className="w-3.5 h-3.5 fill-current" />
-                            </button>
+                            <div className="relative group/tip flex items-center justify-center">
+                              <button 
+                                onClick={() => handleAction(item.id, 'stop', item.name)} 
+                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                aria-label="หยุดเซิร์ฟเวอร์"
+                              >
+                                <Square className="w-3.5 h-3.5 fill-current" />
+                              </button>
+                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                                หยุดเซิร์ฟเวอร์
+                              </div>
+                            </div>
                           ) : (
-                            <button 
-                              onClick={() => handleAction(item.id, 'start', item.name)} 
-                              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
-                              title="Start Server"
-                            >
-                              <Play className="w-3.5 h-3.5 fill-current" />
-                            </button>
+                            <div className="relative group/tip flex items-center justify-center">
+                              <button 
+                                onClick={() => handleAction(item.id, 'start', item.name)} 
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                aria-label="สตาร์ตเซิร์ฟเวอร์"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                              </button>
+                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                                สตาร์ตเซิร์ฟเวอร์
+                              </div>
+                            </div>
                           )}
-                          <button 
-                            onClick={() => handleViewLogs(item.id, item.name)} 
-                            className="p-1 rounded text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="View Logs"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => handleOpenEnv(item.id, item.name)} 
-                            className="p-1 rounded text-amber-600 hover:bg-amber-50 transition-colors"
-                            title="Environment Variables (ตั้งค่าตัวแปร)"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {handleRedeploy(item.id)}}
-                            className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Re-deploy (อัปเดตโค้ดใหม่)"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenWebhookModal(item)}
-                            className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
-                            title="GitHub Webhook (Auto-deploy on Push)"
-                          >
-                            <Zap className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(item.id || item.deployment_id)} 
-                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Delete Server"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button 
+                              onClick={() => handleViewLogs(item.id, item.name)} 
+                              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                              aria-label="ดู Logs การทำงาน"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              ดู Logs
+                            </div>
+                          </div>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button 
+                              onClick={() => handleOpenEnv(item.id, item.name)} 
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                              aria-label="ตั้งค่าตัวแปรระบบ (.env)"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              ตั้งค่าตัวแปร (.env)
+                            </div>
+                          </div>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button
+                              onClick={() => {handleRedeploy(item.id)}}
+                              className="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
+                              aria-label="ดึงโค้ดล่าสุดและ Re-deploy"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              ดึงโค้ด Re-deploy
+                            </div>
+                          </div>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button
+                              onClick={() => handleOpenWebhookModal(item)}
+                              className="p-1.5 rounded-lg text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition-colors cursor-pointer"
+                              aria-label="ตั้งค่า Auto-Deploy เมื่อ Push โค้ด"
+                            >
+                              <Zap className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              Auto-Deploy (Webhook)
+                            </div>
+                          </div>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button 
+                              onClick={() => handleDelete(item.id || item.deployment_id)} 
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              aria-label="ลบเซิร์ฟเวอร์"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              ลบเซิร์ฟเวอร์
+                            </div>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1301,24 +1341,35 @@ const DashboardHome = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleToggleDb(db.id, db.status)}
-                            title={isRunning ? "หยุด Database (Stop)" : "เริ่มทำงาน (Start)"}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              isRunning 
-                                ? 'text-amber-600 hover:bg-amber-50' 
-                                : 'text-emerald-600 hover:bg-emerald-50'
-                            }`}
-                          >
-                            {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDb(db.id, db.name)}
-                            title="ลบ Database (Delete)"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button
+                              onClick={() => handleToggleDb(db.id, db.status)}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                isRunning 
+                                  ? 'text-amber-600 hover:bg-amber-50' 
+                                  : 'text-emerald-600 hover:bg-emerald-50'
+                              }`}
+                              aria-label={isRunning ? "หยุด Database (Stop)" : "เปิดใช้งาน Database (Start)"}
+                            >
+                              {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              {isRunning ? "หยุด Database" : "เปิดใช้งาน Database"}
+                            </div>
+                          </div>
+
+                          <div className="relative group/tip flex items-center justify-center">
+                            <button
+                              onClick={() => handleDeleteDb(db.id, db.name)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              aria-label="ลบ Database (Delete)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
+                              ลบ Database
+                            </div>
+                          </div>
                         </div>
                       </div>
 
