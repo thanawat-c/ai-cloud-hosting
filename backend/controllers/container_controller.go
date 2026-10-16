@@ -26,6 +26,10 @@ func GetContainers(c *gin.Context) {
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())
 	
+	// ดึงรายการ Managed Database ทั้งหมดเพื่อนำมาตรวจจับสถานะการเชื่อมต่อ DB
+	var allDBs []models.ManagedDatabase
+	config.DB.Where("status != ?", "deleted").Find(&allDBs)
+
 	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร
 	dockerStateMap := make(map[string]string)
 	for _, dc := range dockerContainers {
@@ -67,6 +71,34 @@ func GetContainers(c *gin.Context) {
 			continue
 		}
 
+		// ตรวจสอบว่า Container นี้ผูกกับ Managed Database ตัวไหน และ DB นั้นหยุดทำงานอยู่หรือไม่
+		var linkedDBName string
+		var linkedDBID uint
+		var isDBStopped bool
+		var dbWarning string
+
+		if d.ContainerID != "" && len(allDBs) > 0 {
+			envs, err := services.GetContainerEnv(context.Background(), d.ContainerID)
+			if err == nil {
+				for _, env := range envs {
+					for _, db := range allDBs {
+						if strings.Contains(env, db.ContainerName) || strings.Contains(env, db.InternalURL) {
+							linkedDBName = db.Name
+							linkedDBID = db.ID
+							if db.Status != "running" {
+								isDBStopped = true
+								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' กำลังหยุดทำงาน (Stopped) ทำให้แอปไม่สามารถเชื่อมต่อได้", db.Name)
+							}
+							break
+						}
+					}
+					if linkedDBName != "" {
+						break
+					}
+				}
+			}
+		}
+
 		// สังเกตประเภท Service จากชื่อ RepoURL
 		serviceType := "standalone"
 		cleanName := d.RepoURL
@@ -79,16 +111,20 @@ func GetContainers(c *gin.Context) {
 		}
 
 		results = append(results, map[string]interface{}{
-			"id":            d.ContainerID,
-			"deployment_id": d.ID,
-			"name":          d.RepoURL, 
-			"clean_name":    cleanName,
-			"service_type":  serviceType,
-			"image":         d.ImageName,
-			"state":         actualState,
-			"status":        "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
-			"domain_name":   d.DomainName,
-			"last_error":    lastError,
+			"id":             d.ContainerID,
+			"deployment_id":  d.ID,
+			"name":           d.RepoURL, 
+			"clean_name":     cleanName,
+			"service_type":   serviceType,
+			"image":          d.ImageName,
+			"state":          actualState,
+			"status":         "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
+			"domain_name":    d.DomainName,
+			"last_error":     lastError,
+			"linked_db_name": linkedDBName,
+			"linked_db_id":   linkedDBID,
+			"is_db_stopped":  isDBStopped,
+			"db_warning":     dbWarning,
 		})
 	}
 	

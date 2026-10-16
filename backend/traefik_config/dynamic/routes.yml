@@ -1,4 +1,13 @@
 http:
+  services:
+    my-app-deploy-1173458073-backend:
+      loadBalancer:
+        servers:
+          - url: "http://172.19.0.4:80"
+    my-app-deploy-1173458073-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://172.19.0.3:80"
   routers:
     my-app-deploy-1173458073-backend:
       rule: "Host(`my-app-deploy-1173458073-backend.localhost`)"

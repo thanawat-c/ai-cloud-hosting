@@ -43,6 +43,7 @@ const DashboardHome = () => {
   const [activeErrorContainerName, setActiveErrorContainerName] = useState('');
   const [activeErrorDetails, setActiveErrorDetails] = useState('');
   const [dismissAlert, setDismissAlert] = useState(false);
+  const [dismissDbAlert, setDismissDbAlert] = useState(false);
 
   // Managed Databases State
   const [databases, setDatabases] = useState([]);
@@ -67,6 +68,7 @@ const DashboardHome = () => {
 
   // Notification State
   const prevStatesRef = useRef({});
+  const prevDbStatesRef = useRef({});
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
   );
@@ -107,6 +109,7 @@ const DashboardHome = () => {
         
         // ตรวจจับ Container ที่เพิ่งดับ เพื่อส่ง Desktop Alert
         const prevStates = prevStatesRef.current;
+        const prevDbStates = prevDbStatesRef.current;
         containerList.forEach(c => {
           const key = c.id || String(c.deployment_id);
           const prevState = prevStates[key];
@@ -132,9 +135,35 @@ const DashboardHome = () => {
               }
             }
           }
+
+          // ตรวจจับ Database ที่หยุดทำงาน สำหรับ Service ที่กำลังรันอยู่
+          const wasDbStopped = prevDbStates[key];
+          const isDbStopped = !!c.is_db_stopped;
+          if (currentState === 'running' && isDbStopped && !wasDbStopped) {
+            const shortName = getShortAppName(c.name, c.clean_name);
+            const dbName = c.linked_db_name || 'Database';
+
+            toast.warning(`⚠️ ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
+              description: `Database "${dbName}" หยุดทำงานอยู่ ทำให้ Service ไม่สามารถเข้าถึงข้อมูลได้ (Error 500)`,
+              duration: 8000,
+            });
+
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(`⚠️ ฐานข้อมูลหลุดการเชื่อมต่อ! (${shortName})`, {
+                  body: `Database: ${dbName} หยุดทำงานอยู่ อาจทำให้ API ตอบกลับเป็น Error 500`,
+                });
+              } catch (notifErr) {
+                console.error('Desktop Notification error:', notifErr);
+              }
+            }
+          }
+
           prevStates[key] = currentState;
+          prevDbStates[key] = isDbStopped;
         });
         prevStatesRef.current = prevStates;
+        prevDbStatesRef.current = prevDbStates;
 
         // Fetch stats for all running containers asynchronously
         containerList.forEach(async (c) => {
@@ -245,6 +274,7 @@ const DashboardHome = () => {
       if (res.ok) {
         toast.success(action === 'stop' ? 'หยุด Database สำเร็จ' : 'เริ่ม Database สำเร็จ', { id: toastId });
         fetchDatabases();
+        fetchContainers();
       } else {
         const data = await res.json();
         toast.error('ดำเนินการล้มเหลว', { id: toastId, description: data.error });
@@ -534,6 +564,7 @@ const DashboardHome = () => {
   );
 
   const crashedContainers = containers.filter(c => c.state === 'exited' || c.state === 'failed' || c.state === 'restarting');
+  const dbDisconnectedContainers = containers.filter(c => c.state === 'running' && c.is_db_stopped);
 
   return (
     <>
@@ -598,6 +629,43 @@ const DashboardHome = () => {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Alert Banner สำหรับแจ้งเตือนเมื่อตรวจพบ Database ของ Service หลุดการเชื่อมต่อ / หยุดทำงาน */}
+      {dbDisconnectedContainers.length > 0 && !dismissDbAlert && (
+        <div className="relative z-10 mb-6 p-4 rounded-2xl bg-amber-50/95 border border-amber-300 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+              <Database className="w-5 h-5 animate-pulse text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-amber-950 text-sm flex items-center gap-2">
+                ⚠️ ตรวจพบฐานข้อมูลหยุดทำงาน ({dbDisconnectedContainers.length} Service เชื่อมต่อ DB ไม่ได้)
+              </h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Service <span className="font-bold">{dbDisconnectedContainers.map(c => getShortAppName(c.name, c.clean_name)).join(', ')}</span> กำลังทำงาน แต่ฐานข้อมูล <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> หยุดทำงานอยู่ อาจส่งผลให้ระบบตอบกลับเป็น Error 500
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {dbDisconnectedContainers[0]?.linked_db_id && (
+              <button
+                onClick={() => handleToggleDb(dbDisconnectedContainers[0].linked_db_id, 'stopped')}
+                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                สตาร์ต Database ทันที
+              </button>
+            )}
+            <button
+              onClick={() => setDismissDbAlert(true)}
+              className="text-slate-400 hover:text-slate-600 hover:bg-amber-100/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+              title="ปิดการแจ้งเตือนนี้"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -714,6 +782,28 @@ const DashboardHome = () => {
                               Logs
                             </span>
                           </button>
+                        ) : item.state === 'running' && item.is_db_stopped ? (
+                          <div className="flex flex-col gap-1 items-start">
+                            <span 
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs bg-amber-50 text-amber-800 border-amber-300"
+                              title={item.db_warning || `เชื่อมต่อฐานข้อมูล ${item.linked_db_name || 'DB'} ไม่ได้เนื่องจากฐานข้อมูลหยุดทำงาน`}
+                            >
+                              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                              </span>
+                              <span>DB Offline</span>
+                            </span>
+                            {item.linked_db_id && (
+                              <button
+                                onClick={() => handleToggleDb(item.linked_db_id, 'stopped')}
+                                className="text-[10px] text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 font-semibold px-2 py-0.5 rounded border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                title="คลิกเพื่อสตาร์ต Database ทันที"
+                              >
+                                <Play className="w-2.5 h-2.5 fill-current" /> สตาร์ต DB
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs
                             ${item.state === 'running' 
