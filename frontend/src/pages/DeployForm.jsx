@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
   Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
-  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle 
+  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -538,22 +538,13 @@ const DeployForm = () => {
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              terminalBoxRef.current?.scrollTo({ top: terminalBoxRef.current.scrollHeight, behavior: 'smooth' });
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-neutral-300 font-mono rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
-                          >
-                            <Terminal className="w-3.5 h-3.5 text-neutral-500 font-mono" />
-                            <span>Jump to Terminal Bottom</span>
-                          </button>
+                        <div className="flex items-center gap-2 pt-0.5">
                           <button
                             type="button"
                             onClick={handleDeploy}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-700 rounded-md text-xs font-medium transition-colors cursor-pointer"
                           >
+                            <RefreshCw className="w-3.5 h-3.5 text-neutral-400" />
                             <span>Retry Deployment</span>
                           </button>
                         </div>
