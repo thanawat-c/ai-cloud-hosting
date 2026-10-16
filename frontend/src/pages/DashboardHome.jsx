@@ -44,6 +44,19 @@ const formatTimeAgo = (dateStr) => {
   return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 };
 
+// จัดรูปแบบวันที่และเวลาเต็มแบบไทย เช่น "16 ต.ค. 16:32 น."
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }) + ' น.';
+};
+
 const DashboardHome = () => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -853,6 +866,7 @@ const DashboardHome = () => {
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Service / App</th>
                     <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Image</th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
+                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Deploy ล่าสุด</th>
                     <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Usage</th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">URL</th>
                     <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
@@ -993,6 +1007,19 @@ const DashboardHome = () => {
                             {item.state === 'running' ? 'Running' : 'Stopped'}
                           </span>
                         )}
+                      </td>
+
+                      {/* Last Deployed (Deploy ล่าสุด) */}
+                      <td className="hidden sm:table-cell px-3 py-3 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-5">
+                            {formatDateTime(item.deployed_at || item.updated_at || item.created_at)}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Resources (hidden on mobile) */}
@@ -1912,8 +1939,13 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800">GitHub Auto-Deploy Webhook</h3>
-                  <p className="text-xs text-slate-500">
-                    Service: {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                    <span>Service: {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}</span>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1 text-indigo-600 font-medium">
+                      <Clock className="w-3 h-3 text-indigo-500 shrink-0" />
+                      <span>Deploy ล่าสุด: {formatTimeAgo(activeWebhookContainer.deployed_at || activeWebhookContainer.updated_at || activeWebhookContainer.created_at)}</span>
+                    </span>
                   </p>
                 </div>
               </div>
