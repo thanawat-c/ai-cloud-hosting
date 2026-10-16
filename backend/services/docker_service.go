@@ -415,6 +415,14 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 			targetPort = port
 			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiDocker), 0644)
 
+			backendInternalURL := fmt.Sprintf("http://%s", backendEndpoint)
+			if !strings.Contains(oldEnvVars, "BACKEND_URL=") {
+				if oldEnvVars != "" {
+					oldEnvVars += "\n"
+				}
+				oldEnvVars += fmt.Sprintf("BACKEND_URL=%s\nINTERNAL_API_URL=%s", backendInternalURL, backendInternalURL)
+			}
+
 			nginxConf := fmt.Sprintf(`server {
     listen 80;
     server_name localhost;

@@ -163,14 +163,26 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     CMD ["uvicorn", ...] หรือ CMD ["python", "main.py"]
 - กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
 	} else if isFrontend {
+		backendURL := endpoint
+		if backendURL != "" && !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
+			backendURL = "http://" + backendURL
+		}
 		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
 - สโคปการทำงานเฉพาะโฟลเดอร์ "%s/"
 - ตรวจสอบ Package Manager จาก lockfile (pnpm, yarn, npm, bun) เพื่อติดตั้ง dependency ให้ตรงรุ่น
+- เซิร์ฟเวอร์ Backend ทำงานอยู่ที่: "%s"
+- สำคัญมาก! ต้องกำหนด Environment Variables ชี้ไปยัง Backend ก่อนรัน Build และใน Runtime Stage เสมอ:
+    ENV BACKEND_URL=%s
+    ENV API_URL=%s
+    ENV NUXT_PUBLIC_API_URL=%s
+    ENV VITE_API_URL=%s
+    ENV NEXT_PUBLIC_API_URL=%s
 - ขั้นตอนการ Build:
   WORKDIR /app/%s
   COPY %s/package.json %s/*lock* ./
   (รันคำสั่งติดตั้ง dependencies ตาม lockfile เช่น npm ci, pnpm install, yarn install)
   COPY %s/ ./
+  (ต้องใส่ ENV BACKEND_URL=%s และตัวแปรด้านบนก่อนคำสั่งรัน build เพื่อให้ frameworks เช่น Nuxt/Next/Vite compile proxy และ API URL ได้ถูกต้อง)
   (รัน build script เช่น pnpm run build หรือ pnpm run generate หรือ npm run build)
 - Stage สุดท้าย:
   * หากเป็น Static Web App (Vite, React, Vue, Nuxt static):
@@ -181,8 +193,9 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     EXPOSE 80
     CMD ["nginx", "-g", "daemon off;"]
   * หากเป็น SSR App (Next.js standalone, Nuxt node-server):
+    (ต้องใส่ ENV BACKEND_URL=%s และ ENV API_URL=%s ใน Runtime Stage นี้ด้วยเพื่อให้ SSR หรือ Server Proxy เรียก Backend ถูกต้อง)
     EXPOSE 3000
-    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
+    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, targetDir, targetDir, targetDir, backendURL, targetDir, backendURL, backendURL)
 	} else {
 		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับ [Standalone Project] ที่อยู่ที่ Root directory:
 - สแกนดูไฟล์และ config ใน Root เพื่อระบุประเภทโปรเจกต์ (Go, Node.js, Python, Java, PHP, Rust, หรือ Web Frontend)
@@ -423,13 +436,22 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 			buildCmd = "npm run generate || npm run build || true"
 		}
 
+		backendURL := backendEndpoint
+		if backendURL != "" && !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
+			backendURL = "http://" + backendURL
+		}
+		envSnippet := ""
+		if backendURL != "" {
+			envSnippet = fmt.Sprintf("ENV BACKEND_URL=%s\nENV API_URL=%s\nENV NUXT_PUBLIC_API_URL=%s\nENV VITE_API_URL=%s\n", backendURL, backendURL, backendURL, backendURL)
+		}
+
 		dockerfile := fmt.Sprintf(`FROM node:22-alpine AS builder
 WORKDIR /app/%s
 %s
 COPY %spackage.json %s*lock* ./
 RUN %s
 COPY %s ./
-RUN %s
+%sRUN %s
 RUN mkdir -p /app/dist && (cp -r .output/public/* /app/dist/ 2>/dev/null || cp -r dist/* /app/dist/ 2>/dev/null || cp -r build/* /app/dist/ 2>/dev/null || true)
 
 FROM nginx:alpine
@@ -438,7 +460,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-`, targetDir, setupPkgManager, cleanPrefix, cleanPrefix, installCmd, cleanPrefix, buildCmd)
+`, targetDir, setupPkgManager, cleanPrefix, cleanPrefix, installCmd, cleanPrefix, envSnippet, buildCmd)
 
 		return dockerfile, "80", nil
 	}

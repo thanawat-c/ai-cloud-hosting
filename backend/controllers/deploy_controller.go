@@ -149,7 +149,18 @@ func TestDeploy(c *gin.Context) {
 			if feEnvVars != "" {
 				feEnvVars += "\n"
 			}
-			feEnvVars += fmt.Sprintf("NUXT_PUBLIC_API_URL=http://%s\nVITE_API_URL=http://%s\nAPI_URL=http://%s\nREACT_APP_API_URL=http://%s", beDomainName, beDomainName, beDomainName, beDomainName)
+			backendInternalURL := fmt.Sprintf("http://%s", backendInternalEndpoint)
+			backendPublicURL := fmt.Sprintf("http://%s", beDomainName)
+
+			feEnvVars += fmt.Sprintf("BACKEND_URL=%s\nINTERNAL_API_URL=%s\nAPI_URL=%s\nNUXT_PUBLIC_API_URL=%s\nVITE_API_URL=%s\nREACT_APP_API_URL=%s\nNEXT_PUBLIC_API_URL=%s",
+				backendInternalURL,
+				backendInternalURL,
+				backendInternalURL,
+				backendPublicURL,
+				backendPublicURL,
+				backendPublicURL,
+				backendPublicURL,
+			)
 
 			logChan <- "กำลังรัน Frontend Container...\n"
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
