@@ -408,6 +408,13 @@ const DashboardHome = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const handleCopyApiUrl = (url, key) => {
+    navigator.clipboard.writeText(url);
+    setCopiedKey(key);
+    toast.success('คัดลอก API Endpoint แล้ว', { description: url });
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
   const handleExecuteQuery = async (queryToRun, overrideDb) => {
     const targetDb = overrideDb || activeSqlDb;
     const q = queryToRun || sqlQuery;
@@ -1098,14 +1105,50 @@ const DashboardHome = () => {
                       {/* URL */}
                       <td className="px-3 py-3">
                         {item.state === 'running' && item.domain_name ? (
-                          <a 
-                            href={`http://${item.domain_name}`} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
-                          >
-                            Visit <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                          </a>
+                          (item.service_type === 'backend' || item.name?.includes('(Backend)')) ? (
+                            <div className="inline-flex items-center gap-1">
+                              <button 
+                                type="button"
+                                onClick={() => handleCopyApiUrl(`http://${item.domain_name}`, `app-url-${item.id}`)}
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-0.5 rounded-md cursor-pointer ${
+                                  copiedKey === `app-url-${item.id}`
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                }`}
+                                title={`คลิกเพื่อคัดลอก API URL: http://${item.domain_name}`}
+                              >
+                                {copiedKey === `app-url-${item.id}` ? (
+                                  <>
+                                    <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                    <span>Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                    <span>Copy URL</span>
+                                  </>
+                                )}
+                              </button>
+                              <a 
+                                href={`http://${item.domain_name}`} 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                title="เปิดดูในเบราว์เซอร์"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                              </a>
+                            </div>
+                          ) : (
+                            <a 
+                              href={`http://${item.domain_name}`} 
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
+                            >
+                              Visit <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            </a>
+                          )
                         ) : (
                           <span className="text-[11px] text-slate-400 italic">Offline</span>
                         )}
