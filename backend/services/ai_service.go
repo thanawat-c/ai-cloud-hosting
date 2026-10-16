@@ -203,8 +203,10 @@ GitHub Repository: %s
 
 คำแนะนำและกฎเหล็ก:
 1. ให้เลือก Base Image ให้ตรงกับ Config จริง (Go ให้ใช้ golang:alpine พร้อม ENV GOTOOLCHAIN=auto เพื่อรองรับ go.mod เวอร์ชันใหม่ล่าสุด, Frontend ใช้ node:22-alpine, Python ใช้ python:3.11-slim)
-2. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
-3. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+2. หากโปรเจกต์ Node.js มีการใช้ pnpm (มี pnpm-lock.yaml) ต้องใส่คำสั่ง RUN npm install -g pnpm ก่อนเรียกคำสั่ง pnpm เสมอ เพราะ base image ไม่มี pnpm ติดมาด้วย
+3. หากโปรเจกต์ Node.js มีการใช้ yarn (มี yarn.lock) ให้ใส่คำสั่ง RUN corepack enable ก่อนเรียกคำสั่ง yarn เสมอ
+4. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 สำหรับ Go backend)
+5. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
 		repoURL, targetInstruction, fileListStr, configsStr)
 
 	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
@@ -236,6 +238,42 @@ GitHub Repository: %s
 		finalDockerfile = strings.TrimSuffix(finalDockerfile, "```")
 	}
 	finalDockerfile = strings.TrimSpace(finalDockerfile)
+
+	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
+	if strings.Contains(finalDockerfile, "pnpm") && !strings.Contains(finalDockerfile, "install -g pnpm") && !strings.Contains(finalDockerfile, "corepack") {
+		lines := strings.Split(finalDockerfile, "\n")
+		var newLines []string
+		injected := false
+		for _, l := range lines {
+			newLines = append(newLines, l)
+			trimmedL := strings.TrimSpace(l)
+			if !injected && (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ")) {
+				newLines = append(newLines, "RUN npm install -g pnpm")
+				injected = true
+			}
+		}
+		if injected {
+			finalDockerfile = strings.Join(newLines, "\n")
+		}
+	}
+
+	// Auto-fix: ป้องกันกรณีใช้ yarn แต่ยังไม่ได้ enable corepack
+	if strings.Contains(finalDockerfile, "yarn") && !strings.Contains(finalDockerfile, "install -g yarn") && !strings.Contains(finalDockerfile, "corepack") {
+		lines := strings.Split(finalDockerfile, "\n")
+		var newLines []string
+		injected := false
+		for _, l := range lines {
+			newLines = append(newLines, l)
+			trimmedL := strings.TrimSpace(l)
+			if !injected && (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ")) {
+				newLines = append(newLines, "RUN corepack enable")
+				injected = true
+			}
+		}
+		if injected {
+			finalDockerfile = strings.Join(newLines, "\n")
+		}
+	}
 
 	// แกะหา EXPOSE port จาก Dockerfile
 	exposedPort := "80"
