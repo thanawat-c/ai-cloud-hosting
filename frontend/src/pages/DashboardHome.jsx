@@ -1,26 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Zap, Clock } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
-// แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
+// Extract short repository name, e.g. mock-api-server from git URL
 const getShortAppName = (rawName, cleanName) => {
   const nameToParse = cleanName || rawName?.replace(/\s*\((Backend|Frontend)\)$/, '') || '';
   if (!nameToParse) return 'Unknown App';
   
-  // ตัด .git ออก
+  // Remove .git suffix
   let cleaned = nameToParse.replace(/\.git\/?$/, '');
   
-  // ตัด URL protocol และ domain ออก เช่น https://github.com/user/
+  // Remove URL protocol and domain
   if (cleaned.includes('/')) {
     const parts = cleaned.split('/').filter(Boolean);
     if (parts.length > 0) {
-      cleaned = parts[parts.length - 1]; // เอาส่วนท้ายสุดที่เป็นชื่อ repo
+      cleaned = parts[parts.length - 1]; // Use repository name
     }
   }
   return cleaned;
 };
 
-// คำนวณเวลาที่ผ่านไป (Relative Time Ago) เช่น "เมื่อสักครู่", "2 นาทีที่แล้ว", "1 ชั่วโมงที่แล้ว"
+// Calculate relative time ago, e.g., 'just now', '2m ago', '1h ago'
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
@@ -29,32 +29,32 @@ const formatTimeAgo = (dateStr) => {
   const now = new Date();
   const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
 
-  if (diffSeconds < 10) return 'เมื่อสักครู่';
-  if (diffSeconds < 60) return `${diffSeconds} วินาทีที่แล้ว`;
+  if (diffSeconds < 10) return 'just now';
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
 
   const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes} นาทีที่แล้ว`;
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
 
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
+  if (diffHours < 24) return `${diffHours}h ago`;
 
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `${diffDays} วันที่แล้ว`;
+  if (diffDays < 30) return `${diffDays}d ago`;
 
-  return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 };
 
-// จัดรูปแบบวันที่และเวลาเต็มแบบไทย เช่น "16 ต.ค. 16:32 น."
+// Format full date and time
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('th-TH', {
+  return date.toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-  }) + ' น.';
+  });
 };
 
 const DashboardHome = () => {
@@ -141,13 +141,13 @@ const DashboardHome = () => {
     isOpen: false,
     title: '',
     message: '',
-    confirmText: 'ยืนยัน',
-    cancelText: 'ยกเลิก',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
     variant: 'primary', // 'primary' | 'danger' | 'warning'
     onConfirm: null,
   });
 
-  const openConfirmModal = ({ title, message, confirmText = 'ยืนยัน', cancelText = 'ยกเลิก', variant = 'primary', onConfirm }) => {
+  const openConfirmModal = ({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary', onConfirm }) => {
     setConfirmModal({
       isOpen: true,
       title,
@@ -168,23 +168,23 @@ const DashboardHome = () => {
 
   const requestNotificationPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.error('เบราว์เซอร์นี้ไม่รองรับ Desktop Notification');
+      toast.error('Desktop notifications are not supported in this browser');
       return;
     }
     try {
       const perm = await Notification.requestPermission();
       if (perm === 'granted') {
         setNotificationsEnabled(true);
-        toast.success('เปิด Desktop Alert สำเร็จ!', {
-          description: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง',
+        toast.success('Desktop alerts enabled!', {
+          description: 'You will receive notifications if a server crashes or stops.',
         });
-        new Notification('เปิดการแจ้งเตือนสำเร็จ', {
-          body: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง (Crashed)',
+        new Notification('Notifications Enabled', {
+          body: 'You will receive notifications if a server crashes or stops.',
         });
       } else {
         setNotificationsEnabled(false);
-        toast.warning('กรุณาอนุญาต Notification', {
-          description: 'โปรดเปิดสิทธิ์ Notification ในการตั้งค่าเบราว์เซอร์เพื่อรับการแจ้งเตือน',
+        toast.warning('Notification permission required', {
+          description: 'Please enable notifications in your browser settings to receive alerts.',
         });
       }
     } catch (err) {
@@ -200,7 +200,7 @@ const DashboardHome = () => {
         const containerList = data || [];
         setContainers(containerList);
         
-        // ตรวจจับ Container ที่เพิ่งดับ เพื่อส่ง Desktop Alert
+        // Detect stopped containers for desktop alerts
         const prevStates = prevStatesRef.current;
         const prevDbStates = prevDbStatesRef.current;
         containerList.forEach(c => {
@@ -211,17 +211,17 @@ const DashboardHome = () => {
           if (prevState === 'running' && (currentState === 'exited' || currentState === 'failed')) {
             const shortName = getShortAppName(c.name, c.clean_name);
 
-            // 1. แจ้งเตือนแบบ Toast บนหน้าจอเว็บทันที
-            toast.error(`เซิร์ฟเวอร์หยุดทำงาน (${shortName})`, {
-              description: `Service ขัดข้อง (${currentState}) กรุณาตรวจสอบ Log`,
+            // 1. Toast notification
+            toast.error(`Server stopped (${shortName})`, {
+              description: `Service error (${currentState}). Please check logs.`,
               duration: 8000,
             });
 
-            // 2. แจ้งเตือนแบบ Desktop Notification บน macOS/Windows
+            // 2. Desktop notification
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`เซิร์ฟเวอร์หยุดทำงาน (${shortName})`, {
-                  body: `Service: ${c.name} ขัดข้อง (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
+                new Notification(`Server stopped (${shortName})`, {
+                  body: `Service: ${c.name} stopped (${currentState}). Check dashboard for details.`,
                 });
               } catch (notifErr) {
                 console.error('Desktop Notification error:', notifErr);
@@ -229,22 +229,22 @@ const DashboardHome = () => {
             }
           }
 
-          // ตรวจจับ Database ที่หยุดทำงาน สำหรับ Service ที่กำลังรันอยู่
+          // Detect stopped databases for running services
           const wasDbStopped = prevDbStates[key];
           const isDbStopped = !!c.is_db_stopped;
           if (currentState === 'running' && isDbStopped && !wasDbStopped) {
             const shortName = getShortAppName(c.name, c.clean_name);
             const dbName = c.linked_db_name || 'Database';
 
-            toast.warning(`ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
-              description: `Database "${dbName}" หยุดทำงานอยู่ ทำให้ Service ไม่สามารถเข้าถึงข้อมูลได้`,
+            toast.warning(`Database disconnected (${shortName})`, {
+              description: `Database "${dbName}" is stopped. The service cannot access data.`,
               duration: 8000,
             });
 
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
-                  body: `Database: ${dbName} หยุดทำงานอยู่`,
+                new Notification(`Database disconnected (${shortName})`, {
+                  body: `Database: ${dbName} is offline.`,
                 });
               } catch (notifErr) {
                 console.error('Desktop Notification error:', notifErr);
@@ -274,7 +274,7 @@ const DashboardHome = () => {
         });
       }
     } catch (error) {
-      console.error("โหลดข้อมูลล้มเหลว:", error);
+      console.error("Failed to load data:", error);
     } finally {
       setLoading(false);
     }
@@ -323,11 +323,11 @@ const DashboardHome = () => {
   const handleCreateDatabase = async (e) => {
     e.preventDefault();
     if (!newDbName.trim()) {
-      toast.warning('กรุณาระบุชื่อ Database');
+      toast.warning('Please enter a database name');
       return;
     }
     setCreatingDb(true);
-    const toastId = toast.loading('กำลังสร้าง Database และผูก Persistent Volume...');
+    const toastId = toast.loading('Creating database and mounting persistent volume...');
     try {
       const res = await fetch('http://localhost:8080/api/databases', {
         method: 'POST',
@@ -336,21 +336,21 @@ const DashboardHome = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('สร้างฐานข้อมูลสำเร็จ!', {
+        toast.success('Database created successfully!', {
           id: toastId,
-          description: `PostgreSQL พร้อมใช้งานที่พอร์ตภายนอก ${data.database.host_port}`,
+          description: `PostgreSQL is ready on external port ${data.database.host_port}`,
         });
         setNewDbName('');
         setCreateDbModalOpen(false);
         fetchDatabases();
       } else {
-        toast.error('สร้าง Database ล้มเหลว', {
+        toast.error('Failed to create database', {
           id: toastId,
           description: data.error || 'Unknown error',
         });
       }
     } catch (err) {
-      toast.error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', {
+      toast.error('Failed to connect to server', {
         id: toastId,
         description: err.message,
       });
@@ -361,41 +361,41 @@ const DashboardHome = () => {
 
   const handleToggleDb = async (id, currentStatus) => {
     const action = currentStatus === 'running' ? 'stop' : 'start';
-    const toastId = toast.loading(action === 'stop' ? 'กำลังหยุด Database...' : 'กำลังเริ่ม Database...');
+    const toastId = toast.loading(action === 'stop' ? 'Stopping database...' : 'Starting database...');
     try {
       const res = await fetch(`http://localhost:8080/api/databases/${id}/${action}`, { method: 'POST' });
       if (res.ok) {
-        toast.success(action === 'stop' ? 'หยุด Database สำเร็จ' : 'เริ่ม Database สำเร็จ', { id: toastId });
+        toast.success(action === 'stop' ? 'Database stopped successfully' : 'Database started successfully', { id: toastId });
         fetchDatabases();
         fetchContainers();
       } else {
         const data = await res.json();
-        toast.error('ดำเนินการล้มเหลว', { id: toastId, description: data.error });
+        toast.error('Operation failed', { id: toastId, description: data.error });
       }
     } catch (err) {
-      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+      toast.error('Connection failed', { id: toastId, description: err.message });
     }
   };
 
   const handleDeleteDb = (id, name) => {
     openConfirmModal({
-      title: 'ลบฐานข้อมูลถาวร',
-      message: `คุณแน่ใจหรือไม่ที่จะลบ Database "${name}"? ข้อมูลใน Volume และตารางทั้งหมดจะถูกลบทิ้งอย่างถาวร ไม่สามารถกู้คืนได้`,
-      confirmText: 'ลบฐานข้อมูล',
+      title: 'Delete Database',
+      message: `Are you sure you want to permanently delete database "${name}"? All tables and volume data will be removed.`,
+      confirmText: 'Delete Database',
       variant: 'danger',
       onConfirm: async () => {
-        const toastId = toast.loading('กำลังลบ Database และเคลียร์ Volume...');
+        const toastId = toast.loading('Deleting database and clearing volume...');
         try {
           const res = await fetch(`http://localhost:8080/api/databases/${id}`, { method: 'DELETE' });
           if (res.ok) {
-            toast.success('ลบ Database สำเร็จ', { id: toastId });
+            toast.success('Database deleted successfully', { id: toastId });
             fetchDatabases();
           } else {
             const data = await res.json();
-            toast.error('ลบล้มเหลว', { id: toastId, description: data.error });
+            toast.error('Deletion failed', { id: toastId, description: data.error });
           }
         } catch (err) {
-          toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+          toast.error('Connection failed', { id: toastId, description: err.message });
         }
       }
     });
@@ -404,14 +404,14 @@ const DashboardHome = () => {
   const handleCopyUrl = (text, key) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    toast.success('คัดลอก Connection URL แล้ว!', { description: 'พร้อมนำไปแปะใน .env หรือโปรแกรมฐานข้อมูล' });
+    toast.success('Connection URL copied!', { description: 'Ready to paste into .env or database client' });
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
   const handleCopyApiUrl = (url, key) => {
     navigator.clipboard.writeText(url);
     setCopiedKey(key);
-    toast.success('คัดลอก API Endpoint แล้ว', { description: url });
+    toast.success('API endpoint copied', { description: url });
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -428,18 +428,18 @@ const DashboardHome = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSqlResult(data.result || 'คำสั่งสำเร็จ (ไม่มีข้อมูลส่งกลับ)');
-        // รีโหลดรายชื่อ Table
+        setSqlResult(data.result || 'Query executed successfully (no rows returned)');
+        // Reload tables list
         const tblRes = await fetch(`http://localhost:8080/api/databases/${targetDb.id}/tables`);
         if (tblRes.ok) {
           const tblData = await tblRes.json();
           setSqlTables(tblData.tables || []);
         }
       } else {
-        setSqlResult(`ข้อผิดพลาด: ${data.error || 'Query failed'}`);
+        setSqlResult(`Error: ${data.error || 'Query failed'}`);
       }
     } catch (err) {
-      setSqlResult(`การเชื่อมต่อล้มเหลว: ${err.message}`);
+      setSqlResult(`Connection failed: ${err.message}`);
     } finally {
       setRunningSql(false);
     }
@@ -480,11 +480,11 @@ const DashboardHome = () => {
 
   const handleConfirmBind = async () => {
     if (!selectedTargetContainer || !activeBindDb) {
-      toast.warning('กรุณาเลือกเซิร์ฟเวอร์ที่ต้องการผูก');
+      toast.warning('Please select a target server to bind');
       return;
     }
     setBindingServer(true);
-    const toastId = toast.loading(`กำลังผูก Database เข้ากับเซิร์ฟเวอร์ และเริ่มรีสตาร์ต...`);
+    const toastId = toast.loading('Binding database to server and restarting...');
     try {
       const res = await fetch(`http://localhost:8080/api/databases/${activeBindDb.id}/bind`, {
         method: 'POST',
@@ -493,17 +493,17 @@ const DashboardHome = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('ผูก Database สำเร็จ!', {
+        toast.success('Database bound successfully!', {
           id: toastId,
-          description: `ส่งตัวแปร (DATABASE_URL, DB_URL ฯลฯ) และรีสตาร์ตเซิร์ฟเวอร์แล้ว`,
+          description: 'Database environment variables injected and server restarted',
         });
         setBindModalOpen(false);
         fetchContainers();
       } else {
-        toast.error('ผูก Database ล้มเหลว', { id: toastId, description: data.error });
+        toast.error('Failed to bind database', { id: toastId, description: data.error });
       }
     } catch (err) {
-      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+      toast.error('Connection failed', { id: toastId, description: err.message });
     } finally {
       setBindingServer(false);
     }
@@ -511,12 +511,12 @@ const DashboardHome = () => {
 
   const handleBackupDb = async (db) => {
     setBackingUpId(db.id);
-    const toastId = toast.loading(`กำลังสร้างไฟล์ Backup (.sql) สำหรับ "${db.name}"...`);
+    const toastId = toast.loading(`Generating backup (.sql) for "${db.name}"...`);
     try {
       const response = await fetch(`http://localhost:8080/api/databases/${db.id}/backup`);
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'ไม่สามารถดาวน์โหลด Backup ได้');
+        throw new Error(errData.error || 'Unable to download backup');
       }
 
       const blob = await response.blob();
@@ -530,12 +530,12 @@ const DashboardHome = () => {
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
 
-      toast.success('ดาวน์โหลด Backup สำเร็จ!', {
+      toast.success('Backup downloaded successfully!', {
         id: toastId,
-        description: `สร้างไฟล์ backup-${db.name}.sql เรียบร้อยแล้ว`,
+        description: `Created backup-${db.name}.sql file`,
       });
     } catch (err) {
-      toast.error('Backup ล้มเหลว', { id: toastId, description: err.message });
+      toast.error('Backup failed', { id: toastId, description: err.message });
     } finally {
       setBackingUpId(null);
     }
@@ -550,13 +550,13 @@ const DashboardHome = () => {
 
   const handleExecuteRestore = async () => {
     if (!restoreFile || !activeRestoreDb) {
-      toast.warning('กรุณาเลือกไฟล์ .sql เพื่อกู้คืนข้อมูล');
+      toast.warning('Please select a .sql file to restore');
       return;
     }
 
     setRestoring(true);
     setRestoreResult('');
-    const toastId = toast.loading(`กำลังกู้คืนข้อมูลเข้า "${activeRestoreDb.name}"...`);
+    const toastId = toast.loading(`Restoring database into "${activeRestoreDb.name}"...`);
 
     const formData = new FormData();
     formData.append('file', restoreFile);
@@ -569,14 +569,14 @@ const DashboardHome = () => {
 
       const data = await res.json();
       if (res.ok) {
-        toast.success('กู้คืนข้อมูลสำเร็จเรียบร้อย!', { id: toastId });
+        toast.success('Database restored successfully!', { id: toastId });
         setRestoreResult(data.output || 'Restore Completed Successfully.');
       } else {
-        toast.error('การกู้คืนข้อมูลล้มเหลว', { id: toastId, description: data.error });
+        toast.error('Database restore failed', { id: toastId, description: data.error });
         setRestoreResult(`Error: ${data.error}\n${data.output || ''}`);
       }
     } catch (err) {
-      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+      toast.error('Connection failed', { id: toastId, description: err.message });
       setRestoreResult(`Network Error: ${err.message}`);
     } finally {
       setRestoring(false);
@@ -591,7 +591,7 @@ const DashboardHome = () => {
   const handleTestWebhookPing = async () => {
     if (!activeWebhookContainer?.deployment_id) return;
     setPingingWebhook(true);
-    const toastId = toast.loading('กำลังส่ง Ping Test ไปยัง Webhook...');
+    const toastId = toast.loading('Sending test ping to webhook...');
     try {
       const res = await fetch(`http://localhost:8080/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`, {
         method: 'POST',
@@ -601,15 +601,15 @@ const DashboardHome = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Webhook ตอบกลับสำเร็จ (Pong!)', {
+        toast.success('Webhook responded successfully (Pong!)', {
           id: toastId,
-          description: data.message || 'ระบบพร้อมรับ Push Event จาก GitHub แล้ว',
+          description: data.message || 'Ready to receive GitHub push events',
         });
       } else {
-        toast.error('ทดสอบล้มเหลว', { id: toastId, description: data.error });
+        toast.error('Test failed', { id: toastId, description: data.error });
       }
     } catch (err) {
-      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+      toast.error('Connection failed', { id: toastId, description: err.message });
     } finally {
       setPingingWebhook(false);
     }
@@ -617,21 +617,21 @@ const DashboardHome = () => {
 
   const handleAction = async (id, action, containerName) => {
     try {
-      setLoading(true); // ปรับสถานะเป็นโหลดตอนกำลังกด Stop/Start เพื่อไม่ให้ผู้ใช้กดรัวๆ
+      setLoading(true); // Prevent spamming actions
       const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // หาก Start ไม่สำเร็จ หรือแอปพลิเคชัน Crash ดับลงทันที ให้เด้ง Modal สาเหตุให้ดูทันที!
-        const errorTitle = data.error || `คำสั่ง ${action} ไม่สำเร็จ`;
+        // If start fails or app crashes, show error modal
+        const errorTitle = data.error || `Command ${action} failed`;
         const errorDetails = data.details || errorTitle;
         setActiveErrorContainerName(containerName || id);
         setActiveErrorDetails(errorDetails);
         setErrorModalOpen(true);
       }
-      await fetchContainers(); // ดึงข้อมูลใหม่หลังทำเสร็จ
+      await fetchContainers(); // Refresh container data
     } catch (error) {
-      console.error("ดำเนินการล้มเหลว:", error);
+      console.error("Operation failed:", error);
       setActiveErrorContainerName(containerName || id);
       setActiveErrorDetails(error.message);
       setErrorModalOpen(true);
@@ -642,32 +642,32 @@ const DashboardHome = () => {
 
   const handleDelete = (identifier) => {
     if (!identifier) {
-      toast.error("ไม่พบรหัสของเซิร์ฟเวอร์นี้");
+      toast.error("Server ID not found");
       return;
     }
 
     openConfirmModal({
-      title: 'ยืนยันการลบเซิร์ฟเวอร์',
-      message: 'คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? Container และประวัติการรันนี้จะถูกลบออกจากระบบอย่างถาวร',
-      confirmText: 'ลบเซิร์ฟเวอร์',
+      title: 'Delete Server',
+      message: 'Are you sure you want to delete this server? The container and its runtime history will be permanently removed.',
+      confirmText: 'Delete Server',
       variant: 'danger',
       onConfirm: async () => {
-        // อัปเดตหน้าจอทันที (Optimistic UI) ลบแถวนี้ออกจากตารางทันทีไม่ต้องรอ
+        // Optimistic UI update
         setContainers(prev => prev.filter(c => c.id !== identifier && c.deployment_id !== identifier));
-        const toastId = toast.loading("กำลังลบเซิร์ฟเวอร์...");
+        const toastId = toast.loading("Deleting server...");
 
         try {
           const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
           if (!res.ok) {
             const errJson = await res.json().catch(() => ({}));
-            toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId, description: errJson.error || "ไม่สามารถลบได้" });
+            toast.error("Failed to delete server", { id: toastId, description: errJson.error || "Deletion failed" });
           } else {
-            toast.success("ลบเซิร์ฟเวอร์เรียบร้อย", { id: toastId });
+            toast.success("Server deleted successfully", { id: toastId });
           }
           await fetchContainers();
         } catch (error) {
-          console.log("ลบข้อมูลล้มเหลว", error);
-          toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", { id: toastId, description: error.message });
+          console.log("Deletion failed", error);
+          toast.error("Server connection failed", { id: toastId, description: error.message });
           await fetchContainers();
         }
       }
@@ -691,19 +691,19 @@ const DashboardHome = () => {
     }
   };
 
-  // ฟังก์ชันสั่ง Re-deploy
+  // Trigger redeploy
   const handleRedeploy = (id) => {
     openConfirmModal({
-      title: 'ดึงโค้ดใหม่และ Re-deploy',
-      message: 'คุณต้องการดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่ใช่ไหม? (ระบบจะรันตัวใหม่ซ้อนขึ้นมาให้ก่อนแบบ Zero-Downtime)',
-      confirmText: 'เริ่ม Re-deploy',
+      title: 'Re-deploy Server',
+      message: 'Pull latest code from Git and build a new container? (Zero-downtime rebuild)',
+      confirmText: 'Start Re-deploy',
       variant: 'primary',
       onConfirm: async () => {
-        toast.info("เริ่มกระบวนการ Re-deploy...", {
-          description: "กำลังดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่",
+        toast.info("Starting re-deployment...", {
+          description: "Pulling latest code and building container",
         });
 
-        // 1. สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที (Optimistic UI)
+        // 1. Optimistic status update
         setContainers(prev => prev.map(c => 
           c.id === id ? { ...c, state: 'redeploying' } : c
         ));
@@ -714,7 +714,7 @@ const DashboardHome = () => {
           });
           
           if (response.ok) {
-            // 2. เช็คข้อมูลใหม่เป็นระยะ (Polling)
+            // 2. Poll for updates
             const checkInterval = setInterval(() => {
               fetchContainers(); 
             }, 3000);
@@ -724,12 +724,12 @@ const DashboardHome = () => {
               fetchContainers();
             }, 120000);
           } else {
-            toast.error("สั่ง Re-deploy ไม่สำเร็จ");
+            toast.error("Re-deployment failed");
             fetchContainers();
           }
         } catch (error) {
           console.error("Redeploy error:", error);
-          toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ");
+          toast.error("Server connection failed");
           fetchContainers();
         }
       }
@@ -748,11 +748,11 @@ const DashboardHome = () => {
       const res = await fetch(`http://localhost:8080/api/containers/${id}/env`);
       const data = await res.json();
       if (res.ok && data.env) {
-        // กรองค่าตัวแปรมาตรฐานออก แสดงเฉพาะตัวแปรทั่วไปหรือแสดงทั้งหมด
+        // Display environment variables
         setCurrentEnvText(data.env.join('\n'));
       }
     } catch (err) {
-      setEnvError('ไม่สามารถโหลด Env ได้: ' + err.message);
+      setEnvError('Failed to load environment variables: ' + err.message);
     }
   };
 
@@ -769,16 +769,16 @@ const DashboardHome = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setEnvSuccess('บันทึกและรีสตาร์ตเซิร์ฟเวอร์เรียบร้อย!');
+        setEnvSuccess('Environment variables saved and server restarted!');
         fetchContainers();
         setTimeout(() => {
           setEnvModalOpen(false);
         }, 1500);
       } else {
-        setEnvError(data.error || 'บันทึกล้มเหลว');
+        setEnvError(data.error || 'Failed to save environment variables');
       }
     } catch (err) {
-      setEnvError('เกิดข้อผิดพลาด: ' + err.message);
+      setEnvError('An error occurred: ' + err.message);
     } finally {
       setEnvSaving(false);
     }
@@ -821,14 +821,14 @@ const DashboardHome = () => {
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                 : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
             }`}
-            title={notificationsEnabled ? 'เปิดการแจ้งเตือน Desktop Alert อยู่' : 'คลิกเพื่อเปิดแจ้งเตือนบนหน้าจอเมื่อมี Server ดับ'}
+            title={notificationsEnabled ? 'Desktop alerts enabled' : 'Click to enable desktop alerts when servers stop'}
           >
             {notificationsEnabled ? (
               <BellRing className="w-3.5 h-3.5 text-emerald-600" />
             ) : (
               <Bell className="w-3.5 h-3.5 text-slate-400" />
             )}
-            {notificationsEnabled ? 'Desktop Alert: เปิด' : 'เปิดแจ้งเตือน Desktop'}
+            {notificationsEnabled ? 'Desktop Alerts: On' : 'Enable Desktop Alerts'}
           </button>
 
           <span className="bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-full shadow-sm flex items-center gap-2">
@@ -838,7 +838,7 @@ const DashboardHome = () => {
         </div>
       </div>
 
-      {/* Alert Banner สำหรับแจ้งเตือนทันทีเมื่อตรวจพบ Server ดับ (Crashed / Exited) */}
+      {/* Alert Banner for stopped/crashed servers */}
       {crashedContainers.length > 0 && !dismissAlert && (
         <div className="relative z-10 mb-6 p-4 rounded-2xl bg-rose-50/90 border border-rose-200 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
           <div className="flex items-center gap-3">
@@ -847,24 +847,24 @@ const DashboardHome = () => {
             </div>
             <div>
               <h4 className="font-semibold text-rose-950 text-sm">
-                ตรวจพบเซิร์ฟเวอร์หยุดทำงาน ({crashedContainers.length} Service)
+                Servers stopped ({crashedContainers.length} service{crashedContainers.length > 1 ? 's' : ''})
               </h4>
               <p className="text-xs text-rose-700 mt-0.5">
-                คลิกปุ่ม <span className="font-semibold text-rose-800">[Crashed Logs]</span> ในตารางเพื่อดูสาเหตุ หรือกดสตาร์ตเพื่อเริ่มทำงานใหม่
+                Click <span className="font-semibold text-rose-800">[Logs]</span> in the table to view error details, or click start to resume.
               </p>
             </div>
           </div>
           <button
             onClick={() => setDismissAlert(true)}
             className="text-slate-400 hover:text-slate-600 hover:bg-rose-100/60 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-            title="ปิดการแจ้งเตือนนี้"
+            title="Dismiss alert"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Alert Banner สำหรับแจ้งเตือนเมื่อตรวจพบ Database ของ Service หลุดการเชื่อมต่อ / หยุดทำงาน */}
+      {/* Alert Banner for disconnected databases */}
       {dbDisconnectedContainers.length > 0 && !dismissDbAlert && (
         <div className="relative z-10 mb-6 p-4 rounded-2xl bg-amber-50/95 border border-amber-300 shadow-xs flex items-center justify-between gap-4 animate-in fade-in duration-200">
           <div className="flex items-center gap-3">
@@ -873,10 +873,10 @@ const DashboardHome = () => {
             </div>
             <div>
               <h4 className="font-semibold text-amber-950 text-sm">
-                ฐานข้อมูลหยุดทำงาน ({dbDisconnectedContainers.length} Service เชื่อมต่อไม่ได้)
+                Database offline ({dbDisconnectedContainers.length} service{dbDisconnectedContainers.length > 1 ? 's' : ''} affected)
               </h4>
               <p className="text-xs text-amber-800 mt-0.5">
-                ฐานข้อมูล <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> หยุดทำงานอยู่ อาจทำให้ Service ตอบกลับเป็น Error 500
+                Database <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> is offline. Services may return 500 errors.
               </p>
             </div>
           </div>
@@ -887,13 +887,13 @@ const DashboardHome = () => {
                 className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                สตาร์ต Database ทันที
+                Start Database Now
               </button>
             )}
             <button
               onClick={() => setDismissDbAlert(true)}
               className="text-slate-400 hover:text-slate-600 hover:bg-amber-100/60 p-1.5 rounded-lg transition-colors cursor-pointer"
-              title="ปิดการแจ้งเตือนนี้"
+              title="Dismiss alert"
             >
               <X className="w-4 h-4" />
             </button>
@@ -922,7 +922,7 @@ const DashboardHome = () => {
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Service / App</th>
                     <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Image</th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
-                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Deploy ล่าสุด</th>
+                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Last Deployed</th>
                     <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Usage</th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 whitespace-nowrap">URL</th>
                     <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
@@ -979,7 +979,7 @@ const DashboardHome = () => {
                             <span>•</span>
                             <span 
                               className="inline-flex items-center gap-1 text-slate-600 font-sans font-medium bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/60"
-                              title={item.deployed_at ? `Deploy ล่าสุดเมื่อ: ${new Date(item.deployed_at).toLocaleString('th-TH')}` : ''}
+                              title={item.deployed_at ? `Last deployed: ${new Date(item.deployed_at).toLocaleString('en-US')}` : ''}
                             >
                               <Clock className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
                               <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
@@ -1014,7 +1014,7 @@ const DashboardHome = () => {
                               }
                             }}
                             className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
-                            title="คลิกเพื่อดู Log สาเหตุที่ขัดข้อง"
+                            title="Click to view crash logs"
                           >
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -1029,7 +1029,7 @@ const DashboardHome = () => {
                           <div className="flex flex-col gap-1 items-start">
                             <span 
                               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs bg-amber-50 text-amber-800 border-amber-300"
-                              title={item.db_warning || `เชื่อมต่อฐานข้อมูล ${item.linked_db_name || 'DB'} ไม่ได้เนื่องจากฐานข้อมูลหยุดทำงาน`}
+                              title={item.db_warning || `Cannot connect to ${item.linked_db_name || 'database'}; database is stopped`}
                             >
                               <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -1041,9 +1041,9 @@ const DashboardHome = () => {
                               <button
                                 onClick={() => handleToggleDb(item.linked_db_id, 'stopped')}
                                 className="text-[10px] text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 font-semibold px-2 py-0.5 rounded border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
-                                title="คลิกเพื่อสตาร์ต Database ทันที"
+                                title="Click to start database"
                               >
-                                <Play className="w-2.5 h-2.5 fill-current" /> สตาร์ต DB
+                                <Play className="w-2.5 h-2.5 fill-current" /> Start DB
                               </button>
                             )}
                           </div>
@@ -1065,7 +1065,7 @@ const DashboardHome = () => {
                         )}
                       </td>
 
-                      {/* Last Deployed (Deploy ล่าสุด) */}
+                      {/* Last Deployed (Last Deployed) */}
                       <td className="hidden sm:table-cell px-3 py-3 whitespace-nowrap">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
@@ -1115,7 +1115,7 @@ const DashboardHome = () => {
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                 }`}
-                                title={`คลิกเพื่อคัดลอก API URL: http://${item.domain_name}`}
+                                title={`Click to copy API URL: http://${item.domain_name}`}
                               >
                                 {copiedKey === `app-url-${item.id}` ? (
                                   <>
@@ -1134,7 +1134,7 @@ const DashboardHome = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
-                                title="เปิดดูในเบราว์เซอร์"
+                                title="Open in browser"
                               >
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                               </a>
@@ -1162,12 +1162,12 @@ const DashboardHome = () => {
                               <button 
                                 onClick={() => handleAction(item.id, 'stop', item.name)} 
                                 className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                aria-label="หยุดเซิร์ฟเวอร์"
+                                aria-label="Stop Server"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                               </button>
                               <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                                หยุดเซิร์ฟเวอร์
+                                Stop Server
                               </div>
                             </div>
                           ) : (
@@ -1175,12 +1175,12 @@ const DashboardHome = () => {
                               <button 
                                 onClick={() => handleAction(item.id, 'start', item.name)} 
                                 className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                                aria-label="สตาร์ตเซิร์ฟเวอร์"
+                                aria-label="Start Server"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current" />
                               </button>
                               <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                                สตาร์ตเซิร์ฟเวอร์
+                                Start Server
                               </div>
                             </div>
                           )}
@@ -1189,12 +1189,12 @@ const DashboardHome = () => {
                             <button 
                               onClick={() => handleViewLogs(item.id, item.name)} 
                               className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                              aria-label="ดู Logs การทำงาน"
+                              aria-label="View Logs"
                             >
                               <FileText className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              ดู Logs
+                              View Logs
                             </div>
                           </div>
 
@@ -1202,12 +1202,12 @@ const DashboardHome = () => {
                             <button 
                               onClick={() => handleOpenEnv(item.id, item.name)} 
                               className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
-                              aria-label="ตั้งค่าตัวแปรระบบ (.env)"
+                              aria-label="Environment Variables (.env)"
                             >
                               <Settings className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              ตั้งค่าตัวแปร (.env)
+                              Environment (.env)
                             </div>
                           </div>
 
@@ -1215,12 +1215,12 @@ const DashboardHome = () => {
                             <button
                               onClick={() => {handleRedeploy(item.id)}}
                               className="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
-                              aria-label="ดึงโค้ดล่าสุดและ Re-deploy"
+                              aria-label="Re-deploy Server"
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              ดึงโค้ด Re-deploy
+                              Re-deploy
                             </div>
                           </div>
 
@@ -1228,9 +1228,9 @@ const DashboardHome = () => {
                             <button
                               onClick={() => handleOpenWebhookModal(item)}
                               className="p-1.5 rounded-lg text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition-colors cursor-pointer"
-                              aria-label="ตั้งค่า Auto-Deploy เมื่อ Push โค้ด"
+                              aria-label="Auto-Deploy (Webhook)"
                             >
-                              <Zap className="w-3.5 h-3.5" />
+                              <Webhook className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
                               Auto-Deploy (Webhook)
@@ -1241,12 +1241,12 @@ const DashboardHome = () => {
                             <button 
                               onClick={() => handleDelete(item.id || item.deployment_id)} 
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              aria-label="ลบเซิร์ฟเวอร์"
+                              aria-label="Delete Server"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              ลบเซิร์ฟเวอร์
+                              Delete Server
                             </div>
                           </div>
                         </div>
@@ -1280,7 +1280,7 @@ const DashboardHome = () => {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  ฐานข้อมูลพร้อมใช้ทันที • จำกัด RAM 512 MB ต่อก้อน • Persistent Volume ปลอดภัยข้อมูลไม่หาย
+                  Instant PostgreSQL • 512 MB RAM limit per instance • Persistent Volume storage
                 </p>
               </div>
             </div>
@@ -1291,7 +1291,7 @@ const DashboardHome = () => {
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>สร้าง Database ใหม่</span>
+              <span>Create Database</span>
             </button>
           </div>
 
@@ -1300,16 +1300,16 @@ const DashboardHome = () => {
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto mb-3">
                 <Database className="w-6 h-6" />
               </div>
-              <h3 className="text-sm font-semibold text-slate-700">ยังไม่มี Managed Database</h3>
+              <h3 className="text-sm font-semibold text-slate-700">No Managed Databases yet</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                สร้างฐานข้อมูล PostgreSQL 16 สำหรับใช้ร่วมกับแอปพลิเคชันของคุณได้ใน 1 คลิก พร้อมจำกัดทรัพยากรเพื่อไม่ให้กินสเปกเครื่อง
+                Deploy a PostgreSQL 16 database for your applications in 1 click with isolated resources and persistent storage.
               </p>
               <button
                 onClick={() => setCreateDbModalOpen(true)}
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>สร้าง Database ก้อนแรก</span>
+                <span>Create First Database</span>
               </button>
             </div>
           ) : (
@@ -1349,12 +1349,12 @@ const DashboardHome = () => {
                                   ? 'text-amber-600 hover:bg-amber-50' 
                                   : 'text-emerald-600 hover:bg-emerald-50'
                               }`}
-                              aria-label={isRunning ? "หยุด Database (Stop)" : "เปิดใช้งาน Database (Start)"}
+                              aria-label={isRunning ? 'Stop Database' : 'Start Database'}
                             >
                               {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-slate-900 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              {isRunning ? "หยุด Database" : "เปิดใช้งาน Database"}
+                              {isRunning ? 'Stop Database' : 'Start Database'}
                             </div>
                           </div>
 
@@ -1362,12 +1362,12 @@ const DashboardHome = () => {
                             <button
                               onClick={() => handleDeleteDb(db.id, db.name)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              aria-label="ลบ Database (Delete)"
+                              aria-label='Delete Database'
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                             <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-rose-950 text-white text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              ลบ Database
+                              Delete Database
                             </div>
                           </div>
                         </div>
@@ -1392,7 +1392,7 @@ const DashboardHome = () => {
                           <div className="flex items-center justify-between text-[11px]">
                             <div className="flex items-center gap-1.5 text-slate-600 font-medium">
                               <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                              <span>RAM ใช้งานจริง:</span>
+                              <span>Actual RAM:</span>
                             </div>
                             <span className="font-mono font-bold text-slate-700">
                               {Number(stats[db.container_id].memory_mb || 0).toFixed(1)} MB / {stats[db.container_id].memory_limit || 512} MB
@@ -1425,7 +1425,7 @@ const DashboardHome = () => {
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200/60 transition-colors cursor-pointer"
                         >
                           <Link2 className="w-3.5 h-3.5" />
-                          <span>ผูกกับ Server</span>
+                          <span>Bind to Server</span>
                         </button>
                       </div>
 
@@ -1436,7 +1436,7 @@ const DashboardHome = () => {
                           onClick={() => handleBackupDb(db)}
                           disabled={!isRunning || backingUpId === db.id}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 text-emerald-700 rounded-lg text-xs font-semibold border border-emerald-200/60 transition-colors cursor-pointer"
-                          title="ดาวน์โหลดไฟล์ .sql สำรองข้อมูล"
+                          title="Download .sql backup file"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>{backingUpId === db.id ? 'Exporting...' : 'Backup (.sql)'}</span>
@@ -1446,7 +1446,7 @@ const DashboardHome = () => {
                           onClick={() => handleOpenRestoreModal(db)}
                           disabled={!isRunning}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-800 rounded-lg text-xs font-semibold border border-amber-200/60 transition-colors cursor-pointer"
-                          title="อัปโหลดไฟล์ .sql เพื่อกู้คืนข้อมูล"
+                          title="Upload .sql file to restore data"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           <span>Restore</span>
@@ -1458,15 +1458,15 @@ const DashboardHome = () => {
                         {/* Internal URL */}
                         <div>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                            <span className="font-medium text-indigo-700">Internal URL (สำหรับ App ในระบบ):</span>
+                            <span className="font-medium text-indigo-700">Internal URL (for in-network apps):</span>
                             <button
                               onClick={() => handleCopyUrl(db.internal_url, `internal-${db.id}`)}
                               className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
                             >
                               {copiedKey === `internal-${db.id}` ? (
-                                <><Check className="w-3 h-3 text-emerald-600" /> คัดลอกแล้ว</>
+                                <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
                               ) : (
-                                <><Copy className="w-3 h-3" /> คัดลอก</>
+                                <><Copy className="w-3 h-3" /> Copy</>
                               )}
                             </button>
                           </div>
@@ -1484,9 +1484,9 @@ const DashboardHome = () => {
                               className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-indigo-600 font-medium"
                             >
                               {copiedKey === `external-${db.id}` ? (
-                                <><Check className="w-3 h-3 text-emerald-600" /> คัดลอกแล้ว</>
+                                <><Check className="w-3 h-3 text-emerald-600" /> Copied</>
                               ) : (
-                                <><Copy className="w-3 h-3" /> คัดลอก</>
+                                <><Copy className="w-3 h-3" /> Copy</>
                               )}
                             </button>
                           </div>
@@ -1547,7 +1547,7 @@ const DashboardHome = () => {
               )}
 
               <p className="text-xs text-slate-500">
-                เพิ่มหรือแก้ไขตัวแปรระบบ (1 บรรทัดต่อ 1 ค่า เช่น <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">DB_URL=host=...</code>) ระบบจะรีสตาร์ตเซิร์ฟเวอร์ให้อัตโนมัติ:
+                Add or edit environment variables (one per line, e.g. <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">DB_URL=host=...</code>). The server will restart automatically:
               </p>
 
               <textarea 
@@ -1566,7 +1566,7 @@ const DashboardHome = () => {
                 onClick={() => setEnvModalOpen(false)}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
               >
-                ยกเลิก
+                Cancel
               </button>
               <button
                 type="button"
@@ -1574,7 +1574,7 @@ const DashboardHome = () => {
                 disabled={envSaving}
                 className="inline-flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20"
               >
-                {envSaving ? "กำลังบันทึกและรีสตาร์ต..." : "บันทึกและ Restart"}
+                {envSaving ? 'Saving & Restarting...' : 'Save & Restart'}
               </button>
             </div>
           </div>
@@ -1634,7 +1634,7 @@ const DashboardHome = () => {
             </div>
 
             <div className="p-6 space-y-3">
-              <p className="text-xs text-slate-600 font-medium">ข้อความแจ้งเตือนความผิดพลาดจากระบบ:</p>
+              <p className="text-xs text-slate-600 font-medium">System error message:</p>
               <div className="p-4 rounded-xl bg-slate-900 text-rose-300 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto whitespace-pre-wrap break-words border border-slate-800 shadow-inner">
                 {activeErrorDetails}
               </div>
@@ -1646,7 +1646,7 @@ const DashboardHome = () => {
                 onClick={() => setErrorModalOpen(false)}
                 className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-md"
               >
-                ปิดหน้าต่าง
+                Close
               </button>
             </div>
           </div>
@@ -1663,8 +1663,8 @@ const DashboardHome = () => {
                   <Database className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">สร้าง Managed Database ใหม่</h3>
-                  <p className="text-xs text-slate-500">PostgreSQL 16 Alpine • พร้อมใช้ใน 1 คลิก</p>
+                  <h3 className="text-base font-bold text-slate-800">Create Managed Database</h3>
+                  <p className="text-xs text-slate-500">PostgreSQL 16 Alpine • Ready in 1-click</p>
                 </div>
               </div>
               <button 
@@ -1680,25 +1680,25 @@ const DashboardHome = () => {
                 {/* Database Name */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    ชื่อ Database Identifier <span className="text-rose-500">*</span>
+                    Database Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={newDbName}
                     onChange={(e) => setNewDbName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                    placeholder="เช่น prod-db, my-app-db"
+                    placeholder="e.g. prod-db, my-app-db"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     autoFocus
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    ใช้เฉพาะตัวอักษรภาษาอังกฤษพิมพ์เล็ก ตัวเลข ขีดกลาง (-) และขีดล่าง (_)
+                    Use lowercase alphanumeric characters, hyphens (-), and underscores (_)
                   </p>
                 </div>
 
                 {/* Resource Summary Specs Card */}
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <p className="text-xs font-semibold text-slate-700">สเปกทรัพยากร:</p>
+                  <p className="text-xs font-semibold text-slate-700">Specifications:</p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2 rounded-lg bg-white border border-slate-200/60">
                       <div className="text-[10px] text-slate-400 font-medium">RAM CAP</div>
@@ -1718,7 +1718,7 @@ const DashboardHome = () => {
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 pt-0.5 leading-relaxed">
-                    ระบบจะสร้าง Volume ถาวรและกำหนดพอร์ตภายนอกให้อัตโนมัติ (เริ่มที่ 5433)
+                    A persistent volume will be attached and an external port automatically allocated (from 5433).
                   </p>
                 </div>
               </div>
@@ -1729,7 +1729,7 @@ const DashboardHome = () => {
                   onClick={() => setCreateDbModalOpen(false)}
                   className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -1739,12 +1739,12 @@ const DashboardHome = () => {
                   {creatingDb ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>กำลังสร้าง...</span>
+                      <span>Creating...</span>
                     </>
                   ) : (
                     <>
                       <Plus className="w-3.5 h-3.5" />
-                      <span>สร้าง Database</span>
+                      <span>Create Database</span>
                     </>
                   )}
                 </button>
@@ -1787,10 +1787,10 @@ const DashboardHome = () => {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-slate-500 text-xs flex items-center gap-1.5 shrink-0">
                   <Table className="w-3.5 h-3.5 text-indigo-600" />
-                  ตาราง:
+                  Tables:
                 </span>
                 {sqlTables.length === 0 ? (
-                  <span className="text-xs text-slate-400 italic">ไม่มีตารางในฐานข้อมูล</span>
+                  <span className="text-xs text-slate-400 italic">No tables in database</span>
                 ) : (
                   sqlTables.map((tbl) => (
                     <button
@@ -1814,7 +1814,7 @@ const DashboardHome = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700">
-                    คำสั่ง SQL:
+                    SQL Query:
                   </label>
                   <div className="flex items-center gap-2">
                     {sqlTables.length > 0 && (
@@ -1827,7 +1827,7 @@ const DashboardHome = () => {
                         }}
                         className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                       >
-                        ดูข้อมูล {sqlTables[0]}
+                        View {sqlTables[0]}
                       </button>
                     )}
                     <button
@@ -1835,7 +1835,7 @@ const DashboardHome = () => {
                       onClick={() => setSqlQuery('')}
                       className="text-[11px] text-slate-400 hover:text-rose-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                     >
-                      ล้างคำสั่ง
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -1849,12 +1849,12 @@ const DashboardHome = () => {
                     }
                   }}
                   rows="3"
-                  placeholder="พิมพ์คำสั่ง SQL เช่น SELECT * FROM ... หรือ INSERT / UPDATE"
+                  placeholder="Enter SQL query, e.g. SELECT * FROM ... or INSERT / UPDATE"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
                 ></textarea>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-[11px] text-slate-400">
-                    กด <kbd className="bg-slate-100 px-1 py-0.5 rounded text-[10px] font-mono border border-slate-200">⌘ + Enter</kbd> เพื่อรัน
+                    Press <kbd className="bg-slate-100 px-1 py-0.5 rounded text-[10px] font-mono border border-slate-200">⌘ + Enter</kbd> to run
                   </span>
                   <button
                     type="button"
@@ -1865,7 +1865,7 @@ const DashboardHome = () => {
                     {runningSql ? (
                       <>
                         <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>กำลังรัน...</span>
+                        <span>Running...</span>
                       </>
                     ) : (
                       <>
@@ -1880,13 +1880,13 @@ const DashboardHome = () => {
               {/* SQL Result View */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  ผลลัพธ์:
+                  Result:
                 </label>
                 <div className="p-3.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-slate-800 shadow-inner">
                   {runningSql ? (
-                    <span className="text-slate-500">กำลังดึงข้อมูล...</span>
+                    <span className="text-slate-500">Loading data...</span>
                   ) : (
-                    sqlResult || <span className="text-slate-600">-- ไม่มีข้อมูล --</span>
+                    sqlResult || <span className="text-slate-600">-- No rows returned --</span>
                   )}
                 </div>
               </div>
@@ -1902,12 +1902,12 @@ const DashboardHome = () => {
                 {copiedKey === `ext-sql-${activeSqlDb.id}` ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>คัดลอก URL สำเร็จ</span>
+                    <span>Connection URL Copied</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>คัดลอก Connection URL</span>
+                    <span>Copy Connection URL</span>
                   </>
                 )}
               </button>
@@ -1916,7 +1916,7 @@ const DashboardHome = () => {
                 onClick={() => setSqlModalOpen(false)}
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
-                ปิด
+                Close
               </button>
             </div>
           </div>
@@ -1933,7 +1933,7 @@ const DashboardHome = () => {
                   <Link2 className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">เชื่อมต่อ Database</h3>
+                  <h3 className="text-base font-bold text-slate-800">Bind Database to Server</h3>
                   <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 text-indigo-700 font-mono text-xs font-semibold">
                     {activeBindDb.name}
                   </span>
@@ -1950,11 +1950,11 @@ const DashboardHome = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
-                  เลือกเซิร์ฟเวอร์เป้าหมาย:
+                  Select Target Server:
                 </label>
                 {containers.filter(c => c.state === 'running').length === 0 ? (
                   <p className="text-xs text-rose-600 p-3 rounded-xl bg-rose-50 border border-rose-200">
-                    ไม่พบเซิร์ฟเวอร์ที่กำลังออนไลน์อยู่ กรุณาเปิดเซิร์ฟเวอร์ก่อน
+                    No running servers found. Please start a server first.
                   </p>
                 ) : (
                   <select
@@ -1970,7 +1970,7 @@ const DashboardHome = () => {
                   </select>
                 )}
                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                  ระบบจะเพิ่ม <code className="font-mono text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">DATABASE_URL</code> ในเซิร์ฟเวอร์และรีสตาร์ตให้อัตโนมัติ
+                  The system will inject <code className="font-mono text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">DATABASE_URL</code> into the server and restart it automatically.
                 </p>
               </div>
             </div>
@@ -1981,7 +1981,7 @@ const DashboardHome = () => {
                 onClick={() => setBindModalOpen(false)}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
-                ยกเลิก
+                Cancel
               </button>
               <button
                 type="button"
@@ -1992,12 +1992,12 @@ const DashboardHome = () => {
                 {bindingServer ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังเชื่อมต่อ...</span>
+                    <span>Binding...</span>
                   </>
                 ) : (
                   <>
                     <Link2 className="w-3.5 h-3.5" />
-                    <span>เชื่อมต่อเซิร์ฟเวอร์</span>
+                    <span>Bind to Server</span>
                   </>
                 )}
               </button>
@@ -2015,7 +2015,7 @@ const DashboardHome = () => {
                   <Upload className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-800">กู้คืน Database</h3>
+                  <h3 className="text-base font-bold text-slate-800">Restore Database</h3>
                   <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono text-xs font-semibold">
                     {activeRestoreDb.name}
                   </span>
@@ -2031,12 +2031,12 @@ const DashboardHome = () => {
 
             <div className="p-6 space-y-4">
               <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 leading-relaxed">
-                คำสั่ง SQL ในไฟล์จะถูกนำไปรันในฐานข้อมูลโดยตรง โปรดตรวจสอบไฟล์ก่อนกู้คืน
+                SQL statements in the file will be executed directly against the database. Please verify your backup file.
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
-                  เลือกไฟล์สำรองข้อมูล (.sql):
+                  Select backup file (.sql):
                 </label>
                 <input
                   type="file"
@@ -2046,14 +2046,14 @@ const DashboardHome = () => {
                 />
                 {restoreFile && (
                   <p className="text-[11px] text-emerald-600 mt-1 font-medium">
-                    ไฟล์ที่เลือก: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                    Selected file: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
               </div>
 
               {restoreResult && (
                 <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-600">ผลการทำงาน:</span>
+                  <span className="text-[11px] font-semibold text-slate-600">Execution output:</span>
                   <div className="p-3 rounded-xl bg-slate-900 text-slate-200 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
                     {restoreResult}
                   </div>
@@ -2067,7 +2067,7 @@ const DashboardHome = () => {
                 onClick={() => setRestoreModalOpen(false)}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
-                ยกเลิก
+                Cancel
               </button>
               <button
                 type="button"
@@ -2078,12 +2078,12 @@ const DashboardHome = () => {
                 {restoring ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังกู้คืน...</span>
+                    <span>Restoring...</span>
                   </>
                 ) : (
                   <>
                     <Upload className="w-3.5 h-3.5" />
-                    <span>กู้คืนข้อมูล</span>
+                    <span>Restore Data</span>
                   </>
                 )}
               </button>
@@ -2098,7 +2098,7 @@ const DashboardHome = () => {
             <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
-                  <Zap className="w-4 h-4" />
+                  <Webhook className="w-4 h-4" />
                 </div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-slate-800">Webhook Auto-Deploy</h3>
@@ -2133,9 +2133,9 @@ const DashboardHome = () => {
                     className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium cursor-pointer"
                   >
                     {copiedKey === `wh-url-${activeWebhookContainer.deployment_id}` ? (
-                      <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
+                      <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copied</>
                     ) : (
-                      <><Copy className="w-3.5 h-3.5" /> คัดลอก URL</>
+                      <><Copy className="w-3.5 h-3.5" /> Copy URL</>
                     )}
                   </button>
                 </div>
@@ -2148,14 +2148,14 @@ const DashboardHome = () => {
                 {/* Localhost Tunnel Helper */}
                 <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-600 font-medium">คำสั่งเปิด Public Tunnel (สำหรับ Localhost):</span>
+                    <span className="text-slate-600 font-medium">Public Tunnel Command (for Localhost):</span>
                     <button
                       type="button"
                       onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
                       className="text-purple-700 hover:text-purple-900 font-semibold inline-flex items-center gap-1 cursor-pointer"
                     >
                       {copiedKey === 'cmd-localtunnel' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                      คัดลอกคำสั่ง
+                      Copy Command
                     </button>
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800">
@@ -2165,7 +2165,7 @@ const DashboardHome = () => {
                     type="text"
                     value={customPublicUrl}
                     onChange={(e) => handleUpdatePublicUrl(e.target.value)}
-                    placeholder="วาง Public URL ที่ได้ เช่น https://xxxx.loca.lt"
+                    placeholder="Paste your Public URL, e.g. https://xxxx.loca.lt"
                     className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
@@ -2189,9 +2189,9 @@ const DashboardHome = () => {
                       className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium cursor-pointer"
                     >
                       {copiedKey === `wh-sec-${activeWebhookContainer.deployment_id}` ? (
-                        <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
+                        <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copied</>
                       ) : (
-                        <><Copy className="w-3.5 h-3.5" /> คัดลอก</>
+                        <><Copy className="w-3.5 h-3.5" /> Copy</>
                       )}
                     </button>
                   </div>
@@ -2216,7 +2216,7 @@ const DashboardHome = () => {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium underline"
                   >
-                    <span>เปิดหน้า Webhooks ใน GitHub</span>
+                    <span>Open GitHub Webhook Settings</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -2233,12 +2233,12 @@ const DashboardHome = () => {
                 {pingingWebhook ? (
                   <>
                     <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังทดสอบ...</span>
+                    <span>Testing...</span>
                   </>
                 ) : (
                   <>
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>ทดสอบยิง Ping (Test Ping)</span>
+                    <Webhook className="w-3.5 h-3.5" />
+                    <span>Send Test Ping</span>
                   </>
                 )}
               </button>
@@ -2248,7 +2248,7 @@ const DashboardHome = () => {
                 onClick={() => setWebhookModalOpen(false)}
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
-                เสร็จสิ้น
+                Done
               </button>
             </div>
           </div>
@@ -2287,7 +2287,7 @@ const DashboardHome = () => {
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
-                {confirmModal.cancelText || 'ยกเลิก'}
+                {confirmModal.cancelText || 'Cancel'}
               </button>
               <button
                 type="button"
@@ -2304,7 +2304,7 @@ const DashboardHome = () => {
                     : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
                 }`}
               >
-                {confirmModal.confirmText || 'ยืนยัน'}
+                {confirmModal.confirmText || 'Confirm'}
               </button>
             </div>
           </div>

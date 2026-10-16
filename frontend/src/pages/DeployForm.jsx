@@ -32,12 +32,12 @@ const DeployForm = () => {
   const handleInspectRepo = async (targetUrl) => {
     const url = (targetUrl || repoUrl).trim();
     if (!url) {
-      toast.warning('กรุณาระบุ GitHub Repository ก่อนทำการสแกน');
+      toast.warning('Please specify a GitHub repository before scanning.');
       return;
     }
     setInspecting(true);
     setInspectResult(null);
-    const toastId = toast.loading('กำลังตรวจสอบ Repository...');
+    const toastId = toast.loading('Inspecting repository...');
     try {
       const res = await fetch('http://localhost:8080/api/inspect-repo', {
         method: 'POST',
@@ -47,19 +47,18 @@ const DeployForm = () => {
       const data = await res.json();
       if (res.ok) {
         setInspectResult(data);
-        toast.success('ตรวจสอบโปรเจกต์สำเร็จ!', {
+        toast.success('Project inspected successfully!', {
           id: toastId,
-          description: `Framework: ${data.detected_framework} (${data.detected_envs?.length || 0} ตัวแปร)`,
+          description: `Framework: ${data.detected_framework} (${data.detected_envs?.length || 0} variables)`,
         });
-        // ถ้าช่อง env ยังว่าง ให้ใส่ Template ให้อัตโนมัติ
         if (!envVars.trim() && data.env_template) {
           setEnvVars(data.env_template);
         }
       } else {
-        toast.error('ตรวจสอบไม่สำเร็จ', { id: toastId, description: data.error });
+        toast.error('Inspection failed', { id: toastId, description: data.error });
       }
     } catch (err) {
-      toast.error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', { id: toastId, description: err.message });
+      toast.error('Failed to connect to server', { id: toastId, description: err.message });
     } finally {
       setInspecting(false);
     }
@@ -72,7 +71,6 @@ const DeployForm = () => {
     const db = databases.find(d => String(d.id) === String(dbId));
     if (!db) return;
 
-    // สร้างชุดตัวแปรครบทุก Alias (DATABASE_URL, DB_URL, POSTGRES_URL และแยกชิ้น DB_HOST/PORT/USER/PASSWORD/NAME)
     const dbAliases = [
       `DATABASE_URL=${db.internal_url}`,
       `DB_URL=${db.internal_url}`,
@@ -93,27 +91,26 @@ const DeployForm = () => {
     const combined = [...remainingLines.filter(l => l.trim()), ...dbAliases].join('\n');
     setEnvVars(combined);
 
-    toast.success(`เชื่อมต่อกับ Database "${db.name}" สำเร็จ!`, {
-      description: 'ระบบระบุตัวแปร DB ครบทุก Alias (DATABASE_URL, DB_URL, DB_HOST...) ให้อัตโนมัติแล้ว',
+    toast.success(`Connected to database "${db.name}"!`, {
+      description: 'Database environment variables added to .env',
     });
   };
 
-  // นับจำนวนการตั้งค่า Advanced ที่มีการใส่ค่าไว้
   const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi), Boolean(selectedDbId)].filter(Boolean).length;
 
   const handleDeploy = async () => {
     const trimmedUrl = repoUrl.trim();
     if (!trimmedUrl) {
-      toast.warning("กรุณาระบุ GitHub Repository", {
-        description: "วางลิงก์โปรเจกต์ เช่น https://github.com/username/project",
+      toast.warning("Please specify a GitHub repository", {
+        description: "Paste a repository link, e.g., https://github.com/username/project",
       });
       return;
     }
 
     const isLikelyGitUrl = /^https?:\/\/.+/i.test(trimmedUrl) || /^git@.+/i.test(trimmedUrl);
     if (!isLikelyGitUrl) {
-      toast.warning("รูปแบบ URL ไม่ถูกต้อง", {
-        description: "กรุณาวางลิงก์ที่ถูกต้อง เช่น https://github.com/username/project",
+      toast.warning("Invalid repository URL", {
+        description: "Please enter a valid Git URL, e.g., https://github.com/username/project",
       });
       return;
     }
@@ -123,9 +120,9 @@ const DeployForm = () => {
     setAiDockerfile('');
     setContainerId('');
     setPublicPort('');
-    setDeployLogs(''); // ล้างหน้าจอ Terminal
-    toast.info("เริ่มกระบวนการ Deploy...", {
-      description: "กำลังเชื่อมต่อและวิเคราะห์โครงสร้างโค้ด",
+    setDeployLogs('');
+    toast.info("Starting deployment...", {
+      description: "Connecting and analyzing repository structure",
     });
 
     try {
@@ -140,22 +137,18 @@ const DeployForm = () => {
         })
       });
       
-      // เครื่องมือสำหรับอ่านข้อมูลแบบ Stream (สตรีมมิ่ง)
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullLog = '';
 
       while (true) {
-        // รอรับข้อมูลชิ้นใหม่ที่ Backend ดันผ่านท่อมา
         const { value, done } = await reader.read();
-        if (done) break; // ถ้า Backend บอกว่า "จบแล้วท่อปิด" ก็ให้หยุด
+        if (done) break;
         
-        // ถอดรหัสข้อมูลและนำไปต่อท้ายข้อความเดิม
         const chunk = decoder.decode(value, { stream: true });
         fullLog += chunk;
-        setDeployLogs(fullLog); // อัปเดตหน้าจอทันที
+        setDeployLogs(fullLog);
         
-        // แอบเช็คว่าถ้ามีคำว่า SUCCESS โผล่มา แปลว่ารันเสร็จแล้ว
         if (chunk.includes("SUCCESS: DOMAIN=")) {
           const domainMatch = chunk.match(/DOMAIN=([a-zA-Z0-9.-]+)/);
           const idMatch = chunk.match(/ID=([a-zA-Z0-9]+)/);
@@ -163,20 +156,20 @@ const DeployForm = () => {
           if (domainMatch) setPublicPort(domainMatch[1]);
           if (idMatch) setContainerId(idMatch[1]);
           
-          setMessage("Deploy สำเร็จ! เซิร์ฟเวอร์ของคุณพร้อมใช้งานแล้ว");
-          toast.success("Deploy สำเร็จเรียบร้อย!", {
-            description: domainMatch ? `พร้อมเปิดใช้งานที่ ${domainMatch[1]}` : "เซิร์ฟเวอร์เริ่มทำงานแล้ว",
+          setMessage("Deployment successful! Your server is ready.");
+          toast.success("Deployment successful!", {
+            description: domainMatch ? `Available at ${domainMatch[1]}` : "Server is now running",
           });
         } else if (chunk.includes("Error:")) {
-          setMessage("การ Deploy ล้มเหลว โปรดดู Log ด้านล่าง");
-          toast.error("การ Deploy ล้มเหลว", {
-            description: "โปรดดูรายละเอียดข้อผิดพลาดใน Terminal ด้านล่าง",
+          setMessage("Deployment failed. Please check the logs below.");
+          toast.error("Deployment failed", {
+            description: "Check error details in the terminal below",
           });
         }
       }
     } catch (error) {
-      setMessage("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: " + error.message);
-      toast.error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้", {
+      setMessage("Failed to connect to server: " + error.message);
+      toast.error("Failed to connect to server", {
         description: error.message,
       });
     } finally {
@@ -200,7 +193,7 @@ const DeployForm = () => {
             Deploy New Project
           </h3>
           <p className="text-slate-500 text-xs max-w-sm mx-auto">
-            วางลิงก์ GitHub เพื่อเริ่มสร้างและรันโปรเจกต์อัตโนมัติ
+            Paste your GitHub repository link to automatically build and run your project.
           </p>
         </div>
         
@@ -228,12 +221,12 @@ const DeployForm = () => {
                 {inspecting ? (
                   <>
                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังตรวจ...</span>
+                    <span>Inspecting...</span>
                   </>
                 ) : (
                   <>
                     <Search className="w-3.5 h-3.5" />
-                    <span>ตรวจสอบ</span>
+                    <span>Inspect</span>
                   </>
                 )}
               </button>
@@ -256,11 +249,11 @@ const DeployForm = () => {
                     onClick={() => {
                       setShowAdvanced(true);
                       if (inspectResult.env_template) setEnvVars(inspectResult.env_template);
-                      toast.success('เติมตัวแปรลงใน .env แล้ว');
+                      toast.success('Added variables to .env');
                     }}
                     className="text-indigo-600 hover:text-indigo-800 font-medium text-[11px] cursor-pointer"
                   >
-                    คัดลอกลง .env
+                    Copy to .env
                   </button>
                 )}
               </div>
@@ -278,13 +271,13 @@ const DeployForm = () => {
                 </div>
               ) : (
                 <p className="text-slate-400 text-[11px]">
-                  ไม่พบตัวแปรจำเป็นพิเศษ พร้อม Deploy ได้ทันที
+                  No special environment variables required. Ready to deploy.
                 </p>
               )}
 
               {inspectResult.has_database && (
                 <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-2 text-xs text-indigo-900">
-                  <span>แอปนี้ต้องการ Database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})</span>
+                  <span>This app requires a database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})</span>
                   {databases.length > 0 && (
                     <button
                       type="button"
@@ -294,7 +287,7 @@ const DeployForm = () => {
                       }}
                       className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-semibold cursor-pointer shrink-0"
                     >
-                      ผูกกับ {databases[0].name}
+                      Bind with {databases[0].name}
                     </button>
                   )}
                 </div>
@@ -311,7 +304,7 @@ const DeployForm = () => {
             >
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-xs font-semibold text-slate-700">การตั้งค่าเพิ่มเติม (Advanced)</span>
+                <span className="text-xs font-semibold text-slate-700">Advanced Settings</span>
                 {activeAdvancedCount > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700">
                     {activeAdvancedCount}
@@ -327,14 +320,14 @@ const DeployForm = () => {
                 {databases.length > 0 && (
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      เชื่อมต่อ Database:
+                      Connect Database:
                     </label>
                     <select
                       value={selectedDbId}
                       onChange={(e) => handleSelectDatabase(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-slate-700"
                     >
-                      <option value="">-- ไม่เชื่อมต่อ Database --</option>
+                      <option value="">-- No Database Attached --</option>
                       {databases.map(db => (
                         <option key={db.id} value={db.id}>
                           {db.name} (Port :{db.host_port}) [{db.status}]
@@ -361,7 +354,7 @@ const DeployForm = () => {
                 {/* 3. GitHub Token */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Personal Access Token (สำหรับ Private Repo):
+                    Personal Access Token (for Private Repositories):
                   </label>
                   <div className="relative">
                     <input 
@@ -375,7 +368,7 @@ const DeployForm = () => {
                       type="button"
                       onClick={() => setShowToken(!showToken)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
-                      title={showToken ? "ซ่อน Token" : "แสดง Token"}
+                      title={showToken ? "Hide token" : "Show token"}
                     >
                       {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -392,7 +385,7 @@ const DeployForm = () => {
                     className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
                   />
                   <label htmlFor="forceAi" className="text-xs text-slate-600 cursor-pointer select-none">
-                    สร้าง Dockerfile ใหม่เสมอ (แทนที่ Dockerfile เดิมใน Repository)
+                    Always generate new Dockerfile (override repository Dockerfile)
                   </label>
                 </div>
               </div>
@@ -411,7 +404,7 @@ const DeployForm = () => {
             {isLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm">กำลังสร้างและรัน Container...</span>
+                <span className="text-sm">Building and deploying container...</span>
               </>
             ) : (
               <>
@@ -421,10 +414,10 @@ const DeployForm = () => {
             )}
           </button>
 
-          {/* Terminal Log View (จะโชว์เฉพาะตอนที่มี Log) */}
+          {/* Terminal Log View */}
           {deployLogs && (
             <div className="mt-8 bg-slate-900 rounded-xl p-4 overflow-hidden border border-slate-700 shadow-2xl text-left">
-              {/* จุดสีๆ หัวหน้าต่างเหมือนของ Mac */}
+              {/* Window Header */}
               <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2">
                 <div className="w-3 h-3 rounded-full bg-rose-500"></div>
                 <div className="w-3 h-3 rounded-full bg-amber-500"></div>
@@ -432,7 +425,7 @@ const DeployForm = () => {
                 <span className="text-slate-400 text-xs font-mono ml-2">Deploy Terminal</span>
               </div>
               
-              {/* พื้นที่โชว์ตัวหนังสือ (ใส่สีเขียวแบบ Hacker) */}
+              {/* Terminal Logs Content */}
               <div className="h-64 overflow-y-auto font-mono text-xs md:text-sm text-emerald-400 whitespace-pre-wrap">
                 {deployLogs}
               </div>
