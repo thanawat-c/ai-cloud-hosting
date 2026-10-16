@@ -1127,13 +1127,13 @@ const DashboardHome = () => {
                               <span>RAM ใช้งานจริง:</span>
                             </div>
                             <span className="font-mono font-bold text-slate-700">
-                              {(stats[db.container_id].memory_stats?.usage / 1024 / 1024).toFixed(1)} MB / 512 MB
+                              {Number(stats[db.container_id].memory_mb || 0).toFixed(1)} MB / {stats[db.container_id].memory_limit || 512} MB
                             </span>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                             <div 
                               className="bg-gradient-to-r from-indigo-500 to-blue-500 h-1.5 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, Math.max(3, (stats[db.container_id].memory_stats?.usage / (512 * 1024 * 1024)) * 100))}%` }}
+                              style={{ width: `${Math.min(100, Math.max(3, ((Number(stats[db.container_id].memory_mb || 0) / (stats[db.container_id].memory_limit || 512)) * 100)))}%` }}
                             ></div>
                           </div>
                         </div>
