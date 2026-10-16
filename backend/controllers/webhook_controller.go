@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +57,18 @@ func GenerateRandomSecret() string {
 		return "whsec_default_secret_key"
 	}
 	return "whsec_" + hex.EncodeToString(bytes)
+}
+
+// extractWebhookJSON แปลง payload ไม่ว่าจะส่งมาแบบ application/json หรือ form-urlencoded ให้เป็น JSON เสมอ
+func extractWebhookJSON(c *gin.Context, bodyBytes []byte) []byte {
+	rawStr := string(bodyBytes)
+	if strings.HasPrefix(rawStr, "payload=") || strings.Contains(c.ContentType(), "application/x-www-form-urlencoded") {
+		trimmed := strings.TrimPrefix(rawStr, "payload=")
+		if unescaped, err := url.QueryUnescape(trimmed); err == nil {
+			return []byte(unescaped)
+		}
+	}
+	return bodyBytes
 }
 
 // VerifySignature ตรวจสอบ HMAC-SHA256 Signature ที่ส่งมาจาก GitHub Header
@@ -114,8 +127,11 @@ func HandleDeploymentWebhook(c *gin.Context) {
 		return
 	}
 
+	rawJSON := extractWebhookJSON(c, bodyBytes)
 	var payload GitHubWebhookPayload
-	_ = json.Unmarshal(bodyBytes, &payload)
+	if err := json.Unmarshal(rawJSON, &payload); err != nil {
+		fmt.Printf("⚠️ [Webhook Unmarshal Error] Deployment %d: %v | Raw: %s\n", id, err, string(bodyBytes))
+	}
 
 	commitMsg := payload.HeadCommit.Message
 	pusherName := payload.Pusher.Name
@@ -127,7 +143,10 @@ func HandleDeploymentWebhook(c *gin.Context) {
 	fmt.Printf("🚀 [Webhook Triggered] Service: %s (ID: %d) | Branch: %s | Pusher: %s | Commit: %s\n",
 		deploy.RepoURL, deploy.ID, branch, pusherName, commitMsg)
 
-	// 3. สั่ง Re-deploy ใน Goroutine แบบ Asynchronous
+	// 3. ปรับสถานะเป็น redeploying ทันทีเพื่อให้หน้า Dashboard โชว์ Updating
+	config.DB.Model(&deploy).Update("status", "redeploying")
+
+	// สั่ง Re-deploy ใน Goroutine แบบ Asynchronous
 	go func(targetDeploy models.Deployment, pusher, msg, br string) {
 		ctx := context.Background()
 		fmt.Printf("🔄 [Auto-Deploy] เริ่มดึงโค้ดล่าสุดจาก Git และสร้าง Image ใหม่สำหรับ %s...\n", targetDeploy.RepoURL)
@@ -186,9 +205,11 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 		return
 	}
 
+	rawJSON := extractWebhookJSON(c, bodyBytes)
 	var payload GitHubWebhookPayload
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON payload"})
+	if err := json.Unmarshal(rawJSON, &payload); err != nil {
+		fmt.Printf("⚠️ [Global Webhook Unmarshal Error]: %v | Raw: %s\n", err, string(bodyBytes))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON payload: " + err.Error()})
 		return
 	}
 
@@ -235,6 +256,8 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 	triggeredNames := []string{}
 	for _, dep := range matchedDeploys {
 		triggeredNames = append(triggeredNames, dep.RepoURL)
+		config.DB.Model(&dep).Update("status", "redeploying")
+
 		go func(target models.Deployment) {
 			ctx := context.Background()
 			newID, err := services.RedeployApp(
@@ -245,7 +268,13 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 				target.ForceAI,
 				target.GitToken,
 			)
-			if err == nil && len(newID) > 0 {
+			if err != nil {
+				fmt.Printf("❌ [Auto-Deploy Error] %s: %v\n", target.RepoURL, err)
+				config.DB.Model(&target).Updates(map[string]interface{}{
+					"status":     "failed",
+					"last_error": fmt.Sprintf("Auto-Deploy Error: %v", err),
+				})
+			} else if len(newID) > 0 {
 				cleanID := newID
 				if len(cleanID) > 12 {
 					cleanID = cleanID[:12]

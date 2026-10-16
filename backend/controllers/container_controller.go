@@ -269,6 +269,8 @@ func RedeployContainer(c *gin.Context){
 		return
 	}
 
+	config.DB.Model(&deploy).Update("status", "redeploying")
+
 	go func () {
 		ctx := context.Background()
 		newID, err := services.RedeployApp(ctx, deploy.ContainerID, deploy.RepoURL, deploy.ImageName, deploy.ForceAI, deploy.GitToken)
