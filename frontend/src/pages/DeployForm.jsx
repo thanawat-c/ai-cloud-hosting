@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Sparkles, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText, Database, Wand2, Check } from 'lucide-react';
+import { Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, FileText, Database, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DeployForm = () => {
@@ -37,7 +37,7 @@ const DeployForm = () => {
     }
     setInspecting(true);
     setInspectResult(null);
-    const toastId = toast.loading('AI กำลังสแกนโค้ดและตรวจหา Environment Variables...');
+    const toastId = toast.loading('กำลังตรวจสอบ Repository...');
     try {
       const res = await fetch('http://localhost:8080/api/inspect-repo', {
         method: 'POST',
@@ -47,18 +47,16 @@ const DeployForm = () => {
       const data = await res.json();
       if (res.ok) {
         setInspectResult(data);
-        toast.success('วิเคราะห์โปรเจกต์สำเร็จ!', {
+        toast.success('ตรวจสอบโปรเจกต์สำเร็จ!', {
           id: toastId,
-          description: `ตรวจพบ Framework: ${data.detected_framework} พร้อม ${data.detected_envs?.length || 0} ตัวแปรที่แอปต้องการ`,
+          description: `Framework: ${data.detected_framework} (${data.detected_envs?.length || 0} ตัวแปร)`,
         });
-        // เปิดเมนู Advanced Configuration ให้อัตโนมัติ
-        setShowAdvanced(true);
         // ถ้าช่อง env ยังว่าง ให้ใส่ Template ให้อัตโนมัติ
         if (!envVars.trim() && data.env_template) {
           setEnvVars(data.env_template);
         }
       } else {
-        toast.error('สแกนไม่สำเร็จ', { id: toastId, description: data.error });
+        toast.error('ตรวจสอบไม่สำเร็จ', { id: toastId, description: data.error });
       }
     } catch (err) {
       toast.error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', { id: toastId, description: err.message });
@@ -194,23 +192,23 @@ const DeployForm = () => {
         <div className="absolute top-0 right-0 -mt-24 -mr-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -mb-24 -ml-24 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
         
-        <div className="relative z-10 text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 mb-4">
-            <Rocket className="w-7 h-7" />
+        <div className="relative z-10 text-center mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20 mb-3">
+            <Rocket className="w-6 h-6" />
           </div>
-          <h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent mb-2">
+          <h3 className="text-2xl font-bold text-slate-800 mb-1.5">
             Deploy New Project
           </h3>
-          <p className="text-slate-500 text-sm max-w-md mx-auto">
-            วางลิงก์ GitHub แล้วให้ระบบ AI วิเคราะห์ สร้าง Container และเริ่มรันให้โดยอัตโนมัติ
+          <p className="text-slate-500 text-xs max-w-sm mx-auto">
+            วางลิงก์ GitHub เพื่อเริ่มสร้างและรันโปรเจกต์อัตโนมัติ
           </p>
         </div>
         
-        <div className="relative z-10 space-y-5">
+        <div className="relative z-10 space-y-4">
           {/* Main Hero Input: GitHub URL */}
-          <div className="group">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
-              <GitBranch className="w-3.5 h-3.5 text-blue-500" />
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
               GitHub Repository URL
             </label>
             <div className="relative">
@@ -219,114 +217,85 @@ const DeployForm = () => {
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
                 placeholder="https://github.com/username/project" 
-                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-4 pr-32 py-3.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all shadow-xs text-base placeholder:text-slate-400 font-mono text-sm" 
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-3.5 pr-28 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-xs font-mono placeholder:text-slate-400 placeholder:font-sans" 
               />
               <button
                 type="button"
                 onClick={() => handleInspectRepo()}
                 disabled={inspecting || !repoUrl.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
               >
                 {inspecting ? (
                   <>
                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Scanning...</span>
+                    <span>กำลังตรวจ...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-200" />
-                    <span>AI Scan</span>
+                    <Search className="w-3.5 h-3.5" />
+                    <span>ตรวจสอบ</span>
                   </>
                 )}
               </button>
             </div>
           </div>
 
-          {/* AI Repository Insights Card */}
+          {/* Repository Insights Card */}
           {inspectResult && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/80 to-slate-50/80 border border-blue-200/80 shadow-xs space-y-3 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-800">AI Code Analysis</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                  <span className="font-semibold text-slate-700">Framework:</span>
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-bold">
                     {inspectResult.detected_framework}
                   </span>
-                  {inspectResult.has_database && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 flex items-center gap-1">
-                      <Database className="w-3 h-3" /> Database Required
-                    </span>
-                  )}
                 </div>
+                {inspectResult.detected_envs?.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdvanced(true);
+                      if (inspectResult.env_template) setEnvVars(inspectResult.env_template);
+                      toast.success('เติมตัวแปรลงใน .env แล้ว');
+                    }}
+                    className="text-indigo-600 hover:text-indigo-800 font-medium text-[11px] cursor-pointer"
+                  >
+                    คัดลอกลง .env
+                  </button>
+                )}
               </div>
 
               {inspectResult.detected_envs?.length > 0 ? (
-                <div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-600 mb-1.5 font-medium">
-                    <span>ตัวแปร Environment Variables ที่แอปนี้เรียกใช้ ({inspectResult.detected_envs.length} ตัว):</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAdvanced(true);
-                        if (inspectResult.env_template) setEnvVars(inspectResult.env_template);
-                        toast.success('นำค่า Template ใส่ใน .env แล้ว');
-                      }}
-                      className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                <div className="flex flex-wrap gap-1">
+                  {inspectResult.detected_envs.map(envKey => (
+                    <span 
+                      key={envKey} 
+                      className="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-[11px] text-slate-700"
                     >
-                      <Wand2 className="w-3 h-3" /> เติมลงใน .env
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {inspectResult.detected_envs.map(envKey => {
-                      const isDbKey = inspectResult.db_var_names?.includes(envKey);
-                      return (
-                        <span 
-                          key={envKey} 
-                          className={`px-2.5 py-1 rounded-md border font-mono text-[11px] font-bold shadow-xs ${
-                            isDbKey 
-                              ? 'bg-amber-50 border-amber-300 text-amber-800' 
-                              : 'bg-white border-blue-200 text-slate-700'
-                          }`}
-                        >
-                          {envKey}
-                        </span>
-                      );
-                    })}
-                  </div>
+                      {envKey}
+                    </span>
+                  ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">
-                  ไม่พบตัวแปรจำเป็นพิเศษ สามารถกด Deploy ได้ทันที
+                <p className="text-slate-400 text-[11px]">
+                  ไม่พบตัวแปรจำเป็นพิเศษ พร้อม Deploy ได้ทันที
                 </p>
               )}
 
-              {/* Database Link Suggestion */}
               {inspectResult.has_database && (
-                <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-amber-900">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>
-                      แอปนี้ต้องการ Database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})
-                    </span>
-                  </div>
-                  {databases.length > 0 ? (
+                <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-2 text-xs text-indigo-900">
+                  <span>แอปนี้ต้องการ Database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})</span>
+                  {databases.length > 0 && (
                     <button
                       type="button"
                       onClick={() => {
                         setShowAdvanced(true);
                         if (databases[0]) handleSelectDatabase(databases[0].id);
                       }}
-                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer shrink-0"
+                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-semibold cursor-pointer shrink-0"
                     >
-                      <Check className="w-3 h-3" />
-                      <span>ผูกกับ {databases[0].name} ทันที</span>
+                      ผูกกับ {databases[0].name}
                     </button>
-                  ) : (
-                    <span className="text-[11px] text-amber-700 font-medium">
-                      (ยังไม่มี Managed DB ในระบบ ให้สร้างที่หน้า Dashboard)
-                    </span>
                   )}
                 </div>
               )}
@@ -334,82 +303,65 @@ const DeployForm = () => {
           )}
 
           {/* Collapsible Advanced Configuration */}
-          <div className="border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/40 transition-colors">
+          <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-100/60 transition-colors select-none"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-100/60 transition-colors select-none cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-semibold text-slate-700">Advanced Configuration</span>
-                <span className="text-xs text-slate-400 hidden sm:inline">(Environment, Private Repo, Build)</span>
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-slate-700">การตั้งค่าเพิ่มเติม (Advanced)</span>
                 {activeAdvancedCount > 0 && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                    {activeAdvancedCount} active
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700">
+                    {activeAdvancedCount}
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
             </button>
 
             {showAdvanced && (
-              <div className="p-4 pt-2 border-t border-slate-200/70 space-y-4 bg-white/70 animate-in fade-in duration-200">
+              <div className="p-4 pt-2 border-t border-slate-200 space-y-3 bg-white">
                 {/* 1. Managed Database Attachment */}
                 {databases.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Database className="w-3.5 h-3.5 text-indigo-600" />
-                        เชื่อมต่อ Managed Database <span className="text-[11px] font-normal text-slate-400">(Auto-Inject DATABASE_URL)</span>
-                      </span>
-                      {selectedDbId && (
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                          Auto-Linked
-                        </span>
-                      )}
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      เชื่อมต่อ Database:
                     </label>
                     <select
                       value={selectedDbId}
                       onChange={(e) => handleSelectDatabase(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-slate-700"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium text-slate-700"
                     >
-                      <option value="">-- ไม่เชื่อมต่อ (ระบุ DATABASE_URL เอง หรือไม่ใช้ DB) --</option>
+                      <option value="">-- ไม่เชื่อมต่อ Database --</option>
                       {databases.map(db => (
                         <option key={db.id} value={db.id}>
                           {db.name} (Port :{db.host_port}) [{db.status}]
                         </option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      ระบบจะเพิ่ม DATABASE_URL ลงใน .env ให้อัตโนมัติ
-                    </p>
                   </div>
                 )}
 
                 {/* 2. Environment Variables */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-slate-500" />
-                    Environment Variables (.env)
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Environment Variables (.env):
                   </label>
                   <textarea
                     value={envVars}
                     onChange={(e) => setEnvVars(e.target.value)}
-                    placeholder={"PORT=3000\nDATABASE_URL=postgres://...\nJWT_SECRET=supersecret"}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs text-slate-800 placeholder:text-slate-400"
+                    placeholder={"PORT=3000\nDATABASE_URL=postgres://..."}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs text-slate-800 placeholder:text-slate-400"
                     rows="3"
                   ></textarea>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    ใส่บรรทัดละ 1 ตัวแปรในรูปแบบ KEY=VALUE
-                  </p>
                 </div>
 
-                {/* 2. GitHub Token (Private Repo) */}
+                {/* 3. GitHub Token */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-slate-500" />
-                    Personal Access Token <span className="text-[11px] font-normal text-slate-400">(สำหรับ Private Repo)</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Personal Access Token (สำหรับ Private Repo):
                   </label>
                   <div className="relative">
                     <input 
@@ -417,33 +369,30 @@ const DeployForm = () => {
                       value={gitToken}
                       onChange={(e) => setGitToken(e.target.value)}
                       placeholder="ghp_xxxxxxxxxxxx" 
-                      className="w-full bg-slate-50/50 focus:bg-white border border-slate-200 text-slate-800 pl-3.5 pr-10 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono placeholder:text-slate-400 placeholder:font-sans" 
+                      className="w-full bg-slate-50/50 focus:bg-white border border-slate-200 text-slate-800 pl-3 pr-9 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono placeholder:text-slate-400" 
                     />
                     <button
                       type="button"
                       onClick={() => setShowToken(!showToken)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
                       title={showToken ? "ซ่อน Token" : "แสดง Token"}
                     >
                       {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Token ถูกเข้ารหัสอย่างปลอดภัยและไม่แสดงใน Log
-                  </p>
                 </div>
 
-                {/* 3. Force AI Override */}
-                <div className="flex items-center gap-2.5 pt-1">
+                {/* 4. Force Override */}
+                <div className="flex items-center gap-2 pt-0.5">
                   <input 
                     type="checkbox" 
                     id="forceAi"
                     checked={forceAi}
                     onChange={(e) => setForceAi(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
                   />
-                  <label htmlFor="forceAi" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
-                    <span className="font-semibold text-blue-600">Force AI Override:</span> บังคับให้ AI สร้าง Dockerfile ใหม่ทับของเดิม (หาก Dockerfile เดิม Build ไม่ผ่าน)
+                  <label htmlFor="forceAi" className="text-xs text-slate-600 cursor-pointer select-none">
+                    สร้าง Dockerfile ใหม่เสมอ (แทนที่ Dockerfile เดิมใน Repository)
                   </label>
                 </div>
               </div>
@@ -454,20 +403,20 @@ const DeployForm = () => {
           <button 
             onClick={handleDeploy}
             disabled={isLoading}
-            className={`w-full group relative overflow-hidden flex items-center justify-center gap-2.5 font-semibold py-3.5 px-6 rounded-xl transition-all duration-300 shadow-md
+            className={`w-full flex items-center justify-center gap-2 font-semibold py-3 px-6 rounded-xl transition-all shadow-xs
               ${isLoading 
-                ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none' 
-                : 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white shadow-slate-900/15 hover:shadow-lg hover:shadow-slate-900/25 hover:-translate-y-0.5 cursor-pointer'}`}
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                : 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'}`}
           >
             {isLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                <span>AI Analyzing & Building...</span>
+                <span className="text-sm">กำลังสร้างและรัน Container...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
-                <span>Analyze & Deploy</span>
+                <Rocket className="w-4 h-4" />
+                <span className="text-sm">Deploy Project</span>
               </>
             )}
           </button>
