@@ -924,7 +924,7 @@ const DashboardHome = () => {
                     <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Status</th>
                     <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Deploy ล่าสุด</th>
                     <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Usage</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">URL</th>
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 whitespace-nowrap">URL</th>
                     <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
                   </tr>
                 </thead>
@@ -1103,14 +1103,14 @@ const DashboardHome = () => {
                       </td>
 
                       {/* URL */}
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {item.state === 'running' && item.domain_name ? (
                           (item.service_type === 'backend' || item.name?.includes('(Backend)')) ? (
-                            <div className="inline-flex items-center gap-1">
+                            <div className="inline-flex items-center gap-1 whitespace-nowrap">
                               <button 
                                 type="button"
                                 onClick={() => handleCopyApiUrl(`http://${item.domain_name}`, `app-url-${item.id}`)}
-                                className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-0.5 rounded-md cursor-pointer ${
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition-colors px-2 py-0.5 rounded-md cursor-pointer ${
                                   copiedKey === `app-url-${item.id}`
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -1133,7 +1133,7 @@ const DashboardHome = () => {
                                 href={`http://${item.domain_name}`} 
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
                                 title="เปิดดูในเบราว์เซอร์"
                               >
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -1144,7 +1144,7 @@ const DashboardHome = () => {
                               href={`http://${item.domain_name}`} 
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap shrink-0 text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
                             >
                               Visit <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                             </a>
