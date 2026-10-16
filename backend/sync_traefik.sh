@@ -1,4 +1,6 @@
 #!/bin/bash
+export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:~/.docker/bin:/Applications/Docker.app/Contents/Resources/bin
+
 while true; do
   ROUTERS=""
   SERVICES=""
@@ -10,6 +12,12 @@ while true; do
     # Extract the rule Host(`...`)
     rule=$(docker inspect -f '{{index .Config.Labels "traefik.http.routers.'$name'.rule"}}' $container)
     
+    # Extract the dynamic service port
+    port=$(docker inspect -f '{{index .Config.Labels "traefik.http.services.'$name'.loadbalancer.server.port"}}' $container)
+    if [ -z "$port" ] || [ "$port" = "<no value>" ]; then
+      port="80"
+    fi
+    
     if [ ! -z "$rule" ] && [ ! -z "$ip" ] && [ "$rule" != "<no value>" ]; then
       ROUTERS="$ROUTERS
     $name:
@@ -20,7 +28,7 @@ while true; do
     $name:
       loadBalancer:
         servers:
-          - url: \"http://$ip:80\""
+          - url: \"http://$ip:$port\""
     fi
   done
   

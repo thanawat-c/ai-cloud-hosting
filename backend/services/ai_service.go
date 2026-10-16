@@ -161,7 +161,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     COPY %s/ ./
     EXPOSE <port>
     CMD ["uvicorn", ...] หรือ CMD ["python", "main.py"]
-- กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
+- กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
 	} else if isFrontend {
 		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
 - สโคปการทำงานเฉพาะโฟลเดอร์ "%s/"

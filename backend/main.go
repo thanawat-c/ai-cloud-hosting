@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"ai-cloud-api/routes"
 	"ai-cloud-api/config"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -14,7 +15,7 @@ import (
 func main() {
 	err := godotenv.Overload()
 	if err != nil {
-		log.Println("⚠️ ไม่พบไฟล์ .env (จะลองอ่านจาก System OS แทน)")
+		log.Println("ไม่พบไฟล์ .env (จะลองอ่านจาก System OS แทน)")
 	}
 
 	// เชื่อมต่อ Database
@@ -22,9 +23,12 @@ func main() {
 
 	// รัน sync_traefik.sh เป็น background process
 	go func() {
-		cmd := exec.Command("bash", "sync_traefik.sh")
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Warning: sync_traefik.sh exited with error:", err)
+		for {
+			cmd := exec.Command("bash", "sync_traefik.sh")
+			if err := cmd.Run(); err != nil {
+				fmt.Println("Warning: sync_traefik.sh exited with error:", err)
+			}
+			time.Sleep(3 * time.Second)
 		}
 	}()
 
