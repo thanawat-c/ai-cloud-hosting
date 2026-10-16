@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
@@ -65,6 +65,14 @@ const DashboardHome = () => {
   const [activeBindDb, setActiveBindDb] = useState(null);
   const [selectedTargetContainer, setSelectedTargetContainer] = useState('');
   const [bindingServer, setBindingServer] = useState(false);
+
+  // Backup & Restore State
+  const [backingUpId, setBackingUpId] = useState(null);
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [activeRestoreDb, setActiveRestoreDb] = useState(null);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreResult, setRestoreResult] = useState('');
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -391,6 +399,80 @@ const DashboardHome = () => {
       toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
     } finally {
       setBindingServer(false);
+    }
+  };
+
+  const handleBackupDb = async (db) => {
+    setBackingUpId(db.id);
+    const toastId = toast.loading(`กำลังสร้างไฟล์ Backup (.sql) สำหรับ "${db.name}"...`);
+    try {
+      const response = await fetch(`http://localhost:8080/api/databases/${db.id}/backup`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'ไม่สามารถดาวน์โหลด Backup ได้');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.download = `backup-${db.name}-${dateStr}.sql`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast.success('ดาวน์โหลด Backup สำเร็จ!', {
+        id: toastId,
+        description: `สร้างไฟล์ backup-${db.name}.sql เรียบร้อยแล้ว`,
+      });
+    } catch (err) {
+      toast.error('Backup ล้มเหลว', { id: toastId, description: err.message });
+    } finally {
+      setBackingUpId(null);
+    }
+  };
+
+  const handleOpenRestoreModal = (db) => {
+    setActiveRestoreDb(db);
+    setRestoreFile(null);
+    setRestoreResult('');
+    setRestoreModalOpen(true);
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!restoreFile || !activeRestoreDb) {
+      toast.warning('กรุณาเลือกไฟล์ .sql เพื่อกู้คืนข้อมูล');
+      return;
+    }
+
+    setRestoring(true);
+    setRestoreResult('');
+    const toastId = toast.loading(`กำลังกู้คืนข้อมูลเข้า "${activeRestoreDb.name}"...`);
+
+    const formData = new FormData();
+    formData.append('file', restoreFile);
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeRestoreDb.id}/restore`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('กู้คืนข้อมูลสำเร็จเรียบร้อย!', { id: toastId });
+        setRestoreResult(data.output || 'Restore Completed Successfully.');
+      } else {
+        toast.error('การกู้คืนข้อมูลล้มเหลว', { id: toastId, description: data.error });
+        setRestoreResult(`Error: ${data.error}\n${data.output || ''}`);
+      }
+    } catch (err) {
+      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+      setRestoreResult(`Network Error: ${err.message}`);
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -1058,7 +1140,7 @@ const DashboardHome = () => {
                       )}
 
                       {/* Database Quick Tools */}
-                      <div className="grid grid-cols-2 gap-2 mb-3.5">
+                      <div className="grid grid-cols-2 gap-2 mb-2">
                         <button
                           type="button"
                           onClick={() => handleOpenSqlStudio(db)}
@@ -1076,6 +1158,30 @@ const DashboardHome = () => {
                         >
                           <Link2 className="w-3.5 h-3.5" />
                           <span>ผูกกับ Server</span>
+                        </button>
+                      </div>
+
+                      {/* Backup & Restore Tools */}
+                      <div className="grid grid-cols-2 gap-2 mb-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleBackupDb(db)}
+                          disabled={!isRunning || backingUpId === db.id}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 text-emerald-700 rounded-lg text-xs font-semibold border border-emerald-200/60 transition-colors cursor-pointer"
+                          title="ดาวน์โหลดไฟล์ .sql สำรองข้อมูล"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{backingUpId === db.id ? 'Exporting...' : 'Backup (.sql)'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRestoreModal(db)}
+                          disabled={!isRunning}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-800 rounded-lg text-xs font-semibold border border-amber-200/60 transition-colors cursor-pointer"
+                          title="อัปโหลดไฟล์ .sql เพื่อกู้คืนข้อมูล"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Restore</span>
                         </button>
                       </div>
 
@@ -1603,6 +1709,93 @@ const DashboardHome = () => {
                   <>
                     <Link2 className="w-4 h-4" />
                     <span>ผูกทันทีและ Restart</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Restore Database Modal */}
+      {restoreModalOpen && activeRestoreDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">กู้คืนข้อมูล (Restore Database)</h3>
+                  <p className="text-xs text-slate-500">เป้าหมาย: {activeRestoreDb.name} ({activeRestoreDb.type})</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setRestoreModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                <p className="font-bold mb-1">⚠️ คำเตือนการกู้คืนข้อมูล:</p>
+                <p className="text-amber-800">
+                  ไฟล์ SQL จะถูกนำไปรันในฐานข้อมูลโดยตรง หากไฟล์มีคำสั่ง <code className="font-mono font-bold">DROP TABLE</code> ข้อมูลเดิมจะถูกลบและแทนที่ด้วยข้อมูลจากไฟล์ Backup
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  เลือกไฟล์สำรองข้อมูล (.sql):
+                </label>
+                <input
+                  type="file"
+                  accept=".sql,.dump"
+                  onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+                  className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 border border-slate-200 rounded-xl p-1 bg-slate-50 cursor-pointer"
+                />
+                {restoreFile && (
+                  <p className="text-[11px] text-emerald-600 mt-1 font-medium">
+                    ✓ เลือกไฟล์: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+
+              {restoreResult && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-slate-600">ผลการทำงาน (Output):</span>
+                  <div className="p-3 rounded-xl bg-slate-900 text-slate-200 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                    {restoreResult}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setRestoreModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteRestore}
+                disabled={restoring || !restoreFile}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+              >
+                {restoring ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>กำลังกู้คืนข้อมูล...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>เริ่มกู้คืน (Restore Now)</span>
                   </>
                 )}
               </button>

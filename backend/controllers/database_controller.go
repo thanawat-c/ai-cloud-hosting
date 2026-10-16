@@ -2,10 +2,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
 
@@ -161,4 +165,88 @@ func BindDatabase(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "ผูก Database เข้ากับเซิร์ฟเวอร์และรีสตาร์ตสำเร็จเรียบร้อยแล้ว!"})
 }
+
+// BackupDatabase ดาวน์โหลดไฟล์ dump .sql
+func BackupDatabase(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		return
+	}
+
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Database"})
+		return
+	}
+
+	if db.Status != "running" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ต้องอยู่ในสถานะ Running ก่อนทำ Backup"})
+		return
+	}
+
+	sqlDump, err := services.BackupDatabaseSQL(context.Background(), db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ทำ Backup ล้มเหลว: " + err.Error()})
+		return
+	}
+
+	fileName := fmt.Sprintf("backup-%s-%s.sql", db.Name, time.Now().Format("20060102-150405"))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	c.Header("Content-Type", "application/sql")
+	c.String(http.StatusOK, sqlDump)
+}
+
+// RestoreDatabase รับไฟล์ .sql แล้วกู้คืนข้อมูลเข้า Database
+func RestoreDatabase(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		return
+	}
+
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Database"})
+		return
+	}
+
+	if db.Status != "running" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ต้องอยู่ในสถานะ Running ก่อนทำ Restore"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาแนบไฟล์ .sql"})
+		return
+	}
+
+	openedFile, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "เปิดไฟล์ไม่สำเร็จ"})
+		return
+	}
+	defer openedFile.Close()
+
+	contentBytes, err := io.ReadAll(openedFile)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "อ่านเนื้อหาไฟล์ไม่สำเร็จ"})
+		return
+	}
+
+	output, err := services.RestoreDatabaseSQL(context.Background(), db, string(contentBytes))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Restore ล้มเหลว: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "กู้คืนข้อมูล (Restore) สำเร็จเรียบร้อยแล้ว!",
+		"output":  output,
+	})
+}
+
 

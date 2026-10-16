@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -22,6 +23,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -533,5 +535,107 @@ func AutoExecuteRepoSQL(ctx context.Context, buildDir string, envVars string, lo
 		}
 	}
 }
+
+// BackupDatabaseSQL ดึง dump ข้อมูลทั้งหมดออกมาเป็นไฟล์ SQL
+func BackupDatabaseSQL(ctx context.Context, db models.ManagedDatabase) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	// ใช้ pg_dump พร้อมคำสั่งล้างตารางเดิมถ้ามี (--clean --if-exists)
+	cmd := []string{
+		"pg_dump",
+		"-U", db.Username,
+		"-d", db.DBName,
+		"--clean",
+		"--if-exists",
+	}
+
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmd,
+		Env:          []string{"PGPASSWORD=" + db.Password},
+		Tty:          false,
+	}
+
+	execIDResp, err := cli.ContainerExecCreate(ctx, db.ContainerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec: %w", err)
+	}
+
+	resp, err := cli.ContainerExecAttach(ctx, execIDResp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach exec: %w", err)
+	}
+	defer resp.Close()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, resp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read dump stream: %w", err)
+	}
+
+	if stderrBuf.Len() > 0 && stdoutBuf.Len() == 0 {
+		return "", fmt.Errorf("pg_dump error: %s", stderrBuf.String())
+	}
+
+	return stdoutBuf.String(), nil
+}
+
+// RestoreDatabaseSQL นำเข้าไฟล์ SQL เข้าไปยัง PostgreSQL Container ผ่าน psql
+func RestoreDatabaseSQL(ctx context.Context, db models.ManagedDatabase, sqlContent string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	execConfig := types.ExecConfig{
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+		Cmd: []string{
+			"psql",
+			"-U", db.Username,
+			"-d", db.DBName,
+		},
+		Env: []string{"PGPASSWORD=" + db.Password},
+	}
+
+	execIDResp, err := cli.ContainerExecCreate(ctx, db.ContainerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec for restore: %w", err)
+	}
+
+	resp, err := cli.ContainerExecAttach(ctx, execIDResp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach exec for restore: %w", err)
+	}
+	defer resp.Close()
+
+	// เขียนเนื้อหา SQL เข้าไปใน Stdin ของ psql
+	go func() {
+		defer resp.CloseWrite()
+		io.WriteString(resp.Conn, sqlContent)
+	}()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, resp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore output: %w", err)
+	}
+
+	out := stdoutBuf.String()
+	if stderrBuf.Len() > 0 {
+		out += "\n" + stderrBuf.String()
+	}
+	return strings.TrimSpace(out), nil
+}
+
+
 
 
