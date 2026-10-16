@@ -413,6 +413,16 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 		cleanPrefix += "/"
 	}
 
+	copySource := cleanPrefix
+	if copySource == "" {
+		copySource = "."
+	}
+
+	workdir := "/app"
+	if targetDir != "" {
+		workdir = "/app/" + targetDir
+	}
+
 	// 1. ตรวจสอบกรณี Frontend (Nuxt, Vite, React, Vue, Static Web)
 	if isFrontend || targetDir == "frontend" {
 		pnpmLockPath := filepath.Join(fullTarget, "pnpm-lock.yaml")
@@ -446,7 +456,7 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 		}
 
 		dockerfile := fmt.Sprintf(`FROM node:22-alpine AS builder
-WORKDIR /app/%s
+WORKDIR %s
 %s
 COPY %spackage.json %s*lock* ./
 RUN %s
@@ -460,7 +470,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-`, targetDir, setupPkgManager, cleanPrefix, cleanPrefix, installCmd, cleanPrefix, envSnippet, buildCmd)
+`, workdir, setupPkgManager, cleanPrefix, cleanPrefix, installCmd, copySource, envSnippet, buildCmd)
 
 		return dockerfile, "80", nil
 	}
@@ -481,7 +491,7 @@ WORKDIR /app
 COPY --from=builder /app/server .
 EXPOSE 8080
 CMD ["/app/server"]
-`, cleanPrefix, cleanPrefix, cleanPrefix)
+`, cleanPrefix, cleanPrefix, copySource)
 
 		return dockerfile, "8080", nil
 	}
@@ -496,7 +506,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY %s ./
 EXPOSE 8000
 CMD ["python", "main.py"]
-`, cleanPrefix, cleanPrefix)
+`, cleanPrefix, copySource)
 
 		return dockerfile, "8000", nil
 	}
@@ -509,7 +519,7 @@ RUN npm install
 COPY %s ./
 EXPOSE 3000
 CMD ["npm", "start"]
-`, cleanPrefix, cleanPrefix, cleanPrefix)
+`, cleanPrefix, cleanPrefix, copySource)
 
 	return dockerfile, "3000", nil
 }
