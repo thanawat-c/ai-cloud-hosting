@@ -43,6 +43,9 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
+		// ตรวจหาไฟล์ SQL Schema และรันสร้าง Table เข้า Database อัตโนมัติ (ถ้ามีการผูก Database ไว้)
+		services.AutoExecuteRepoSQL(ctx, buildDir, req.EnvVars, logChan)
+
 		// ให้ AI ช่วยวิเคราะห์ว่าเป็น Monorepo หรือไม่ และโฟลเดอร์ไหนคือ Frontend / Backend (ไม่ยึดติดกับชื่อโฟลเดอร์)
 		isMonorepo, feDirName, beDirName := services.DetectMonorepoServices(ctx, buildDir)
 

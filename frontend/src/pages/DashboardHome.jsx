@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
@@ -50,6 +50,20 @@ const DashboardHome = () => {
   const [newDbName, setNewDbName] = useState('');
   const [creatingDb, setCreatingDb] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
+
+  // SQL Studio State
+  const [sqlModalOpen, setSqlModalOpen] = useState(false);
+  const [activeSqlDb, setActiveSqlDb] = useState(null);
+  const [sqlQuery, setSqlQuery] = useState('');
+  const [sqlResult, setSqlResult] = useState('');
+  const [sqlTables, setSqlTables] = useState([]);
+  const [runningSql, setRunningSql] = useState(false);
+
+  // Bind Server State
+  const [bindModalOpen, setBindModalOpen] = useState(false);
+  const [activeBindDb, setActiveBindDb] = useState(null);
+  const [selectedTargetContainer, setSelectedTargetContainer] = useState('');
+  const [bindingServer, setBindingServer] = useState(false);
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -149,7 +163,21 @@ const DashboardHome = () => {
       const res = await fetch('http://localhost:8080/api/databases');
       if (res.ok) {
         const data = await res.json();
-        setDatabases(data || []);
+        const dbList = data || [];
+        setDatabases(dbList);
+
+        // Fetch stats for all running database containers
+        dbList.forEach(async (db) => {
+          if (db.status === 'running' && db.container_id) {
+            try {
+              const statRes = await fetch(`http://localhost:8080/api/containers/${db.container_id}/stats`);
+              if (statRes.ok) {
+                const statData = await statRes.json();
+                setStats(prev => ({ ...prev, [db.container_id]: statData }));
+              }
+            } catch (err) {}
+          }
+        });
       }
     } catch (err) {
       console.error('Failed to fetch databases:', err);
@@ -250,6 +278,90 @@ const DashboardHome = () => {
     setCopiedKey(key);
     toast.success('คัดลอก Connection URL แล้ว!', { description: 'พร้อมนำไปแปะใน .env หรือโปรแกรมฐานข้อมูล' });
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleOpenSqlStudio = async (db) => {
+    setActiveSqlDb(db);
+    setSqlModalOpen(true);
+    setSqlResult('');
+    setSqlQuery("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';");
+    setSqlTables([]);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${db.id}/tables`);
+      if (res.ok) {
+        const data = await res.json();
+        setSqlTables(data.tables || []);
+      }
+    } catch (err) {
+      console.error('Failed to load tables:', err);
+    }
+  };
+
+  const handleExecuteQuery = async (queryToRun) => {
+    const q = queryToRun || sqlQuery;
+    if (!q.trim() || !activeSqlDb) return;
+    setRunningSql(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeSqlDb.id}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSqlResult(data.result || 'คำสั่งสำเร็จ (ไม่มีข้อความตอบกลับ)');
+        // รีโหลดรายชื่อ Table เผื่อมีการสร้าง/ลบ Table
+        const tblRes = await fetch(`http://localhost:8080/api/databases/${activeSqlDb.id}/tables`);
+        if (tblRes.ok) {
+          const tblData = await tblRes.json();
+          setSqlTables(tblData.tables || []);
+        }
+      } else {
+        setSqlResult(`❌ ข้อผิดพลาด:\n${data.error || 'Query failed'}`);
+      }
+    } catch (err) {
+      setSqlResult(`❌ การเชื่อมต่อล้มเหลว: ${err.message}`);
+    } finally {
+      setRunningSql(false);
+    }
+  };
+
+  const handleOpenBindModal = (db) => {
+    setActiveBindDb(db);
+    const runningServers = containers.filter(c => c.state === 'running');
+    setSelectedTargetContainer(runningServers.length > 0 ? (runningServers[0].id || String(runningServers[0].deployment_id)) : '');
+    setBindModalOpen(true);
+  };
+
+  const handleConfirmBind = async () => {
+    if (!selectedTargetContainer || !activeBindDb) {
+      toast.warning('กรุณาเลือกเซิร์ฟเวอร์ที่ต้องการผูก');
+      return;
+    }
+    setBindingServer(true);
+    const toastId = toast.loading(`กำลังผูก Database เข้ากับเซิร์ฟเวอร์ และเริ่มรีสตาร์ต...`);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeBindDb.id}/bind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ container_id: selectedTargetContainer }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('ผูก Database สำเร็จ!', {
+          id: toastId,
+          description: `ส่งตัวแปร (DATABASE_URL, DB_URL ฯลฯ) และรีสตาร์ตเซิร์ฟเวอร์แล้ว`,
+        });
+        setBindModalOpen(false);
+        fetchContainers();
+      } else {
+        toast.error('ผูก Database ล้มเหลว', { id: toastId, description: data.error });
+      }
+    } catch (err) {
+      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+    } finally {
+      setBindingServer(false);
+    }
   };
 
   const handleAction = async (id, action, containerName) => {
@@ -834,6 +946,49 @@ const DashboardHome = () => {
                         </span>
                       </div>
 
+                      {/* Live RAM Stats */}
+                      {isRunning && stats[db.container_id] && (
+                        <div className="mb-3.5 p-2.5 rounded-xl bg-white border border-slate-200/70 shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                              <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                              <span>RAM ใช้งานจริง:</span>
+                            </div>
+                            <span className="font-mono font-bold text-slate-700">
+                              {(stats[db.container_id].memory_stats?.usage / 1024 / 1024).toFixed(1)} MB / 512 MB
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-indigo-500 to-blue-500 h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(3, (stats[db.container_id].memory_stats?.usage / (512 * 1024 * 1024)) * 100))}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Database Quick Tools */}
+                      <div className="grid grid-cols-2 gap-2 mb-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSqlStudio(db)}
+                          disabled={!isRunning}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-200/60 transition-colors cursor-pointer"
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                          <span>SQL Studio</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBindModal(db)}
+                          disabled={!isRunning}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200/60 transition-colors cursor-pointer"
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                          <span>ผูกกับ Server</span>
+                        </button>
+                      </div>
+
                       {/* Connection Strings */}
                       <div className="space-y-2.5">
                         {/* Internal URL */}
@@ -1131,6 +1286,237 @@ const DashboardHome = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Web SQL Studio Modal */}
+      {sqlModalOpen && activeSqlDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Code className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    SQL Studio: <span className="text-indigo-600 font-mono">{activeSqlDb.name}</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">PostgreSQL 16 • ตรวจสอบ Table และรันคำสั่ง SQL ได้ทันทีบนเว็บ</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSqlModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* Tables Bar */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2">
+                  <Table className="w-4 h-4 text-indigo-600" />
+                  <span>Tables ในฐานข้อมูล ({sqlTables.length} ตาราง):</span>
+                </div>
+                {sqlTables.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">
+                    ยังไม่มี Table ในฐานข้อมูล (คุณสามารถพิมพ์คำสั่ง CREATE TABLE ด้านล่างเพื่อสร้างได้เลย)
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {sqlTables.map((tbl) => (
+                      <button
+                        key={tbl}
+                        type="button"
+                        onClick={() => {
+                          const query = `SELECT * FROM ${tbl} LIMIT 50;`;
+                          setSqlQuery(query);
+                          handleExecuteQuery(query);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 font-mono text-xs font-medium shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5"
+                        title="คลิกเพื่อดูข้อมูลในตารางนี้"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span>{tbl}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SQL Query Editor */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    คำสั่ง SQL (Query Editor):
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSqlQuery("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")}
+                      className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors"
+                    >
+                      ดูรายชื่อตาราง
+                    </button>
+                    {sqlTables.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSqlQuery(`SELECT * FROM ${sqlTables[0]} LIMIT 20;`)}
+                        className="text-[11px] text-slate-500 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors"
+                      >
+                        ดูข้อมูล {sqlTables[0]}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <textarea
+                  value={sqlQuery}
+                  onChange={(e) => setSqlQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleExecuteQuery();
+                    }
+                  }}
+                  rows="4"
+                  placeholder="SELECT * FROM users LIMIT 10;"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed"
+                ></textarea>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                  <span>💡 กด <kbd className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Cmd + Enter</kbd> หรือ <kbd className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Ctrl + Enter</kbd> เพื่อรันคำสั่งได้ทันที</span>
+                  <button
+                    type="button"
+                    onClick={() => handleExecuteQuery()}
+                    disabled={runningSql || !sqlQuery.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    {runningSql ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>กำลังรัน...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Run Query</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* SQL Result View */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  ผลลัพธ์คำสั่ง (Query Output):
+                </label>
+                <div className="p-4 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs leading-relaxed max-h-56 overflow-auto whitespace-pre border border-slate-800 shadow-inner">
+                  {sqlResult || "-- กดปุ่ม Run Query เพื่อดูผลลัพธ์ --"}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                หรือต่อผ่าน External URL: <code className="font-mono text-slate-600">{activeSqlDb.external_url}</code>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSqlModalOpen(false)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bind Database to Server Modal */}
+      {bindModalOpen && activeBindDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Link2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">ผูก Database กับเซิร์ฟเวอร์</h3>
+                  <p className="text-xs text-slate-500">Auto-Inject Environment Variables และรีสตาร์ตทันที</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setBindModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 leading-relaxed">
+                <p className="font-bold mb-1">🔗 ระบบจะดำเนินการดังนี้ให้อัตโนมัติ:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-indigo-800">
+                  <li>แทรกตัวแปร <code className="font-mono font-bold">DATABASE_URL</code>, <code className="font-mono font-bold">DB_URL</code>, <code className="font-mono font-bold">DB_HOST</code> เข้าเซิร์ฟเวอร์</li>
+                  <li>สั่งรีสตาร์ตเซิร์ฟเวอร์เพื่อให้เริ่มต่อเข้ากับ Database <span className="font-bold">"{activeBindDb.name}"</span> ทันที</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  เลือกเซิร์ฟเวอร์ที่ต้องการผูก:
+                </label>
+                {containers.filter(c => c.state === 'running').length === 0 ? (
+                  <p className="text-xs text-rose-500 p-3 rounded-lg bg-rose-50 border border-rose-200">
+                    ไม่พบเซิร์ฟเวอร์ที่กำลังออนไลน์อยู่ กรุณากด Start เซิร์ฟเวอร์ก่อน
+                  </p>
+                ) : (
+                  <select
+                    value={selectedTargetContainer}
+                    onChange={(e) => setSelectedTargetContainer(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    {containers.filter(c => c.state === 'running').map((c) => (
+                      <option key={c.id} value={c.id}>
+                        🚀 {getShortAppName(c.name, c.clean_name)} ({c.id.slice(0, 8)}) - {c.domain_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBindModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBind}
+                disabled={bindingServer || !selectedTargetContainer}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+              >
+                {bindingServer ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>กำลังผูกและรีสตาร์ต...</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-4 h-4" />
+                    <span>ผูกทันทีและ Restart</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

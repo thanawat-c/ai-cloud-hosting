@@ -29,5 +29,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/databases/:id/start", controllers.StartDatabase)
 		api.POST("/databases/:id/stop", controllers.StopDatabase)
 		api.DELETE("/databases/:id", controllers.DeleteDatabase)
+		api.POST("/databases/:id/query", controllers.QueryDatabase)
+		api.GET("/databases/:id/tables", controllers.GetDatabaseTables)
+		api.POST("/databases/:id/bind", controllers.BindDatabase)
 	}
 }

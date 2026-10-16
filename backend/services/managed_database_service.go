@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -308,3 +310,228 @@ func DeleteManagedDatabase(ctx context.Context, id uint) error {
 	config.DB.Model(&db).Update("status", "deleted")
 	return nil
 }
+
+// ExecSQLInDatabase รันคำสั่ง SQL หรือ Script ใน PostgreSQL Container ผ่าน psql
+func ExecSQLInDatabase(ctx context.Context, id uint, sqlQuery string) (string, error) {
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, id).Error; err != nil {
+		return "", fmt.Errorf("ไม่พบ Database: %w", err)
+	}
+
+	if db.Status != "running" {
+		return "", fmt.Errorf("Database กำลังหยุดทำงาน กรุณากด Start ก่อนสั่งรัน SQL")
+	}
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	// เรียกใช้ psql ภายใน Container โดยตรง (ใช้ Tty: true เพื่อไม่ให้มี header ไบนารีของ Docker)
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Cmd: []string{
+			"psql",
+			"-U", db.Username,
+			"-d", db.DBName,
+			"-c", sqlQuery,
+		},
+	}
+
+	execResp, err := cli.ContainerExecCreate(ctx, db.ContainerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("สร้าง Exec ไม่สำเร็จ: %w", err)
+	}
+
+	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{Tty: true})
+	if err != nil {
+		return "", fmt.Errorf("Attach Exec ไม่สำเร็จ: %w", err)
+	}
+	defer attachResp.Close()
+
+	outputBytes, err := io.ReadAll(attachResp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("อ่านผลลัพธ์ไม่สำเร็จ: %w", err)
+	}
+
+	outputStr := string(outputBytes)
+	outputStr = strings.ReplaceAll(outputStr, "\r", "")
+	return strings.TrimSpace(outputStr), nil
+}
+
+// ListDatabaseTables ดึงรายชื่อ Table ทั้งหมดใน Database
+func ListDatabaseTables(ctx context.Context, id uint) ([]string, error) {
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, id).Error; err != nil {
+		return nil, fmt.Errorf("ไม่พบ Database: %w", err)
+	}
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// ใช้ -t -A เพื่อให้คืนค่าเฉพาะชื่อตารางบรรทัดละ 1 ชื่อ ไม่มีขอบตารางและไม่มี header
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Cmd: []string{
+			"psql",
+			"-U", db.Username,
+			"-d", db.DBName,
+			"-t", "-A",
+			"-c", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;",
+		},
+	}
+
+	execResp, err := cli.ContainerExecCreate(ctx, db.ContainerID, execConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{Tty: true})
+	if err != nil {
+		return nil, err
+	}
+	defer attachResp.Close()
+
+	outputBytes, err := io.ReadAll(attachResp.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	rawOutput := strings.ReplaceAll(string(outputBytes), "\r", "")
+	lines := strings.Split(rawOutput, "\n")
+	var tables []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			tables = append(tables, line)
+		}
+	}
+	return tables, nil
+}
+
+// BindDatabaseToContainer ผูก Database เข้ากับคอนเทนเนอร์เซิร์ฟเวอร์ที่รันอยู่แล้ว และสั่งรีสตาร์ตให้อัตโนมัติ
+func BindDatabaseToContainer(ctx context.Context, dbID uint, targetContainerID string) error {
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, dbID).Error; err != nil {
+		return fmt.Errorf("ไม่พบ Database: %w", err)
+	}
+
+	currentEnvs, err := GetContainerEnv(ctx, targetContainerID)
+	if err != nil {
+		return fmt.Errorf("ไม่สามารถอ่านตัวแปรของเซิร์ฟเวอร์เป้าหมาย: %w", err)
+	}
+
+	dbAliases := []string{
+		fmt.Sprintf("DATABASE_URL=%s", db.InternalURL),
+		fmt.Sprintf("DB_URL=%s", db.InternalURL),
+		fmt.Sprintf("POSTGRES_URL=%s", db.InternalURL),
+		fmt.Sprintf("DB_HOST=%s", db.ContainerName),
+		"DB_PORT=5432",
+		fmt.Sprintf("DB_USER=%s", db.Username),
+		fmt.Sprintf("DB_PASSWORD=%s", db.Password),
+		fmt.Sprintf("DB_NAME=%s", db.DBName),
+	}
+
+	dbPrefixes := []string{"DATABASE_URL=", "DB_URL=", "POSTGRES_URL=", "DB_HOST=", "DB_PORT=", "DB_USER=", "DB_PASSWORD=", "DB_NAME="}
+	var newEnvs []string
+	for _, env := range currentEnvs {
+		hasPrefix := false
+		for _, prefix := range dbPrefixes {
+			if strings.HasPrefix(env, prefix) {
+				hasPrefix = true
+				break
+			}
+		}
+		if !hasPrefix {
+			newEnvs = append(newEnvs, env)
+		}
+	}
+	newEnvs = append(newEnvs, dbAliases...)
+
+	newID, err := UpdateContainerEnv(ctx, targetContainerID, strings.Join(newEnvs, "\n"))
+	if err != nil {
+		return fmt.Errorf("อัปเดตและเริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
+	}
+
+	var deploy models.Deployment
+	if err := config.DB.Where("container_id LIKE ?", targetContainerID[:8]+"%").First(&deploy).Error; err == nil {
+		config.DB.Model(&deploy).Updates(map[string]interface{}{
+			"container_id": newID[:12],
+			"status":       "running",
+			"last_error":   "",
+		})
+	}
+
+	return nil
+}
+
+// AutoExecuteRepoSQL ตรวจหาไฟล์ .sql ใน Repo แล้วรันเข้า Managed Database อัตโนมัติถ้ามีการผูกไว้
+func AutoExecuteRepoSQL(ctx context.Context, buildDir string, envVars string, logChan chan string) {
+	if strings.TrimSpace(envVars) == "" {
+		return
+	}
+
+	var runningDBs []models.ManagedDatabase
+	config.DB.Where("status = ?", "running").Find(&runningDBs)
+	if len(runningDBs) == 0 {
+		return
+	}
+
+	var targetDB *models.ManagedDatabase
+	for i, db := range runningDBs {
+		if strings.Contains(envVars, db.ContainerName) || strings.Contains(envVars, db.InternalURL) || (db.DBName != "" && strings.Contains(envVars, db.DBName)) {
+			targetDB = &runningDBs[i]
+			break
+		}
+	}
+
+	if targetDB == nil {
+		return
+	}
+
+	targetNames := map[string]bool{
+		"schema.sql": true, "init.sql": true, "database.sql": true,
+		"tables.sql": true, "db.sql": true, "create_tables.sql": true,
+	}
+
+	var foundSQLPath string
+	var sqlRelName string
+
+	_ = filepath.Walk(buildDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		base := strings.ToLower(info.Name())
+		if targetNames[base] {
+			foundSQLPath = path
+			rel, _ := filepath.Rel(buildDir, path)
+			sqlRelName = rel
+			return filepath.SkipAll
+		}
+		return nil
+	})
+
+	if foundSQLPath != "" {
+		sqlBytes, err := os.ReadFile(foundSQLPath)
+		if err == nil && len(strings.TrimSpace(string(sqlBytes))) > 0 {
+			logChan <- fmt.Sprintf("\n⚡ ตรวจพบไฟล์ SQL Schema: '%s'\n", sqlRelName)
+			logChan <- fmt.Sprintf("🔄 กำลังรันคำสั่ง SQL สร้าง Table ลงใน Database '%s' อัตโนมัติ...\n", targetDB.Name)
+			_, execErr := ExecSQLInDatabase(ctx, targetDB.ID, string(sqlBytes))
+			if execErr != nil {
+				logChan <- fmt.Sprintf("⚠️ การรัน SQL Schema: %v\n", execErr)
+			} else {
+				logChan <- fmt.Sprintf("✅ สร้างโครงสร้าง Tables ใน Database '%s' เรียบร้อยแล้ว!\n\n", targetDB.Name)
+			}
+		}
+	}
+}
+
+
