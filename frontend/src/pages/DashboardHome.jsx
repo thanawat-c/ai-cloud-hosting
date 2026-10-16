@@ -78,6 +78,19 @@ const DashboardHome = () => {
   const [webhookModalOpen, setWebhookModalOpen] = useState(false);
   const [activeWebhookContainer, setActiveWebhookContainer] = useState(null);
   const [pingingWebhook, setPingingWebhook] = useState(false);
+  const [customPublicUrl, setCustomPublicUrl] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ai_cloud_public_url') || '';
+    }
+    return '';
+  });
+
+  const handleUpdatePublicUrl = (url) => {
+    setCustomPublicUrl(url);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ai_cloud_public_url', url);
+    }
+  };
 
   // Notification State
   const prevStatesRef = useRef({});
@@ -1879,12 +1892,19 @@ const DashboardHome = () => {
                 </p>
               </div>
 
-              {/* Step 1: Payload URL */}
+              {/* Step 1: Payload URL & Localhost Tunnel Helper */}
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
                   <span>1. Payload URL:</span>
                   <button
-                    onClick={() => handleCopyUrl(activeWebhookContainer.webhook_url, `wh-url-${activeWebhookContainer.deployment_id}`)}
+                    onClick={() => {
+                      const urlToCopy = activeWebhookContainer 
+                        ? (customPublicUrl.trim() 
+                            ? `${customPublicUrl.trim().replace(/\/$/, '')}/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`
+                            : activeWebhookContainer.webhook_url)
+                        : '';
+                      handleCopyUrl(urlToCopy, `wh-url-${activeWebhookContainer.deployment_id}`);
+                    }}
                     className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium"
                   >
                     {copiedKey === `wh-url-${activeWebhookContainer.deployment_id}` ? (
@@ -1895,7 +1915,53 @@ const DashboardHome = () => {
                   </button>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-900 text-purple-300 font-mono text-xs select-all border border-slate-800 break-all">
-                  {activeWebhookContainer.webhook_url}
+                  {activeWebhookContainer && (customPublicUrl.trim() 
+                    ? `${customPublicUrl.trim().replace(/\/$/, '')}/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`
+                    : activeWebhookContainer.webhook_url)}
+                </div>
+
+                {/* Localhost Warning & Public Tunnel Helper */}
+                <div className="mt-2.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-900 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-950">ทำไมใส่ localhost ใน GitHub ไม่ได้?</p>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        GitHub เป็นเซิร์ฟเวอร์บนอินเทอร์เน็ต จะไม่สามารถเข้าถึง <code className="font-mono bg-amber-100 px-1 rounded">localhost</code> ของคอมพิวเตอร์คุณได้โดยตรง ต้องเปิดท่อ Tunnel ชั่วคราวด้วยคำสั่งด้านล่าง:
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* One-click command copy */}
+                  <div className="space-y-1.5 pt-1 border-t border-amber-200/60">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-slate-700">รันคำสั่งนี้ใน Terminal (ไม่ต้องติดตั้งอะไรเพิ่ม):</span>
+                      <button
+                        onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
+                        className="text-amber-800 hover:text-amber-950 font-semibold inline-flex items-center gap-1"
+                      >
+                        {copiedKey === 'cmd-localtunnel' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        คัดลอกคำสั่ง
+                      </button>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-amber-200 font-mono text-[11px] text-slate-800 flex items-center justify-between">
+                      <code>npx localtunnel --port 8080</code>
+                    </div>
+                  </div>
+
+                  {/* Public Domain input */}
+                  <div className="pt-1">
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      วาง Public URL ที่ได้จาก Terminal (เช่น https://xxxx.loca.lt หรือ https://xxxx.trycloudflare.com):
+                    </label>
+                    <input
+                      type="text"
+                      value={customPublicUrl}
+                      onChange={(e) => handleUpdatePublicUrl(e.target.value)}
+                      placeholder="https://xxxx.loca.lt"
+                      className="w-full px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
                 </div>
               </div>
 
