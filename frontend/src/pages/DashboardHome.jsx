@@ -1051,8 +1051,8 @@ const DashboardHome = () => {
                         {/* 1. Deployment / Project Name */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-5 h-5 bg-neutral-900 border border-neutral-800 rounded flex items-center justify-center text-white shrink-0">
-                              <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
+                            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                              <svg viewBox="0 0 76 65" fill="none" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" className="w-3.5 h-3.5 text-[#00df8f]">
                                 <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
                               </svg>
                             </div>
@@ -1123,10 +1123,10 @@ const DashboardHome = () => {
                               <span>DB Offline</span>
                             </div>
                           ) : isRunning ? (
-                            <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-                              <span>Ready</span>
-                              <span className="text-[11px] text-neutral-500 font-mono">
+                            <div className="flex items-center gap-1.5 text-xs font-mono">
+                              <span className="w-2 h-2 rounded-full bg-[#00df8f] shadow-[0_0_8px_rgba(0,223,143,0.5)] shrink-0"></span>
+                              <span className="text-white font-medium">Ready</span>
+                              <span className="text-[#888888] font-mono text-[11px] ml-1">
                                 {formatTimeAgo(item.deployed_at || item.created_at)}
                               </span>
                             </div>
@@ -1140,25 +1140,32 @@ const DashboardHome = () => {
 
                         {/* 4. Environment */}
                         <td className="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            <ArrowUpRight className="w-2.5 h-2.5" />
-                            Production
-                          </span>
+                          {isRunning ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-[#0070f3] text-white shadow-[0_0_12px_rgba(0,112,243,0.25)]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                              Production
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-[#888888] border border-[#333333] bg-transparent">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#666666]"></span>
+                              Production
+                            </span>
+                          )}
                         </td>
 
                         {/* 5. Commit */}
-                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-400">
-                          <div className="flex items-center gap-1.5 text-neutral-400">
-                            <span className="text-neutral-500 font-bold">-o-</span>
-                            <span>{item.id ? item.id.substring(0, 7) : 'head'}</span>
+                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[#666666] font-mono text-xs">-o-</span>
+                            <span className="text-[#a1a1a1] hover:text-white transition-colors">{item.id ? item.id.substring(0, 7) : 'head'}</span>
                           </div>
                         </td>
 
                         {/* 6. Branch */}
-                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-400">
+                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
                           <div className="flex items-center gap-1.5">
-                            <GitBranch className="w-3 h-3 text-neutral-500 shrink-0" />
-                            <span>main</span>
+                            <GitBranch className="w-3.5 h-3.5 text-[#666666] shrink-0" />
+                            <span className="text-[#a1a1a1] hover:text-white transition-colors">main</span>
                           </div>
                         </td>
 
@@ -1167,9 +1174,15 @@ const DashboardHome = () => {
                           {formatTimeAgo(item.deployed_at || item.created_at)}
                         </td>
 
-                        {/* 8. Menu (...) & Visit */}
+                        {/* 8. Menu (...) & Visit & Avatar */}
                         <td className="px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container">
-                          <div className="inline-flex items-center justify-end gap-1">
+                          <div className="inline-flex items-center justify-end gap-2.5">
+                            {/* Vercel Avatar with gradient border */}
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-500 p-[1.5px] shrink-0" title="Deployer: Kan">
+                              <div className="w-full h-full bg-black rounded-full flex items-center justify-center text-[9px] font-mono font-bold text-white">
+                                K
+                              </div>
+                            </div>
                             {item.domain_name && isRunning && (
                               <a
                                 href={`http://${item.domain_name}`}
