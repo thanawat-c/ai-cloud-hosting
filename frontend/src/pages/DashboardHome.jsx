@@ -1832,63 +1832,60 @@ const DashboardHome = () => {
       {/* Bind Database to Server Modal */}
       {bindModalOpen && activeBindDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  <Link2 className="w-5 h-5" />
+                  <Link2 className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">ผูก Database กับเซิร์ฟเวอร์</h3>
-                  <p className="text-xs text-slate-500">Auto-Inject Environment Variables และรีสตาร์ตทันที</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-800">เชื่อมต่อ Database</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 text-indigo-700 font-mono text-xs font-semibold">
+                    {activeBindDb.name}
+                  </span>
                 </div>
               </div>
               <button 
                 onClick={() => setBindModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 leading-relaxed">
-                <p className="font-bold mb-1">🔗 ระบบจะดำเนินการดังนี้ให้อัตโนมัติ:</p>
-                <ul className="list-disc list-inside space-y-0.5 text-indigo-800">
-                  <li>แทรกตัวแปร <code className="font-mono font-bold">DATABASE_URL</code>, <code className="font-mono font-bold">DB_URL</code>, <code className="font-mono font-bold">DB_HOST</code> เข้าเซิร์ฟเวอร์</li>
-                  <li>สั่งรีสตาร์ตเซิร์ฟเวอร์เพื่อให้เริ่มต่อเข้ากับ Database <span className="font-bold">"{activeBindDb.name}"</span> ทันที</li>
-                </ul>
-              </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  เลือกเซิร์ฟเวอร์ที่ต้องการผูก:
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  เลือกเซิร์ฟเวอร์เป้าหมาย:
                 </label>
                 {containers.filter(c => c.state === 'running').length === 0 ? (
-                  <p className="text-xs text-rose-500 p-3 rounded-lg bg-rose-50 border border-rose-200">
-                    ไม่พบเซิร์ฟเวอร์ที่กำลังออนไลน์อยู่ กรุณากด Start เซิร์ฟเวอร์ก่อน
+                  <p className="text-xs text-rose-600 p-3 rounded-xl bg-rose-50 border border-rose-200">
+                    ไม่พบเซิร์ฟเวอร์ที่กำลังออนไลน์อยู่ กรุณาเปิดเซิร์ฟเวอร์ก่อน
                   </p>
                 ) : (
                   <select
                     value={selectedTargetContainer}
                     onChange={(e) => setSelectedTargetContainer(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-colors"
                   >
                     {containers.filter(c => c.state === 'running').map((c) => (
                       <option key={c.id} value={c.id}>
-                        🚀 {getShortAppName(c.name, c.clean_name)} ({c.id.slice(0, 8)}) - {c.domain_name}
+                        {getShortAppName(c.name, c.clean_name)} ({c.id.slice(0, 8)})
                       </option>
                     ))}
                   </select>
                 )}
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  ระบบจะเพิ่ม <code className="font-mono text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">DATABASE_URL</code> ในเซิร์ฟเวอร์และรีสตาร์ตให้อัตโนมัติ
+                </p>
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setBindModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
                 ยกเลิก
               </button>
@@ -1896,17 +1893,17 @@ const DashboardHome = () => {
                 type="button"
                 onClick={handleConfirmBind}
                 disabled={bindingServer || !selectedTargetContainer}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
               >
                 {bindingServer ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังผูกและรีสตาร์ต...</span>
+                    <span>กำลังเชื่อมต่อ...</span>
                   </>
                 ) : (
                   <>
-                    <Link2 className="w-4 h-4" />
-                    <span>ผูกทันทีและ Restart</span>
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>เชื่อมต่อเซิร์ฟเวอร์</span>
                   </>
                 )}
               </button>
