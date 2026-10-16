@@ -23,15 +23,15 @@ import (
 // BuildImage packages the buildDir and builds a docker image
 func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, customImageName ...string) (string, error) {
 
-	logChan <- "กำลังแพ็กโฟลเดอร์เพื่อส่งให้ Docker...\n"
+	logChan <- "Packaging workspace for Docker engine...\n"
 	tar, err := archive.TarWithOptions(buildDir, &archive.TarOptions{})
 	if err != nil {
-		return "", fmt.Errorf("แพ็กไฟล์ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to package build directory: %w", err)
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return "", fmt.Errorf("เชื่อมต่อ Docker ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to connect to Docker daemon: %w", err)
 	}
 	defer cli.Close()
 
@@ -39,14 +39,14 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, cus
 	if len(customImageName) > 0 && customImageName[0] != "" {
 		imageName = customImageName[0]
 	}
-	logChan <- fmt.Sprintf("กำลัง Build Image ชื่อ: %s\n", imageName)
+	logChan <- fmt.Sprintf("Building Docker image: %s\n", imageName)
 
 	buildResponse, err := cli.ImageBuild(ctx, tar, types.ImageBuildOptions{
 		Tags:   []string{imageName},
 		Remove: true,
 	})
 	if err != nil {
-		return "", fmt.Errorf("Build Image ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to start Docker image build: %w", err)
 	}
 	defer buildResponse.Body.Close()
 
@@ -58,23 +58,23 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, cus
 			if err == io.EOF {
 				break
 			}
-			return "", fmt.Errorf("อ่านผลลัพธ์การ Build ไม่สำเร็จ: %w", err)
+			return "", fmt.Errorf("failed to parse build stream: %w", err)
 		}
 
-		// ถ้าเจอกุญแจคำว่า "error" ใน Stream แปลว่า Build พัง!
+		// If error field exists, build failed
 		if errMsg, ok := msg["error"]; ok {
-			return "", fmt.Errorf("Docker Build ล้มเหลว: %v", errMsg)
+			return "", fmt.Errorf("Docker build failed: %v", errMsg)
 		}
 
-		// พิมพ์ Log การ Build ออกทาง Terminal ปกติ
+		// Stream logs to console and log channel
 		if streamMsg, ok := msg["stream"]; ok {
 			str := fmt.Sprintf("%v", streamMsg)
-			fmt.Print(str) // พิมพ์ลงจอเรา
-			logChan <- str // ดันเข้าท่อส่งไปให้ลูกค้า!
+			fmt.Print(str)
+			logChan <- str
 		}
 	}
 
-	logChan <- fmt.Sprintf("Build Image เสร็จสมบูรณ์! ได้ Image ชื่อ: %s\n", imageName)
+	logChan <- fmt.Sprintf("Successfully built Docker image: %s\n", imageName)
 	return imageName, nil
 }
 
@@ -82,7 +82,7 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, cus
 func CreateAndStartContainer(ctx context.Context, imageName string, envVars string, targetPort string) (string, string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return "", "", fmt.Errorf("เชื่อมต่อ Docker ไม่สำเร็จ: %w", err)
+		return "", "", fmt.Errorf("failed to connect to Docker daemon: %w", err)
 	}
 	defer cli.Close()
 

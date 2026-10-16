@@ -524,13 +524,13 @@ func AutoExecuteRepoSQL(ctx context.Context, buildDir string, envVars string, lo
 	if foundSQLPath != "" {
 		sqlBytes, err := os.ReadFile(foundSQLPath)
 		if err == nil && len(strings.TrimSpace(string(sqlBytes))) > 0 {
-			logChan <- fmt.Sprintf("\n⚡ ตรวจพบไฟล์ SQL Schema: '%s'\n", sqlRelName)
-			logChan <- fmt.Sprintf("🔄 กำลังรันคำสั่ง SQL สร้าง Table ลงใน Database '%s' อัตโนมัติ...\n", targetDB.Name)
+			logChan <- fmt.Sprintf("\n⚡ SQL schema detected: '%s'\n", sqlRelName)
+			logChan <- fmt.Sprintf("🔄 Executing SQL schema against database '%s'...\n", targetDB.Name)
 			_, execErr := ExecSQLInDatabase(ctx, targetDB.ID, string(sqlBytes))
 			if execErr != nil {
-				logChan <- fmt.Sprintf("⚠️ การรัน SQL Schema: %v\n", execErr)
+				logChan <- fmt.Sprintf("⚠️ SQL schema execution warning: %v\n", execErr)
 			} else {
-				logChan <- fmt.Sprintf("✅ สร้างโครงสร้าง Tables ใน Database '%s' เรียบร้อยแล้ว!\n\n", targetDB.Name)
+				logChan <- fmt.Sprintf("✅ SQL schema applied successfully to '%s'!\n\n", targetDB.Name)
 			}
 		}
 	}
