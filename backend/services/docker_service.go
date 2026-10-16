@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // BuildImage packages the buildDir and builds a docker image
@@ -290,20 +292,32 @@ func GetContainerLogs(ctx context.Context, containerID string) (string, error) {
 	}
 	defer cli.Close()
 
-	logReader, err := cli.ContainerLogs(ctx, containerID, container.LogsOptions{ShowStdout: true, ShowStderr: true})
-
+	logReader, err := cli.ContainerLogs(ctx, containerID, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       "150",
+	})
 	if err != nil {
 		return "", err
 	}
-
 	defer logReader.Close()
 
-	logs, err := io.ReadAll(logReader)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdoutBuf, &stderrBuf, logReader)
 	if err != nil {
-		return "", err
+		// Fallback for tty containers or non-multiplexed logs
+		rawLogs, _ := io.ReadAll(logReader)
+		return string(rawLogs), nil
 	}
 
-	return string(logs), nil
+	result := stdoutBuf.String()
+	if stderrBuf.Len() > 0 {
+		if result != "" {
+			result += "\n"
+		}
+		result += stderrBuf.String()
+	}
+	return result, nil
 }
 
 type ContainerStatsData struct {

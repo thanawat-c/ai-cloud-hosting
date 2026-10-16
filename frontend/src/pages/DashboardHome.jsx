@@ -45,6 +45,30 @@ const formatTimeAgo = (dateStr) => {
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 };
 
+// Extract key error message / root cause from stack trace
+const extractCrashRootCause = (logText) => {
+  if (!logText) return 'No error details recorded';
+  const clean = logText.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '');
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (
+      line.startsWith('Error:') || 
+      line.startsWith('Error ') || 
+      line.includes('PrismaClient') ||
+      line.includes('Exception:') ||
+      line.includes('panic:') ||
+      line.includes('fatal:') ||
+      line.includes('failed:') ||
+      line.includes('connect ECONNREFUSED')
+    ) {
+      return line;
+    }
+  }
+  return lines[0] || 'Unknown runtime error';
+};
+
 // Format full date and time
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';
@@ -1000,10 +1024,9 @@ const DashboardHome = () => {
           </Link>
         </div>
       ) : (
-        <div className="relative z-10">
-          <div className="w-full">
-            <div className="bg-black border border-neutral-800 rounded-lg relative overflow-visible">
-              <table className="w-full table-auto text-left">
+        <div className="relative z-10 w-full">
+          <div className="bg-black border border-neutral-800 rounded-lg overflow-x-auto min-h-[200px]">
+            <table className="w-full min-w-[850px] table-auto text-left">
                 <thead className="bg-neutral-950/90 border-b border-neutral-800">
                   <tr>
                     <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
@@ -1331,7 +1354,6 @@ const DashboardHome = () => {
               </table>
             </div>
           </div>
-        </div>
       )}
       </div>
       )}
@@ -1699,10 +1721,57 @@ const DashboardHome = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-3">
-              <p className="text-xs text-neutral-400 font-medium">System error message:</p>
-              <div className="p-4 rounded-xl bg-slate-900 text-rose-300 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto whitespace-pre-wrap break-words border border-slate-800 shadow-inner">
-                {activeErrorDetails}
+            <div className="p-6 space-y-4">
+              {/* 1. Highlighted Latest Root Cause Error on TOP */}
+              {(() => {
+                const rootCause = extractCrashRootCause(activeErrorDetails);
+                return (
+                  <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-900/60 text-rose-200 font-mono text-xs flex items-start gap-3 shadow-inner">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-bold tracking-wider uppercase text-rose-400">
+                          Latest Root Cause Error (ข้อผิดพลาดล่าสุด)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(rootCause);
+                            toast.success("Error copied to clipboard");
+                          }}
+                          className="text-[10px] text-rose-300 hover:text-white flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded bg-rose-900/50 border border-rose-800 cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </button>
+                      </div>
+                      <div className="font-semibold text-rose-100 text-xs break-words leading-relaxed">
+                        {rootCause}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 2. Full Trace / Details */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-neutral-400 font-medium">Full Crash Log & Stack Trace:</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeErrorDetails || '');
+                      toast.success("Full logs copied to clipboard");
+                    }}
+                    className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy Full Logs</span>
+                  </button>
+                </div>
+                <div className="p-4 rounded-lg bg-black text-neutral-300 font-mono text-xs leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap break-words border border-neutral-800 shadow-inner">
+                  {activeErrorDetails?.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '') || 'No details available'}
+                </div>
               </div>
             </div>
 
@@ -1710,7 +1779,7 @@ const DashboardHome = () => {
               <button
                 type="button"
                 onClick={() => setErrorModalOpen(false)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                className="px-4 py-2 bg-white hover:bg-neutral-200 text-black rounded-md text-xs font-semibold transition-colors cursor-pointer"
               >
                 Close
               </button>
