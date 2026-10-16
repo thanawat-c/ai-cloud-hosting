@@ -298,7 +298,7 @@ const DeployForm = () => {
                 </div>
               ) : (
                 <p className="text-xs text-slate-500">
-                  ✓ ไม่พบตัวแปรจำเป็นพิเศษที่ต้องระบุเพิ่ม สามารถกด Deploy ได้ทันที
+                  ไม่พบตัวแปรจำเป็นพิเศษ สามารถกด Deploy ได้ทันที
                 </p>
               )}
 
@@ -377,12 +377,12 @@ const DeployForm = () => {
                       <option value="">-- ไม่เชื่อมต่อ (ระบุ DATABASE_URL เอง หรือไม่ใช้ DB) --</option>
                       {databases.map(db => (
                         <option key={db.id} value={db.id}>
-                          📦 {db.name} (PostgreSQL 16 - Host Port :{db.host_port}) [{db.status}]
+                          {db.name} (Port :{db.host_port}) [{db.status}]
                         </option>
                       ))}
                     </select>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      💡 เมื่อเลือก ระบบจะกรอก DATABASE_URL (Internal Container URL) ลงใน .env ให้อัตโนมัติ
+                      ระบบจะเพิ่ม DATABASE_URL ลงใน .env ให้อัตโนมัติ
                     </p>
                   </div>
                 )}
@@ -429,7 +429,7 @@ const DeployForm = () => {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    🔒 Token จะถูกส่งต่ออย่างปลอดภัย และไม่ถูกบันทึกเปิดเผยใน Log
+                    Token ถูกเข้ารหัสอย่างปลอดภัยและไม่แสดงใน Log
                   </p>
                 </div>
 

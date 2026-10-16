@@ -178,7 +178,7 @@ const DashboardHome = () => {
         toast.success('เปิด Desktop Alert สำเร็จ!', {
           description: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง',
         });
-        new Notification('🔔 เปิดการแจ้งเตือนสำเร็จ', {
+        new Notification('เปิดการแจ้งเตือนสำเร็จ', {
           body: 'ระบบจะส่งการแจ้งเตือนทันทีเมื่อตรวจพบ Server ขัดข้องหรือดับลง (Crashed)',
         });
       } else {
@@ -211,17 +211,17 @@ const DashboardHome = () => {
           if (prevState === 'running' && (currentState === 'exited' || currentState === 'failed')) {
             const shortName = getShortAppName(c.name, c.clean_name);
 
-            // 1. แจ้งเตือนแบบ Toast บนหน้าจอเว็บทันที (ไม่พลาดแน่นอน)
-            toast.error(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
-              description: `Service หยุดทำงานกะทันหัน (${currentState}) กรุณาตรวจสอบ Log`,
+            // 1. แจ้งเตือนแบบ Toast บนหน้าจอเว็บทันที
+            toast.error(`เซิร์ฟเวอร์หยุดทำงาน (${shortName})`, {
+              description: `Service ขัดข้อง (${currentState}) กรุณาตรวจสอบ Log`,
               duration: 8000,
             });
 
             // 2. แจ้งเตือนแบบ Desktop Notification บน macOS/Windows
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`🚨 เซิร์ฟเวอร์ดับ! (${shortName})`, {
-                  body: `Service: ${c.name} หยุดทำงานกะทันหัน (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
+                new Notification(`เซิร์ฟเวอร์หยุดทำงาน (${shortName})`, {
+                  body: `Service: ${c.name} ขัดข้อง (${currentState})\nกรุณาเข้าสู่ Dashboard เพื่อดูสาเหตุ Error`,
                 });
               } catch (notifErr) {
                 console.error('Desktop Notification error:', notifErr);
@@ -236,15 +236,15 @@ const DashboardHome = () => {
             const shortName = getShortAppName(c.name, c.clean_name);
             const dbName = c.linked_db_name || 'Database';
 
-            toast.warning(`⚠️ ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
-              description: `Database "${dbName}" หยุดทำงานอยู่ ทำให้ Service ไม่สามารถเข้าถึงข้อมูลได้ (Error 500)`,
+            toast.warning(`ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
+              description: `Database "${dbName}" หยุดทำงานอยู่ ทำให้ Service ไม่สามารถเข้าถึงข้อมูลได้`,
               duration: 8000,
             });
 
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`⚠️ ฐานข้อมูลหลุดการเชื่อมต่อ! (${shortName})`, {
-                  body: `Database: ${dbName} หยุดทำงานอยู่ อาจทำให้ API ตอบกลับเป็น Error 500`,
+                new Notification(`ฐานข้อมูลหลุดการเชื่อมต่อ (${shortName})`, {
+                  body: `Database: ${dbName} หยุดทำงานอยู่`,
                 });
               } catch (notifErr) {
                 console.error('Desktop Notification error:', notifErr);
@@ -429,10 +429,10 @@ const DashboardHome = () => {
           setSqlTables(tblData.tables || []);
         }
       } else {
-        setSqlResult(`❌ ข้อผิดพลาด: ${data.error || 'Query failed'}`);
+        setSqlResult(`ข้อผิดพลาด: ${data.error || 'Query failed'}`);
       }
     } catch (err) {
-      setSqlResult(`❌ การเชื่อมต่อล้มเหลว: ${err.message}`);
+      setSqlResult(`การเชื่อมต่อล้มเหลว: ${err.message}`);
     } finally {
       setRunningSql(false);
     }
@@ -696,7 +696,7 @@ const DashboardHome = () => {
           description: "กำลังดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่",
         });
 
-        // 1. 🪄 หลอกตาผู้ใช้! สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที
+        // 1. สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที (Optimistic UI)
         setContainers(prev => prev.map(c => 
           c.id === id ? { ...c, state: 'redeploying' } : c
         ));
@@ -707,7 +707,7 @@ const DashboardHome = () => {
           });
           
           if (response.ok) {
-            // 2. 🕵️‍♂️ สั่งให้เบราว์เซอร์แอบยิงไปเช็คข้อมูลใหม่ทุกๆ 3 วินาที (Polling)
+            // 2. เช็คข้อมูลใหม่เป็นระยะ (Polling)
             const checkInterval = setInterval(() => {
               fetchContainers(); 
             }, 3000);
@@ -839,11 +839,11 @@ const DashboardHome = () => {
               <AlertTriangle className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h4 className="font-semibold text-rose-950 text-sm flex items-center gap-2">
-                ตรวจพบเซิร์ฟเวอร์ขัดข้อง ({crashedContainers.length} Service ดับลงกะทันหัน)
+              <h4 className="font-semibold text-rose-950 text-sm">
+                ตรวจพบเซิร์ฟเวอร์หยุดทำงาน ({crashedContainers.length} Service)
               </h4>
               <p className="text-xs text-rose-700 mt-0.5">
-                โปรดคลิกที่ปุ่ม <span className="font-semibold text-rose-800">[🔴 Crashed Logs]</span> ในตารางด้านล่างเพื่อดูสาเหตุ หรือกดปุ่มสตาร์ตเพื่อเริ่มทำงานใหม่
+                คลิกปุ่ม <span className="font-semibold text-rose-800">[Crashed Logs]</span> ในตารางเพื่อดูสาเหตุ หรือกดสตาร์ตเพื่อเริ่มทำงานใหม่
               </p>
             </div>
           </div>
@@ -865,11 +865,11 @@ const DashboardHome = () => {
               <Database className="w-5 h-5 animate-pulse text-amber-600" />
             </div>
             <div>
-              <h4 className="font-semibold text-amber-950 text-sm flex items-center gap-2">
-                ⚠️ ตรวจพบฐานข้อมูลหยุดทำงาน ({dbDisconnectedContainers.length} Service เชื่อมต่อ DB ไม่ได้)
+              <h4 className="font-semibold text-amber-950 text-sm">
+                ฐานข้อมูลหยุดทำงาน ({dbDisconnectedContainers.length} Service เชื่อมต่อไม่ได้)
               </h4>
               <p className="text-xs text-amber-800 mt-0.5">
-                Service <span className="font-bold">{dbDisconnectedContainers.map(c => getShortAppName(c.name, c.clean_name)).join(', ')}</span> กำลังทำงาน แต่ฐานข้อมูล <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> หยุดทำงานอยู่ อาจส่งผลให้ระบบตอบกลับเป็น Error 500
+                ฐานข้อมูล <span className="font-bold">({dbDisconnectedContainers[0].linked_db_name || 'Database'})</span> หยุดทำงานอยู่ อาจทำให้ Service ตอบกลับเป็น Error 500
               </p>
             </div>
           </div>
@@ -964,10 +964,10 @@ const DashboardHome = () => {
                           <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5 flex-wrap">
                             <span>
                               {item.service_type === 'backend' || item.name?.includes('(Backend)') 
-                                ? '⚙️ API Server' 
+                                ? 'API Server' 
                                 : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
-                                ? '🌐 Web UI'
-                                : '📦 Standalone'}
+                                ? 'Web UI'
+                                : 'Standalone'}
                             </span>
                             <span>•</span>
                             <span 
@@ -1282,13 +1282,13 @@ const DashboardHome = () => {
                       {/* Specs Badges */}
                       <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[10px] font-semibold text-slate-600">
                         <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100/60">
-                          ⚡ 512 MB Cap
+                          RAM: 512 MB
                         </span>
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100/60">
-                          🔌 Port: {db.host_port}
+                          Port: {db.host_port}
                         </span>
                         <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                          💾 Named Volume
+                          Volume: Persistent
                         </span>
                       </div>
 
@@ -1603,54 +1603,54 @@ const DashboardHome = () => {
                 </div>
 
                 {/* Resource Summary Specs Card */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <p className="text-xs font-semibold text-slate-700">ข้อกำหนดทรัพยากร (Resource Allocation):</p>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <p className="text-xs font-semibold text-slate-700">สเปกทรัพยากร:</p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">RAM HARD CAP</div>
+                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">RAM CAP</div>
                       <div className="text-xs font-bold text-indigo-600 mt-0.5">512 MB Max</div>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
+                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
                       <div className="text-[10px] text-slate-400 font-medium">CPU LIMIT</div>
                       <div className="text-xs font-bold text-slate-700 mt-0.5">1.0 Core</div>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">PERSISTENT STORAGE</div>
+                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">STORAGE</div>
                       <div className="text-xs font-bold text-emerald-600 mt-0.5">Docker Volume</div>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/60">
-                      <div className="text-[10px] text-slate-400 font-medium">DOCKER NETWORK</div>
+                    <div className="p-2 rounded-lg bg-white border border-slate-200/60">
+                      <div className="text-[10px] text-slate-400 font-medium">NETWORK</div>
                       <div className="text-xs font-bold text-slate-700 mt-0.5">ai-cloud-network</div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-500 pt-1 leading-relaxed">
-                    💡 ระบบจะสร้าง Volume ถาวรแยกเฉพาะก้อน และผูกพอร์ตภายนอกอัตโนมัติ (เริ่มที่ 5433)
+                  <p className="text-[11px] text-slate-400 pt-0.5 leading-relaxed">
+                    ระบบจะสร้าง Volume ถาวรและกำหนดพอร์ตภายนอกให้อัตโนมัติ (เริ่มที่ 5433)
                   </p>
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setCreateDbModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={creatingDb || !newDbName.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
                 >
                   {creatingDb ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>กำลังสร้าง Instance...</span>
+                      <span>กำลังสร้าง...</span>
                     </>
                   ) : (
                     <>
-                      <Plus className="w-4 h-4" />
-                      <span>สร้าง Database ทันที</span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>สร้าง Database</span>
                     </>
                   )}
                 </button>
@@ -1914,31 +1914,30 @@ const DashboardHome = () => {
       {/* Restore Database Modal */}
       {restoreModalOpen && activeRestoreDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
-                  <Upload className="w-5 h-5" />
+                  <Upload className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">กู้คืนข้อมูล (Restore Database)</h3>
-                  <p className="text-xs text-slate-500">เป้าหมาย: {activeRestoreDb.name} ({activeRestoreDb.type})</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-800">กู้คืน Database</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono text-xs font-semibold">
+                    {activeRestoreDb.name}
+                  </span>
                 </div>
               </div>
               <button 
                 onClick={() => setRestoreModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 leading-relaxed">
-                <p className="font-bold mb-1">⚠️ คำเตือนการกู้คืนข้อมูล:</p>
-                <p className="text-amber-800">
-                  ไฟล์ SQL จะถูกนำไปรันในฐานข้อมูลโดยตรง หากไฟล์มีคำสั่ง <code className="font-mono font-bold">DROP TABLE</code> ข้อมูลเดิมจะถูกลบและแทนที่ด้วยข้อมูลจากไฟล์ Backup
-                </p>
+              <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                คำสั่ง SQL ในไฟล์จะถูกนำไปรันในฐานข้อมูลโดยตรง โปรดตรวจสอบไฟล์ก่อนกู้คืน
               </div>
 
               <div>
@@ -1953,14 +1952,14 @@ const DashboardHome = () => {
                 />
                 {restoreFile && (
                   <p className="text-[11px] text-emerald-600 mt-1 font-medium">
-                    ✓ เลือกไฟล์: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                    ไฟล์ที่เลือก: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
               </div>
 
               {restoreResult && (
                 <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-600">ผลการทำงาน (Output):</span>
+                  <span className="text-[11px] font-semibold text-slate-600">ผลการทำงาน:</span>
                   <div className="p-3 rounded-xl bg-slate-900 text-slate-200 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
                     {restoreResult}
                   </div>
@@ -1968,29 +1967,29 @@ const DashboardHome = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setRestoreModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors cursor-pointer"
               >
-                ปิด
+                ยกเลิก
               </button>
               <button
                 type="button"
                 onClick={handleExecuteRestore}
                 disabled={restoring || !restoreFile}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
               >
                 {restoring ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>กำลังกู้คืนข้อมูล...</span>
+                    <span>กำลังกู้คืน...</span>
                   </>
                 ) : (
                   <>
-                    <Upload className="w-4 h-4" />
-                    <span>เริ่มกู้คืน (Restore Now)</span>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>กู้คืนข้อมูล</span>
                   </>
                 )}
               </button>
@@ -2001,45 +2000,34 @@ const DashboardHome = () => {
       {/* GitHub Webhook Setup Modal */}
       {webhookModalOpen && activeWebhookContainer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
-                  <Zap className="w-5 h-5" />
+                  <Zap className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">GitHub Auto-Deploy Webhook</h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
-                    <span>Service: {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}</span>
-                    <span>•</span>
-                    <span className="inline-flex items-center gap-1 text-indigo-600 font-medium">
-                      <Clock className="w-3 h-3 text-indigo-500 shrink-0" />
-                      <span>Deploy ล่าสุด: {formatTimeAgo(activeWebhookContainer.deployed_at || activeWebhookContainer.updated_at || activeWebhookContainer.created_at)}</span>
-                    </span>
-                  </p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-800">Webhook Auto-Deploy</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-mono text-xs font-semibold">
+                    {getShortAppName(activeWebhookContainer.name, activeWebhookContainer.clean_name)}
+                  </span>
                 </div>
               </div>
               <button 
                 onClick={() => setWebhookModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="p-3.5 rounded-xl bg-purple-50/80 border border-purple-100 text-xs text-purple-900 leading-relaxed">
-                <p className="font-bold mb-1">⚡ เมื่อคุณ Git Push โค้ดใหม่เข้า GitHub:</p>
-                <p className="text-purple-800">
-                  GitHub จะส่งสัญญาณมาที่ URL ด้านล่าง เพื่อสั่งให้ AI-Cloud Platform ดึงโค้ดล่าสุด บิลด์ Image ใหม่ และสลับรันให้อัตโนมัติในทันที (Zero-effort CI/CD)
-                </p>
-              </div>
-
-              {/* Step 1: Payload URL & Localhost Tunnel Helper */}
+              {/* Step 1: Payload URL */}
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
                   <span>1. Payload URL:</span>
                   <button
+                    type="button"
                     onClick={() => {
                       const urlToCopy = activeWebhookContainer 
                         ? (customPublicUrl.trim() 
@@ -2048,7 +2036,7 @@ const DashboardHome = () => {
                         : '';
                       handleCopyUrl(urlToCopy, `wh-url-${activeWebhookContainer.deployment_id}`);
                     }}
-                    className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium"
+                    className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium cursor-pointer"
                   >
                     {copiedKey === `wh-url-${activeWebhookContainer.deployment_id}` ? (
                       <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
@@ -2063,52 +2051,33 @@ const DashboardHome = () => {
                     : activeWebhookContainer.webhook_url)}
                 </div>
 
-                {/* Localhost Warning & Public Tunnel Helper */}
-                <div className="mt-2.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-900 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-amber-950">ทำไมใส่ localhost ใน GitHub ไม่ได้?</p>
-                      <p className="text-[11px] text-amber-800 mt-0.5">
-                        GitHub เป็นเซิร์ฟเวอร์บนอินเทอร์เน็ต จะไม่สามารถเข้าถึง <code className="font-mono bg-amber-100 px-1 rounded">localhost</code> ของคอมพิวเตอร์คุณได้โดยตรง ต้องเปิดท่อ Tunnel ชั่วคราวด้วยคำสั่งด้านล่าง:
-                      </p>
-                    </div>
+                {/* Localhost Tunnel Helper */}
+                <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600 font-medium">คำสั่งเปิด Public Tunnel (สำหรับ Localhost):</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
+                      className="text-purple-700 hover:text-purple-900 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedKey === 'cmd-localtunnel' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                      คัดลอกคำสั่ง
+                    </button>
                   </div>
-
-                  {/* One-click command copy */}
-                  <div className="space-y-1.5 pt-1 border-t border-amber-200/60">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-slate-700">รันคำสั่งนี้ใน Terminal (ไม่ต้องติดตั้งอะไรเพิ่ม):</span>
-                      <button
-                        onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
-                        className="text-amber-800 hover:text-amber-950 font-semibold inline-flex items-center gap-1"
-                      >
-                        {copiedKey === 'cmd-localtunnel' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                        คัดลอกคำสั่ง
-                      </button>
-                    </div>
-                    <div className="p-2 bg-white rounded-lg border border-amber-200 font-mono text-[11px] text-slate-800 flex items-center justify-between">
-                      <code>npx localtunnel --port 8080</code>
-                    </div>
+                  <div className="p-2 bg-white rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800">
+                    <code>npx localtunnel --port 8080</code>
                   </div>
-
-                  {/* Public Domain input */}
-                  <div className="pt-1">
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      วาง Public URL ที่ได้จาก Terminal (เช่น https://xxxx.loca.lt หรือ https://xxxx.trycloudflare.com):
-                    </label>
-                    <input
-                      type="text"
-                      value={customPublicUrl}
-                      onChange={(e) => handleUpdatePublicUrl(e.target.value)}
-                      placeholder="https://xxxx.loca.lt"
-                      className="w-full px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={customPublicUrl}
+                    onChange={(e) => handleUpdatePublicUrl(e.target.value)}
+                    placeholder="วาง Public URL ที่ได้ เช่น https://xxxx.loca.lt"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
                 </div>
               </div>
 
-              {/* Step 2: Content type */}
+              {/* Step 2 & 3 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className="block text-xs font-semibold text-slate-700 mb-1.5">2. Content type:</span>
@@ -2117,13 +2086,13 @@ const DashboardHome = () => {
                   </div>
                 </div>
 
-                {/* Step 3: Secret */}
                 <div>
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
-                    <span>3. Secret (แนะนำ):</span>
+                    <span>3. Secret:</span>
                     <button
+                      type="button"
                       onClick={() => handleCopyUrl(activeWebhookContainer.webhook_secret, `wh-sec-${activeWebhookContainer.deployment_id}`)}
-                      className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium"
+                      className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 font-medium cursor-pointer"
                     >
                       {copiedKey === `wh-sec-${activeWebhookContainer.deployment_id}` ? (
                         <><Check className="w-3.5 h-3.5 text-emerald-600" /> คัดลอกแล้ว</>
@@ -2138,10 +2107,10 @@ const DashboardHome = () => {
                 </div>
               </div>
 
-              {/* Step 4: Event Trigger */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                <span className="font-semibold text-slate-800">4. Which events would you like to trigger this webhook?</span>
-                <p>เลือก: <span className="font-bold text-indigo-700">Just the push event</span> (สั่ง Deploy เมื่อมีคน Push โค้ด)</p>
+              {/* Step 4: Event */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                <span className="font-medium text-slate-700">4. Event:</span>
+                <span className="font-semibold text-indigo-700">Just the push event</span>
               </div>
 
               {/* GitHub Link Guide */}
@@ -2151,10 +2120,10 @@ const DashboardHome = () => {
                     href={`${activeWebhookContainer.clean_name.replace(/\.git$/, '')}/settings/hooks`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium underline"
+                    className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium underline"
                   >
-                    <span>เปิดหน้า GitHub Webhooks ของ Repo นี้</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>เปิดหน้า Webhooks ใน GitHub</span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}
