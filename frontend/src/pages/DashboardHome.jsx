@@ -1025,7 +1025,7 @@ const DashboardHome = () => {
         </div>
       ) : (
         <div className="relative z-10 w-full">
-          <div className="bg-black border border-neutral-800 rounded-lg overflow-x-auto min-h-[200px]">
+          <div className="bg-black border border-neutral-800 rounded-lg overflow-visible">
             <table className="w-full table-auto text-left">
                 <thead className="bg-neutral-950/90 border-b border-neutral-800">
                   <tr>
@@ -1070,7 +1070,7 @@ const DashboardHome = () => {
                       : 'Production Service • Docker Container';
 
                     return (
-                      <tr key={item.id} className="hover:bg-neutral-900/40 transition-colors group">
+                      <tr key={item.id} className={`hover:bg-neutral-900/40 transition-colors group ${isMenuOpen ? 'relative z-30' : ''}`}>
                         {/* 1. Deployment / Project Name with Tooltip */}
                         <td className="px-4 py-3.5 max-w-[180px] sm:max-w-[220px] lg:max-w-[260px]">
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1202,7 +1202,7 @@ const DashboardHome = () => {
                         </td>
 
                         {/* 8. Menu (...) & Visit & Avatar */}
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container">
+                        <td className={`px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container ${isMenuOpen ? 'z-40' : ''}`}>
                           <div className="inline-flex items-center justify-end gap-2.5">
                             {/* Vercel Avatar with gradient border */}
                             <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-500 p-[1.5px] shrink-0" title="Deployer: Kan">
