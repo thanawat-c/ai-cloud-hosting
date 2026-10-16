@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send, MoreHorizontal, ArrowUpRight, GitCommit } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Extract short repository name, e.g. mock-api-server from git URL
@@ -62,6 +62,17 @@ const DashboardHome = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'storage' ? 'storage' : 'deployments';
   const [containers, setContainers] = useState([]);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (!e.target.closest('.dropdown-menu-container')) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [logModalOpen, setLogModalOpen] = useState(false);
@@ -991,345 +1002,318 @@ const DashboardHome = () => {
       ) : (
         <div className="relative z-10">
           <div className="w-full">
-            <div className="overflow-hidden bg-black border border-neutral-800 rounded-lg">
-              <table className="w-full table-auto divide-y divide-neutral-800 text-left">
-                <thead className="bg-neutral-950/90">
+            <div className="bg-black border border-neutral-800 rounded-lg relative overflow-visible">
+              <table className="w-full table-auto text-left">
+                <thead className="bg-neutral-950/90 border-b border-neutral-800">
                   <tr>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-20">ID</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">Service / App</th>
-                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-36">Image</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-28">Status</th>
-                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-36">Last Deployed</th>
-                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32">Usage</th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32 whitespace-nowrap">URL</th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-32">Actions</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Deployment
+                    </th>
+                    <th scope="col" className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Description / Commit
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="hidden sm:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Environment
+                    </th>
+                    <th scope="col" className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Commit
+                    </th>
+                    <th scope="col" className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Branch
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                      Age
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-20">
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-900 bg-black">
-                  {containers.map((item) => (
-                    <tr key={item.id} className="hover:bg-neutral-900/50 transition-colors group">
-                      {/* ID */}
-                      <td className="px-3 py-3">
-                        <div className="flex items-center text-xs font-mono text-neutral-400">
-                          <Terminal className="w-3.5 h-3.5 mr-1 text-neutral-500 shrink-0" />
-                          <span className="truncate max-w-[50px]" title={item.id}>{item.id ? item.id.substring(0, 7) : '-'}</span>
-                        </div>
-                      </td>
+                  {containers.map((item) => {
+                    const isRunning = item.state === 'running';
+                    const isCrashed = item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting';
+                    const isUpdating = item.state === 'redeploying';
+                    const isDbStopped = isRunning && item.is_db_stopped;
+                    const shortName = getShortAppName(item.name, item.clean_name);
+                    const isMenuOpen = activeMenuId === item.id;
 
-                      {/* Service / App */}
-                      <td className="px-3 py-3">
-                        <div className="flex flex-col gap-0.5 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                <Database className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-                                Backend API
-                              </span>
-                            ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                <Globe className="w-2.5 h-2.5 text-purple-600 shrink-0" />
-                                Frontend UI
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-neutral-900 text-neutral-300 border border-neutral-800">
-                                <Layers className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
-                                Service
-                              </span>
-                            )}
+                    const description = item.service_type === 'backend' || item.name?.includes('(Backend)')
+                      ? 'Production API Server • Traefik Reverse Proxy'
+                      : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
+                      ? 'Production Web UI • Nginx Static Routing'
+                      : 'Production Service • Docker Container';
 
-                            <span 
-                              className="text-xs font-medium text-white tracking-tight font-mono" 
-                              title={`Repository: ${item.name}`}
-                            >
-                              {getShortAppName(item.name, item.clean_name)}
-                            </span>
+                    return (
+                      <tr key={item.id} className="hover:bg-neutral-900/40 transition-colors group">
+                        {/* 1. Deployment / Project Name */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-5 h-5 bg-neutral-900 border border-neutral-800 rounded flex items-center justify-center text-white shrink-0">
+                              <svg viewBox="0 0 76 65" fill="currentColor" className="w-2.5 h-2.5">
+                                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+                              </svg>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {item.domain_name && isRunning ? (
+                                <a 
+                                  href={`http://${item.domain_name}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-medium text-white hover:underline truncate tracking-tight font-sans"
+                                >
+                                  {shortName}
+                                </a>
+                              ) : (
+                                <span className="text-sm font-medium text-white truncate tracking-tight font-sans">
+                                  {shortName}
+                                </span>
+                              )}
+                              {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  API
+                                </span>
+                              ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                  UI
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
+                        </td>
 
-                          <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono mt-0.5 flex-wrap">
-                            <span>
-                              {item.service_type === 'backend' || item.name?.includes('(Backend)') 
-                                ? 'API Server' 
-                                : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
-                                ? 'Web UI'
-                                : 'Standalone'}
-                            </span>
-                            <span>•</span>
-                            <span 
-                              className="inline-flex items-center gap-1 text-neutral-400 font-sans font-medium bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800 font-mono"
-                              title={item.deployed_at ? `Last deployed: ${new Date(item.deployed_at).toLocaleString('en-US')}` : ''}
+                        {/* 2. Description / Commit */}
+                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-xs xl:max-w-md font-sans">
+                          {description}
+                        </td>
+
+                        {/* 3. Status */}
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          {isUpdating ? (
+                            <div className="flex items-center gap-2 text-xs font-mono text-blue-400">
+                              <RefreshCw className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+                              <span>Building</span>
+                            </div>
+                          ) : isCrashed ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (item.last_error) {
+                                  setActiveErrorDetails(item.last_error);
+                                  setActiveErrorContainerName(item.name);
+                                  setErrorModalOpen(true);
+                                } else {
+                                  handleViewLogs(item.id, item.name);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 text-xs font-mono text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                              title="Click to view crash error"
                             >
-                              <Clock className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
-                              <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Image (hidden on small screens) */}
-                      <td className="hidden lg:table-cell px-3 py-3">
-                        <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono text-neutral-400 bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono truncate max-w-[130px]" title={item.image}>
-                          {item.image || '-'}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-3 py-3">
-                        {item.state === 'redeploying' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap font-mono">
-                            <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
-                            Updating
-                          </span>
-                        ) : item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting' ? (
-                          <button
-                            onClick={() => {
-                              if (item.last_error) {
-                                setActiveErrorDetails(item.last_error);
-                                setActiveErrorContainerName(item.name);
-                                setErrorModalOpen(true);
-                              } else {
-                                handleViewLogs(item.id, item.name);
-                              }
-                            }}
-                            className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors cursor-pointer whitespace-nowrap font-mono"
-                            title="Click to view crash logs"
-                          >
-                            <span className="relative flex h-1.5 w-1.5 shrink-0">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
-                            </span>
-                            <span>{item.state === 'restarting' ? 'Crash Loop' : 'Crashed'}</span>
-                            <span className="text-[10px] bg-rose-950 border border-rose-800/80 px-1.5 py-0.2 rounded text-[10px] text-rose-300 font-mono transition-colors">
-                              Logs
-                            </span>
-                          </button>
-                        ) : item.state === 'running' && item.is_db_stopped ? (
-                          <div className="flex flex-col gap-1 items-start">
-                            <span 
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono"
-                              title={item.db_warning || `Cannot connect to ${item.linked_db_name || 'database'}; database is stopped`}
-                            >
-                              <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+                              <span>Failed</span>
+                              <span className="text-[10px] text-rose-300 bg-rose-950 border border-rose-900 px-1 py-0.2 rounded">
+                                Logs
                               </span>
+                            </button>
+                          ) : isDbStopped ? (
+                            <div className="flex items-center gap-1.5 text-xs font-mono text-amber-400">
+                              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
                               <span>DB Offline</span>
-                            </span>
-                            {item.linked_db_id && (
-                              <button
-                                onClick={() => handleToggleDb(item.linked_db_id, 'stopped')}
-                                className="text-[10px] text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 font-semibold px-2 py-0.5 rounded border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Click to start database"
-                              >
-                                <Play className="w-2.5 h-2.5 fill-current" /> Start DB
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs
-                            ${item.state === 'running' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono' 
-                              : 'bg-neutral-900 text-neutral-400 border border-neutral-800 font-mono'}`}>
-                            {item.state === 'running' ? (
-                              <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                              </span>
-                            ) : (
-                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0"></span>
-                            )}
-                            {item.state === 'running' ? 'Running' : 'Stopped'}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Last Deployed (Last Deployed) */}
-                      <td className="hidden sm:table-cell px-3 py-3 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                            <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                            <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
-                          </div>
-                          <span className="text-[10px] text-neutral-500 font-mono mt-0.5 ml-5">
-                            {formatDateTime(item.deployed_at || item.updated_at || item.created_at)}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Resources (hidden on mobile) */}
-                      <td className="hidden md:table-cell px-3 py-3">
-                        {item.state === 'running' && stats[item.id] ? (
-                          <div className="flex flex-col gap-0.5 text-[10px] font-mono text-neutral-400">
-                            <div className="flex items-center gap-1">
-                              <Cpu className="w-3 h-3 text-indigo-400 shrink-0" />
-                              <span className={stats[item.id].cpu_percent > 80 ? 'text-rose-500 font-semibold' : ''}>
-                                {stats[item.id].cpu_percent.toFixed(1)}%
-                              </span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <HardDrive className="w-3 h-3 text-emerald-400 shrink-0" />
-                              <span>
-                                {stats[item.id].memory_mb.toFixed(0)}MB
+                          ) : isRunning ? (
+                            <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                              <span>Ready</span>
+                              <span className="text-[11px] text-neutral-500 font-mono">
+                                {formatTimeAgo(item.deployed_at || item.created_at)}
                               </span>
-                            </div>
-                          </div>
-                        ) : item.state === 'running' ? (
-                          <div className="text-[10px] text-neutral-500 animate-pulse font-mono">Loading...</div>
-                        ) : (
-                          <div className="text-[10px] text-neutral-500 font-mono">-</div>
-                        )}
-                      </td>
-
-                      {/* URL */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {item.state === 'running' && item.domain_name ? (
-                          (item.service_type === 'backend' || item.name?.includes('(Backend)')) ? (
-                            <div className="inline-flex items-center gap-1 whitespace-nowrap">
-                              <button 
-                                type="button"
-                                onClick={() => handleCopyApiUrl(`http://${item.domain_name}`, `app-url-${item.id}`)}
-                                className={`inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition-colors px-2 py-0.5 rounded-md cursor-pointer ${
-                                  copiedKey === `app-url-${item.id}`
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                }`}
-                                title={`Click to copy API URL: http://${item.domain_name}`}
-                              >
-                                {copiedKey === `app-url-${item.id}` ? (
-                                  <>
-                                    <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-                                    <span>Copied</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-                                    <span>Copy URL</span>
-                                  </>
-                                )}
-                              </button>
-                              <a 
-                                href={`http://${item.domain_name}`} 
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1 rounded text-neutral-500 hover:text-neutral-400 hover:bg-slate-100 transition-colors shrink-0"
-                                title="Open in browser"
-                              >
-                                <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                              </a>
                             </div>
                           ) : (
-                            <a 
-                              href={`http://${item.domain_name}`} 
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap shrink-0 text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md"
-                            >
-                              Visit <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                            </a>
-                          )
-                        ) : (
-                          <span className="text-[11px] text-neutral-500 italic">Offline</span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-3 py-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-1">
-                          {item.state === 'running' ? (
-                            <div className="relative group/tip flex items-center justify-center">
-                              <button 
-                                onClick={() => handleAction(item.id, 'stop', item.name)} 
-                                className="p-1.5 rounded-md text-neutral-400 hover:text-rose-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
-                                aria-label="Stop Server"
-                              >
-                                <Square className="w-3.5 h-3.5 fill-current" />
-                              </button>
-                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                                Stop Server
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="relative group/tip flex items-center justify-center">
-                              <button 
-                                onClick={() => handleAction(item.id, 'start', item.name)} 
-                                className="p-1.5 rounded-md text-neutral-400 hover:text-emerald-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
-                                aria-label="Start Server"
-                              >
-                                <Play className="w-3.5 h-3.5 fill-current" />
-                              </button>
-                              <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                                Start Server
-                              </div>
+                            <div className="flex items-center gap-1.5 text-xs font-mono text-neutral-500">
+                              <span className="w-2 h-2 rounded-full bg-neutral-600 shrink-0"></span>
+                              <span>Stopped</span>
                             </div>
                           )}
+                        </td>
 
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button 
-                              onClick={() => handleViewLogs(item.id, item.name)} 
-                              className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
-                              aria-label="View Logs"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              View Logs
+                        {/* 4. Environment */}
+                        <td className="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            <ArrowUpRight className="w-2.5 h-2.5" />
+                            Production
+                          </span>
+                        </td>
+
+                        {/* 5. Commit */}
+                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-400">
+                          <div className="flex items-center gap-1.5 text-neutral-400">
+                            <span className="text-neutral-500 font-bold">-o-</span>
+                            <span>{item.id ? item.id.substring(0, 7) : 'head'}</span>
+                          </div>
+                        </td>
+
+                        {/* 6. Branch */}
+                        <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-400">
+                          <div className="flex items-center gap-1.5">
+                            <GitBranch className="w-3 h-3 text-neutral-500 shrink-0" />
+                            <span>main</span>
+                          </div>
+                        </td>
+
+                        {/* 7. Age */}
+                        <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-500">
+                          {formatTimeAgo(item.deployed_at || item.created_at)}
+                        </td>
+
+                        {/* 8. Menu (...) & Visit */}
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {item.domain_name && isRunning && (
+                              <a
+                                href={`http://${item.domain_name}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 rounded-md transition-colors"
+                                title={`Visit http://${item.domain_name}`}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+
+                            {/* 3-dots Menu Button */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(isMenuOpen ? null : item.id);
+                                }}
+                                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                  isMenuOpen
+                                    ? 'bg-neutral-800 text-white border border-neutral-700'
+                                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800'
+                                }`}
+                                title="More actions"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {/* Vercel Dropdown Menu */}
+                              {isMenuOpen && (
+                                <div 
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1.5 w-48 bg-[#0a0a0a] border border-neutral-800 rounded-lg shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-100"
+                                >
+                                  {item.domain_name && isRunning && (
+                                    <a
+                                      href={`http://${item.domain_name}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setActiveMenuId(null)}
+                                      className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                                      <span>Visit Application</span>
+                                    </a>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleViewLogs(item.id, item.name);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>View Logs</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleOpenEnv(item.id, item.name);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <Settings className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>Environment Variables</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleOpenWebhook(item);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <Webhook className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>Webhook CI/CD</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleRedeploy(item.id, item.name, item.image);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <RefreshCw className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>Redeploy</span>
+                                  </button>
+
+                                  <div className="my-1 border-t border-neutral-900"></div>
+
+                                  {isRunning ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        handleAction(item.id, 'stop', item.name);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-400 hover:bg-neutral-900 transition-colors cursor-pointer"
+                                    >
+                                      <Square className="w-3.5 h-3.5" />
+                                      <span>Stop Service</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        handleAction(item.id, 'start', item.name);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-emerald-400 hover:bg-neutral-900 transition-colors cursor-pointer"
+                                    >
+                                      <Play className="w-3.5 h-3.5" />
+                                      <span>Start Service</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleAction(item.id, 'delete', item.name);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete Service</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
-
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button 
-                              onClick={() => handleOpenEnv(item.id, item.name)} 
-                              className="p-1.5 rounded-md text-neutral-400 hover:text-amber-400 hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
-                              aria-label="Environment Variables (.env)"
-                            >
-                              <Settings className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              Environment (.env)
-                            </div>
-                          </div>
-
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button
-                              onClick={() => {handleRedeploy(item.id)}}
-                              className="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
-                              aria-label="Re-deploy Server"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              Re-deploy
-                            </div>
-                          </div>
-
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button
-                              onClick={() => handleOpenWebhookModal(item)}
-                              className="p-1.5 rounded-lg text-purple-600 hover:text-purple-800 hover:bg-purple-50 transition-colors cursor-pointer"
-                              aria-label="Auto-Deploy (Webhook)"
-                            >
-                              <Webhook className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              Auto-Deploy (Webhook)
-                            </div>
-                          </div>
-
-                          <div className="relative group/tip flex items-center justify-center">
-                            <button 
-                              onClick={() => handleDelete(item.id || item.deployment_id)} 
-                              className="p-1.5 rounded-md text-neutral-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
-                              aria-label="Delete Server"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full mb-1.5 right-0 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 px-2 py-1 bg-neutral-950 border border-rose-900 text-rose-300 font-mono text-[10px] font-medium rounded-md shadow-lg whitespace-nowrap z-30">
-                              Delete Server
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
