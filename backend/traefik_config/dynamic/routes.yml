@@ -1,8 +1,14 @@
 http:
   routers:
+    my-app-deploy-538544472:
+      rule: "Host(`my-app-deploy-538544472.localhost`)"
+      service: my-app-deploy-538544472
     my-app-deploy-1361158672-frontend:
       rule: "Host(`my-app-deploy-1361158672-frontend.localhost`)"
       service: my-app-deploy-1361158672-frontend
+    my-app-deploy-1361158672-backend:
+      rule: "Host(`my-app-deploy-1361158672-backend.localhost`)"
+      service: my-app-deploy-1361158672-backend
     my-app-deploy-1173458073-frontend:
       rule: "Host(`my-app-deploy-1173458073-frontend.localhost`)"
       service: my-app-deploy-1173458073-frontend
@@ -10,10 +16,18 @@ http:
       rule: "Host(`my-app-deploy-1173458073-backend.localhost`)"
       service: my-app-deploy-1173458073-backend
   services:
+    my-app-deploy-538544472:
+      loadBalancer:
+        servers:
+          - url: "http://invalid IP:3000"
     my-app-deploy-1361158672-frontend:
       loadBalancer:
         servers:
           - url: "http://172.19.0.7:80"
+    my-app-deploy-1361158672-backend:
+      loadBalancer:
+        servers:
+          - url: "http://172.19.0.5:8080"
     my-app-deploy-1173458073-frontend:
       loadBalancer:
         servers:

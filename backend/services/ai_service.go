@@ -246,7 +246,7 @@ GitHub Repository: %s
 4. อย่าลืมใส่คำสั่ง EXPOSE <port> ใน Dockerfile เสมอ (เช่น EXPOSE 80 สำหรับ Nginx หรือ EXPOSE 8080 หรือ 3000)
 5. ในโปรเจกต์ Node.js/TypeScript/Monorepo หากต้องการสั่ง Build ให้ใช้คำสั่งมาตรฐานตาม scripts ใน package.json เสมอ เช่น RUN npm run build (หรือ pnpm run build หรือ yarn build) ห้ามคิดเดาหรือเรียกคำสั่งเจาะจงเองเช่น RUN npx nx build <ชื่อที่เดา> เด็ดขาด เพราะคำสั่ง npm run build จะเรียก build target ที่ถูกต้องตาม package.json โดยอัตโนมัติ!
 6. ห้ามเขียนคำสั่ง COPY dist/... หรือ COPY build/... จาก host โดยเด็ดขาด เพราะโฟลเดอร์เหล่านี้ถูก .gitignore และไม่มีอยู่ใน repository จริงบน GitHub หากโปรเจกต์ต้องมีการ build (เช่น Node/TypeScript/NestJS/React/Vite/Next) ต้องใส่ขั้นตอน RUN npm run build หรือ multi-stage build (COPY --from=builder ...) ภายใน Dockerfile เสมอ!
-7. หากใน dependencies มี @prisma/client หรือ prisma ให้ใส่คำสั่ง RUN npx prisma generate ก่อนขั้นตอน build เสมอ
+7. หากใน dependencies มี @prisma/client หรือ prisma ให้ใส่คำสั่ง RUN npx prisma generate ก่อนขั้นตอน build เสมอ และหากใช้ Alpine Linux ต้องใส่คำสั่ง RUN apk add --no-cache openssl libc6-compat ในทุกๆ Stage (ทั้ง builder และ runner stage) เพื่อให้ Prisma engine ทำงานได้บน Alpine arm64/amd64
 8. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
 		repoURL, targetInstruction, fileListStr, configsStr)
 
@@ -296,22 +296,18 @@ GitHub Repository: %s
 		finalDockerfile = strings.Replace(finalDockerfile, "RUN yarn build", "RUN npx prisma generate || true\nRUN yarn build", 1)
 	}
 
-	// Auto-fix: ป้องกัน Prisma บน Alpine ขาด OpenSSL
-	if strings.Contains(configsStr, "prisma") && strings.Contains(finalDockerfile, "alpine") && !strings.Contains(finalDockerfile, "openssl") {
+	// Auto-fix: ป้องกัน Prisma บน Alpine ขาด OpenSSL ในทุก Stage (ทั้ง builder และ runtime runner)
+	if strings.Contains(configsStr, "prisma") && strings.Contains(finalDockerfile, "alpine") {
 		lines := strings.Split(finalDockerfile, "\n")
 		var newLines []string
-		injected := false
 		for _, l := range lines {
 			newLines = append(newLines, l)
 			trimmedL := strings.TrimSpace(l)
-			if !injected && (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ")) {
-				newLines = append(newLines, "RUN apk add --no-cache openssl")
-				injected = true
+			if (strings.HasPrefix(trimmedL, "FROM node:") || strings.HasPrefix(trimmedL, "FROM node ") || strings.HasPrefix(trimmedL, "FROM alpine")) && strings.Contains(trimmedL, "alpine") {
+				newLines = append(newLines, "RUN apk add --no-cache openssl libc6-compat")
 			}
 		}
-		if injected {
-			finalDockerfile = strings.Join(newLines, "\n")
-		}
+		finalDockerfile = strings.Join(newLines, "\n")
 	}
 
 	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
