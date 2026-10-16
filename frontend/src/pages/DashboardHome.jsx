@@ -136,6 +136,29 @@ const DashboardHome = () => {
     }
   };
 
+  // Universal Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'ยืนยัน',
+    cancelText: 'ยกเลิก',
+    variant: 'primary', // 'primary' | 'danger' | 'warning'
+    onConfirm: null,
+  });
+
+  const openConfirmModal = ({ title, message, confirmText = 'ยืนยัน', cancelText = 'ยกเลิก', variant = 'primary', onConfirm }) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      cancelText,
+      variant,
+      onConfirm,
+    });
+  };
+
   // Notification State
   const prevStatesRef = useRef({});
   const prevDbStatesRef = useRef({});
@@ -354,23 +377,28 @@ const DashboardHome = () => {
     }
   };
 
-  const handleDeleteDb = async (id, name) => {
-    if (!window.confirm(`คุณแน่ใจหรือไม่ที่จะลบ Database "${name}"? ข้อมูลใน Volume จะถูกลบทิ้งอย่างถาวร`)) {
-      return;
-    }
-    const toastId = toast.loading('กำลังลบ Database และเคลียร์ Volume...');
-    try {
-      const res = await fetch(`http://localhost:8080/api/databases/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('ลบ Database สำเร็จ', { id: toastId });
-        fetchDatabases();
-      } else {
-        const data = await res.json();
-        toast.error('ลบล้มเหลว', { id: toastId, description: data.error });
+  const handleDeleteDb = (id, name) => {
+    openConfirmModal({
+      title: 'ลบฐานข้อมูลถาวร',
+      message: `คุณแน่ใจหรือไม่ที่จะลบ Database "${name}"? ข้อมูลใน Volume และตารางทั้งหมดจะถูกลบทิ้งอย่างถาวร ไม่สามารถกู้คืนได้`,
+      confirmText: 'ลบฐานข้อมูล',
+      variant: 'danger',
+      onConfirm: async () => {
+        const toastId = toast.loading('กำลังลบ Database และเคลียร์ Volume...');
+        try {
+          const res = await fetch(`http://localhost:8080/api/databases/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            toast.success('ลบ Database สำเร็จ', { id: toastId });
+            fetchDatabases();
+          } else {
+            const data = await res.json();
+            toast.error('ลบล้มเหลว', { id: toastId, description: data.error });
+          }
+        } catch (err) {
+          toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
+        }
       }
-    } catch (err) {
-      toast.error('เชื่อมต่อล้มเหลว', { id: toastId, description: err.message });
-    }
+    });
   };
 
   const handleCopyUrl = (text, key) => {
@@ -595,31 +623,38 @@ const DashboardHome = () => {
     }
   };
 
-  const handleDelete = async (identifier) => {
+  const handleDelete = (identifier) => {
     if (!identifier) {
       toast.error("ไม่พบรหัสของเซิร์ฟเวอร์นี้");
       return;
     }
-    if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? ข้อมูลและประวัตินี้จะถูกลบออก")) return;
-    
-    // อัปเดตหน้าจอทันที (Optimistic UI) ลบแถวนี้ออกจากตารางทันทีไม่ต้องรอ
-    setContainers(prev => prev.filter(c => c.id !== identifier && c.deployment_id !== identifier));
-    const toastId = toast.loading("กำลังลบเซิร์ฟเวอร์...");
 
-    try {
-      const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId, description: errJson.error || "ไม่สามารถลบได้" });
-      } else {
-        toast.success("ลบเซิร์ฟเวอร์เรียบร้อย", { id: toastId });
+    openConfirmModal({
+      title: 'ยืนยันการลบเซิร์ฟเวอร์',
+      message: 'คุณแน่ใจหรือไม่ที่จะลบเซิร์ฟเวอร์นี้? Container และประวัติการรันนี้จะถูกลบออกจากระบบอย่างถาวร',
+      confirmText: 'ลบเซิร์ฟเวอร์',
+      variant: 'danger',
+      onConfirm: async () => {
+        // อัปเดตหน้าจอทันที (Optimistic UI) ลบแถวนี้ออกจากตารางทันทีไม่ต้องรอ
+        setContainers(prev => prev.filter(c => c.id !== identifier && c.deployment_id !== identifier));
+        const toastId = toast.loading("กำลังลบเซิร์ฟเวอร์...");
+
+        try {
+          const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const errJson = await res.json().catch(() => ({}));
+            toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId, description: errJson.error || "ไม่สามารถลบได้" });
+          } else {
+            toast.success("ลบเซิร์ฟเวอร์เรียบร้อย", { id: toastId });
+          }
+          await fetchContainers();
+        } catch (error) {
+          console.log("ลบข้อมูลล้มเหลว", error);
+          toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", { id: toastId, description: error.message });
+          await fetchContainers();
+        }
       }
-      await fetchContainers();
-    } catch (error) {
-      console.log("ลบข้อมูลล้มเหลว", error);
-      toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", { id: toastId, description: error.message });
-      await fetchContainers();
-    }
+    });
   };
 
   const handleViewLogs = async (id, name) => {
@@ -640,44 +675,48 @@ const DashboardHome = () => {
   };
 
   // ฟังก์ชันสั่ง Re-deploy
-  const handleRedeploy = async (id) => {
-    if (!confirm("คุณต้องการดึงโค้ดใหม่และ Re-deploy เซิร์ฟเวอร์นี้ใช่ไหม? (ระบบจะรันตัวใหม่ซ้อนขึ้นมาให้ก่อน)")) return;
-    
-    toast.info("เริ่มกระบวนการ Re-deploy...", {
-      description: "กำลังดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่",
-    });
+  const handleRedeploy = (id) => {
+    openConfirmModal({
+      title: 'ดึงโค้ดใหม่และ Re-deploy',
+      message: 'คุณต้องการดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่ใช่ไหม? (ระบบจะรันตัวใหม่ซ้อนขึ้นมาให้ก่อนแบบ Zero-Downtime)',
+      confirmText: 'เริ่ม Re-deploy',
+      variant: 'primary',
+      onConfirm: async () => {
+        toast.info("เริ่มกระบวนการ Re-deploy...", {
+          description: "กำลังดึงโค้ดล่าสุดจาก Git และสร้าง Container ใหม่",
+        });
 
-    // 1. 🪄 หลอกตาผู้ใช้! สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที
-    setContainers(prev => prev.map(c => 
-      c.id === id ? { ...c, state: 'redeploying' } : c
-    ));
+        // 1. 🪄 หลอกตาผู้ใช้! สั่งเปลี่ยนสถานะของตัวนี้ให้เป็น 'redeploying' ทันที
+        setContainers(prev => prev.map(c => 
+          c.id === id ? { ...c, state: 'redeploying' } : c
+        ));
 
-    try {
-      const response = await fetch(`http://localhost:8080/api/containers/${id}/redeploy`, {
-        method: 'POST',
-      });
-      
-      if (response.ok) {
-        // 2. 🕵️‍♂️ สั่งให้เบราว์เซอร์แอบยิงไปเช็คข้อมูลใหม่ทุกๆ 3 วินาที (Polling)
-        const checkInterval = setInterval(() => {
-          fetchContainers(); 
-        }, 3000);
+        try {
+          const response = await fetch(`http://localhost:8080/api/containers/${id}/redeploy`, {
+            method: 'POST',
+          });
+          
+          if (response.ok) {
+            // 2. 🕵️‍♂️ สั่งให้เบราว์เซอร์แอบยิงไปเช็คข้อมูลใหม่ทุกๆ 3 วินาที (Polling)
+            const checkInterval = setInterval(() => {
+              fetchContainers(); 
+            }, 3000);
 
-        setTimeout(() => {
-          clearInterval(checkInterval);
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              fetchContainers();
+            }, 120000);
+          } else {
+            toast.error("สั่ง Re-deploy ไม่สำเร็จ");
+            fetchContainers();
+          }
+        } catch (error) {
+          console.error("Redeploy error:", error);
+          toast.error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ");
           fetchContainers();
-        }, 120000);
-
-      } else {
-        const errData = await response.json();
-        toast.error("Re-deploy ล้มเหลว", { description: errData.error });
-        fetchContainers();
+        }
       }
-    } catch (error) {
-      toast.error("การเชื่อมต่อล้มเหลว", { description: error.message });
-    } finally {
-      fetchContainers();
-    }
+    });
   };
 
   const handleOpenEnv = async (id, name) => {
@@ -2116,6 +2155,62 @@ const DashboardHome = () => {
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 เสร็จสิ้น
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Universal Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3.5">
+              <div className={`p-3 rounded-2xl shrink-0 ${
+                confirmModal.variant === 'danger' 
+                  ? 'bg-rose-50 text-rose-600 border border-rose-100' 
+                  : confirmModal.variant === 'warning'
+                  ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                  : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+              }`}>
+                {confirmModal.variant === 'danger' ? (
+                  <AlertTriangle className="w-6 h-6" />
+                ) : confirmModal.variant === 'warning' ? (
+                  <AlertCircle className="w-6 h-6" />
+                ) : (
+                  <RefreshCw className="w-6 h-6" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-slate-800">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{confirmModal.message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                {confirmModal.cancelText || 'ยกเลิก'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = confirmModal.onConfirm;
+                  setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                  if (action) action();
+                }}
+                className={`px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                  confirmModal.variant === 'danger'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
+                    : confirmModal.variant === 'warning'
+                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+                }`}
+              >
+                {confirmModal.confirmText || 'ยืนยัน'}
               </button>
             </div>
           </div>
