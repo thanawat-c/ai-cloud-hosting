@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
   Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
-  FileText, Database, Check, Copy, LayoutDashboard, X 
+  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,12 +11,14 @@ const DeployForm = () => {
   const navigate = useNavigate();
   const resultRef = useRef(null);
   const logsEndRef = useRef(null);
+  const terminalBoxRef = useRef(null);
 
   const [repoUrl, setRepoUrl] = useState('');
   const [gitToken, setGitToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [lastError, setLastError] = useState('');
   const [containerId, setContainerId] = useState('');
   const [aiDockerfile, setAiDockerfile] = useState(''); 
   const [publicPort, setPublicPort] = useState('');
@@ -40,9 +42,28 @@ const DeployForm = () => {
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
+  const extractLastError = (logs) => {
+    if (!logs) return '';
+    const lines = logs.split('\n').map(l => l.trim()).filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (
+        line.startsWith('Error:') || 
+        line.startsWith('Error ') || 
+        line.includes('Error response from daemon:') ||
+        line.includes('failed:') ||
+        line.includes('COPY failed:') ||
+        line.includes('npm ERR!')
+      ) {
+        return line.replace(/^Error:\s*/i, '');
+      }
+    }
+    return lines[lines.length - 1] || 'Unknown build error occurred';
+  };
+
   useEffect(() => {
-    if (deployLogs && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (deployLogs && terminalBoxRef.current) {
+      terminalBoxRef.current.scrollTop = terminalBoxRef.current.scrollHeight;
     }
   }, [deployLogs]);
 
@@ -143,6 +164,7 @@ const DeployForm = () => {
 
     setIsLoading(true);
     setMessage('');
+    setLastError('');
     setShowSuccessModal(false);
     setAiDockerfile('');
     setContainerId('');
@@ -188,14 +210,17 @@ const DeployForm = () => {
           toast.success("Deployment successful!", {
             description: domainMatch ? `Available at ${domainMatch[1]}` : "Server is now running",
           });
-        } else if (chunk.includes("Error:")) {
-          setMessage("Deployment failed. Please check the logs below.");
+        } else if (chunk.includes("Error:") || chunk.includes("failed:") || chunk.includes("Error response from daemon:")) {
+          const detectedError = extractLastError(fullLog);
+          setLastError(detectedError);
+          setMessage("Deployment failed. Root cause details highlighted below.");
           toast.error("Deployment failed", {
-            description: "Check error details in the terminal below",
+            description: detectedError.substring(0, 90) + (detectedError.length > 90 ? '...' : ''),
           });
         }
       }
     } catch (error) {
+      setLastError(error.message);
       setMessage("Failed to connect to server: " + error.message);
       toast.error("Failed to connect to server", {
         description: error.message,
@@ -469,7 +494,7 @@ const DeployForm = () => {
                       <h4 className={`text-base font-bold ${containerId ? 'text-emerald-900' : 'text-rose-900'}`}>
                         {containerId ? 'Deployment Successful!' : 'Deployment Failed'}
                       </h4>
-                      {containerId && (
+                      {containerId ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold border border-emerald-200">
                           <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -477,10 +502,63 @@ const DeployForm = () => {
                           </span>
                           Live & Running
                         </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-semibold border border-rose-200">
+                          <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          Build Failed
+                        </span>
                       )}
                     </div>
                     <p className={`text-xs ${containerId ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>
                     
+                    {!containerId && lastError && (
+                      <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
+                        <div className="p-3.5 bg-rose-950/90 rounded-xl border border-rose-800 text-rose-100 shadow-sm">
+                          <div className="flex items-center justify-between gap-2 mb-1.5 border-b border-rose-800/80 pb-1.5">
+                            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-300">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                              Latest Error Details
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(lastError);
+                                toast.success("Error copied to clipboard");
+                              }}
+                              className="text-[11px] font-mono text-rose-300 hover:text-white flex items-center gap-1 px-2 py-0.5 rounded bg-rose-900/60 hover:bg-rose-900 transition-colors cursor-pointer"
+                              title="Copy error message"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Copy Error</span>
+                            </button>
+                          </div>
+                          <p className="font-mono text-xs text-rose-200 whitespace-pre-wrap break-all leading-relaxed select-all">
+                            {lastError}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              terminalBoxRef.current?.scrollTo({ top: terminalBoxRef.current.scrollHeight, behavior: 'smooth' });
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <Terminal className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Jump to Terminal Bottom</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeploy}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                          >
+                            <span>Retry Deployment</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {containerId && (
                       <div className="mt-4 space-y-3">
                         {publicPort && (
@@ -569,7 +647,10 @@ const DeployForm = () => {
               </div>
               
               {/* Terminal Logs Content */}
-              <div className="h-64 overflow-y-auto font-mono text-xs md:text-sm text-emerald-400 whitespace-pre-wrap">
+              <div 
+                ref={terminalBoxRef}
+                className="h-64 overflow-y-auto font-mono text-xs md:text-sm text-emerald-400 whitespace-pre-wrap"
+              >
                 {deployLogs}
                 <div ref={logsEndRef} />
               </div>
