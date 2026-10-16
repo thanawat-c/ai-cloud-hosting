@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
@@ -155,6 +156,7 @@ func HandleDeploymentWebhook(c *gin.Context) {
 				"container_id": cleanNewID,
 				"status":       "running",
 				"last_error":   "",
+				"updated_at":   time.Now(),
 			})
 			fmt.Printf("✅ [Auto-Deploy Success] %s ทำงานบน Container ID ใหม่: %s เรียบร้อยแล้ว!\n", targetDeploy.RepoURL, cleanNewID)
 		}
@@ -216,15 +218,22 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 	}
 
 	sigHeader := c.GetHeader("X-Hub-Signature-256")
-	triggeredNames := []string{}
-
-	for _, dep := range matchedDeploys {
-		if dep.WebhookSecret != "" && sigHeader != "" {
-			if !VerifySignature(dep.WebhookSecret, bodyBytes, sigHeader) {
-				continue // ข้ามถ้า secret ไม่ตรง
+	if sigHeader != "" {
+		validSig := false
+		for _, dep := range matchedDeploys {
+			if dep.WebhookSecret == "" || VerifySignature(dep.WebhookSecret, bodyBytes, sigHeader) {
+				validSig = true
+				break
 			}
 		}
+		if !validSig {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Webhook Secret Signature"})
+			return
+		}
+	}
 
+	triggeredNames := []string{}
+	for _, dep := range matchedDeploys {
 		triggeredNames = append(triggeredNames, dep.RepoURL)
 		go func(target models.Deployment) {
 			ctx := context.Background()
@@ -245,6 +254,7 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 					"container_id": cleanID,
 					"status":       "running",
 					"last_error":   "",
+					"updated_at":   time.Now(),
 				})
 			}
 		}(dep)

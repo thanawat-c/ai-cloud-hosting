@@ -115,6 +115,11 @@ func GetContainers(c *gin.Context) {
 			config.DB.Model(&d).Update("webhook_secret", d.WebhookSecret)
 		}
 
+		deployedAt := d.UpdatedAt
+		if deployedAt.IsZero() || deployedAt.Before(d.CreatedAt) {
+			deployedAt = d.CreatedAt
+		}
+
 		results = append(results, map[string]interface{}{
 			"id":             d.ContainerID,
 			"deployment_id":  d.ID,
@@ -123,7 +128,10 @@ func GetContainers(c *gin.Context) {
 			"service_type":   serviceType,
 			"image":          d.ImageName,
 			"state":          actualState,
-			"status":         "Deployed: " + d.CreatedAt.Format("02 Jan 15:04"),
+			"status":         "Deployed: " + deployedAt.Format("02 Jan 15:04"),
+			"created_at":     d.CreatedAt.Format(time.RFC3339),
+			"updated_at":     d.UpdatedAt.Format(time.RFC3339),
+			"deployed_at":    deployedAt.Format(time.RFC3339),
 			"domain_name":    d.DomainName,
 			"last_error":     lastError,
 			"linked_db_name": linkedDBName,
@@ -275,6 +283,7 @@ func RedeployContainer(c *gin.Context){
 				"container_id": newID[:12],
 				"status":       "running",
 				"last_error":   "",
+				"updated_at":   time.Now(),
 			})
 			fmt.Println("Redeploy สำเร็จ! อัปเดต ID เซิฟร์เวอร์ใหม่เป็น", newID[:12])
 		}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Zap } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Zap, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 // แปลง URL เช่น https://github.com/thanawat-c/mock-api-server.git ให้เหลือชื่อสั้นๆ เช่น mock-api-server
@@ -20,6 +20,30 @@ const getShortAppName = (rawName, cleanName) => {
   return cleaned;
 };
 
+// คำนวณเวลาที่ผ่านไป (Relative Time Ago) เช่น "เมื่อสักครู่", "2 นาทีที่แล้ว", "1 ชั่วโมงที่แล้ว"
+const formatTimeAgo = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+
+  const now = new Date();
+  const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+  if (diffSeconds < 10) return 'เมื่อสักครู่';
+  if (diffSeconds < 60) return `${diffSeconds} วินาทีที่แล้ว`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} นาทีที่แล้ว`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays} วันที่แล้ว`;
+
+  return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+};
+
 const DashboardHome = () => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +52,13 @@ const DashboardHome = () => {
   const [currentLogs, setCurrentLogs] = useState('');
   const [logLoading, setLogLoading] = useState(false);
   const [activeContainerName, setActiveContainerName] = useState('');
+
+  // Auto-refresh relative time every 10 seconds
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Env Modal State
   const [envModalOpen, setEnvModalOpen] = useState(false);
@@ -867,13 +898,23 @@ const DashboardHome = () => {
                             </span>
                           </div>
 
-                          <span className="text-[10px] text-slate-400 font-mono truncate">
-                            {item.service_type === 'backend' || item.name?.includes('(Backend)') 
-                              ? '⚙️ API Server' 
-                              : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
-                              ? '🌐 Web UI'
-                              : '📦 Standalone'}
-                          </span>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5 flex-wrap">
+                            <span>
+                              {item.service_type === 'backend' || item.name?.includes('(Backend)') 
+                                ? '⚙️ API Server' 
+                                : item.service_type === 'frontend' || item.name?.includes('(Frontend)')
+                                ? '🌐 Web UI'
+                                : '📦 Standalone'}
+                            </span>
+                            <span>•</span>
+                            <span 
+                              className="inline-flex items-center gap-1 text-slate-600 font-sans font-medium bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200/60"
+                              title={item.deployed_at ? `Deploy ล่าสุดเมื่อ: ${new Date(item.deployed_at).toLocaleString('th-TH')}` : ''}
+                            >
+                              <Clock className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                              <span>{formatTimeAgo(item.deployed_at || item.updated_at || item.created_at)}</span>
+                            </span>
+                          </div>
                         </div>
                       </td>
 
