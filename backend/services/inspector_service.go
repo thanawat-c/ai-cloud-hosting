@@ -21,24 +21,24 @@ type InspectResult struct {
 
 // InspectRepository โคลน repo แบบตื้น (--depth 1) มาสแกนหาตัวแปรและโครงสร้างโค้ด
 func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, error) {
+	cleanRepoURL := strings.TrimSpace(repoURL)
+	if err := ValidateGitRepository(cleanRepoURL, gitToken...); err != nil {
+		return nil, err
+	}
+
 	tempDir, err := os.MkdirTemp("", "inspect-*")
 	if err != nil {
 		return nil, fmt.Errorf("สร้าง workspace ชั่วคราวไม่สำเร็จ: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	cloneURL := repoURL
-	if len(gitToken) > 0 && strings.TrimSpace(gitToken[0]) != "" {
-		token := strings.TrimSpace(gitToken[0])
-		if strings.HasPrefix(cloneURL, "https://") {
-			cloneURL = strings.Replace(cloneURL, "https://", fmt.Sprintf("https://oauth2:%s@", token), 1)
-		}
-	}
+	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
 	// ใช้ --depth 1 เพื่อความรวดเร็วระดับวินาที
-	cmd := exec.Command("git", "clone", "--depth", "1", cloneURL, tempDir)
+	cmd := exec.Command("git", "clone", "--depth", "1", authURL, tempDir)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("Git Clone ไม่สำเร็จ: %s", string(output))
+		return nil, TranslateGitError(string(output), cleanRepoURL, token)
 	}
 
 	result := &InspectResult{
