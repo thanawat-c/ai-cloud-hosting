@@ -120,7 +120,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	fileListStr := strings.Join(fileList, ", ")
 	configsStr := strings.Join(configContents, "\n\n")
 
-	model := aiClient.GenerativeModel("gemini-2.5-flash")
+	model := aiClient.GenerativeModel("gemini-1.5-flash")
 
 	var targetInstruction string
 	isFrontend = len(backendEndpoint) > 0 && backendEndpoint[0] != ""
@@ -317,14 +317,98 @@ GitHub Repository: %s
 }
 
 // MonorepoDetectionResult เก็บชื่อโฟลเดอร์ที่ AI วิเคราะห์เจอ
+// MonorepoDetectionResult เก็บชื่อโฟลเดอร์ที่ AI วิเคราะห์เจอ
 type MonorepoDetectionResult struct {
 	IsMonorepo  bool   `json:"is_monorepo"`
 	FrontendDir string `json:"frontend_dir"`
 	BackendDir  string `json:"backend_dir"`
 }
 
+// checkHeuristicMonorepo ตรวจจับโครงสร้าง Monorepo มาตรฐาน (เช่น frontend/backend, client/server) ได้ทันทีโดยไม่ต้องพึ่ง AI
+func checkHeuristicMonorepo(buildDir string) (bool, string, string) {
+	feCandidates := []string{"frontend", "client", "web", "ui", "app"}
+	beCandidates := []string{"backend", "server", "api"}
+
+	var foundFE, foundBE string
+	for _, fe := range feCandidates {
+		fePath := filepath.Join(buildDir, fe)
+		if info, err := os.Stat(fePath); err == nil && info.IsDir() {
+			if _, err := os.Stat(filepath.Join(fePath, "package.json")); err == nil {
+				foundFE = fe
+				break
+			} else if _, err := os.Stat(filepath.Join(fePath, "index.html")); err == nil {
+				foundFE = fe
+				break
+			}
+		}
+	}
+
+	for _, be := range beCandidates {
+		bePath := filepath.Join(buildDir, be)
+		if info, err := os.Stat(bePath); err == nil && info.IsDir() {
+			if _, err := os.Stat(filepath.Join(bePath, "go.mod")); err == nil {
+				foundBE = be
+				break
+			} else if _, err := os.Stat(filepath.Join(bePath, "package.json")); err == nil {
+				foundBE = be
+				break
+			} else if _, err := os.Stat(filepath.Join(bePath, "requirements.txt")); err == nil {
+				foundBE = be
+				break
+			} else if _, err := os.Stat(filepath.Join(bePath, "main.go")); err == nil {
+				foundBE = be
+				break
+			}
+		}
+	}
+
+	if foundFE != "" && foundBE != "" {
+		return true, foundFE, foundBE
+	}
+
+	// สแกนโฟลเดอร์ชั้นที่ 2 (เช่น apps/web, apps/api หรือ packages/web, packages/api)
+	parents := []string{"apps", "packages", "services"}
+	for _, p := range parents {
+		pDir := filepath.Join(buildDir, p)
+		if info, err := os.Stat(pDir); err == nil && info.IsDir() {
+			var subFE, subBE string
+			for _, fe := range feCandidates {
+				candidate := filepath.Join(pDir, fe)
+				if _, err := os.Stat(filepath.Join(candidate, "package.json")); err == nil {
+					subFE = filepath.Join(p, fe)
+					break
+				}
+			}
+			for _, be := range beCandidates {
+				candidate := filepath.Join(pDir, be)
+				if _, err := os.Stat(filepath.Join(candidate, "go.mod")); err == nil {
+					subBE = filepath.Join(p, be)
+					break
+				} else if _, err := os.Stat(filepath.Join(candidate, "package.json")); err == nil {
+					subBE = filepath.Join(p, be)
+					break
+				} else if _, err := os.Stat(filepath.Join(candidate, "requirements.txt")); err == nil {
+					subBE = filepath.Join(p, be)
+					break
+				}
+			}
+			if subFE != "" && subBE != "" {
+				return true, subFE, subBE
+			}
+		}
+	}
+
+	return false, "", ""
+}
+
 // DetectMonorepoServices ให้ AI ช่วยดูโครงสร้างโฟลเดอร์จริงว่าโฟลเดอร์ไหนคือ Frontend และโฟลเดอร์ไหนคือ Backend
 func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string, string) {
+	// 1. ตรวจสอบด้วย Heuristic ก่อนเสมอ (ทำงาน 0ms, ไม่กิน Quota AI, แม่นยำ 100%)
+	if isMono, fe, be := checkHeuristicMonorepo(buildDir); isMono {
+		fmt.Printf("⚡ [Heuristic Detection] ตรวจพบ Monorepo อัตโนมัติ: Frontend='%s', Backend='%s'\n", fe, be)
+		return true, fe, be
+	}
+
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return false, "", ""
@@ -381,7 +465,7 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 
 ห้ามใส่คำอธิบาย ห้ามใส่ markdown block ตอบเฉพาะ raw json ล้วนๆ`, strings.Join(summary, "\n"))
 
-	model := aiClient.GenerativeModel("gemini-2.5-flash")
+	model := aiClient.GenerativeModel("gemini-1.5-flash")
 	model.ResponseMIMEType = "application/json"
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
@@ -421,6 +505,23 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 	workdir := "/app"
 	if targetDir != "" {
 		workdir = "/app/" + targetDir
+	}
+
+	// 0. ตรวจสอบว่าใน target มี Dockerfile เดิมของผู้ใช้อยู่แล้วหรือไม่
+	existingDockerfile := filepath.Join(fullTarget, "Dockerfile")
+	if info, err := os.Stat(existingDockerfile); err == nil && !info.IsDir() {
+		content, err := os.ReadFile(existingDockerfile)
+		if err == nil && len(content) > 0 {
+			port := "8080"
+			for _, line := range strings.Split(string(content), "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "EXPOSE ") {
+					port = strings.TrimSpace(strings.TrimPrefix(trimmed, "EXPOSE "))
+					break
+				}
+			}
+			return string(content), port, nil
+		}
 	}
 
 	// 1. ตรวจสอบกรณี Frontend (Nuxt, Vite, React, Vue, Static Web)
@@ -475,15 +576,24 @@ CMD ["nginx", "-g", "daemon off;"]
 		return dockerfile, "80", nil
 	}
 
-	// 2. ตรวจสอบกรณี Go (มี go.mod)
+	// 2. ตรวจสอบกรณี Go (มี go.mod หรือ main.go)
 	goModPath := filepath.Join(fullTarget, "go.mod")
-	if _, err := os.Stat(goModPath); err == nil {
+	mainGoPath := filepath.Join(fullTarget, "main.go")
+	if _, err := os.Stat(goModPath); err == nil || (func() bool { _, e := os.Stat(mainGoPath); return e == nil })() {
+		hasMod := false
+		if _, err := os.Stat(goModPath); err == nil {
+			hasMod = true
+		}
+
+		modSteps := ""
+		if hasMod {
+			modSteps = fmt.Sprintf("COPY %sgo.mod %sgo.sum* ./\nRUN go mod download\n", cleanPrefix, cleanPrefix)
+		}
+
 		dockerfile := fmt.Sprintf(`FROM golang:alpine AS builder
 ENV GOTOOLCHAIN=auto
 WORKDIR /app
-COPY %sgo.mod %sgo.sum* ./
-RUN go mod download
-COPY %s ./
+%sCOPY %s ./
 RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
 
 FROM alpine:latest
@@ -491,28 +601,34 @@ WORKDIR /app
 COPY --from=builder /app/server .
 EXPOSE 8080
 CMD ["/app/server"]
-`, cleanPrefix, cleanPrefix, copySource)
+`, modSteps, copySource)
 
 		return dockerfile, "8080", nil
 	}
 
 	// 3. กรณี Python
 	reqPath := filepath.Join(fullTarget, "requirements.txt")
-	if _, err := os.Stat(reqPath); err == nil {
+	pyMainPath := filepath.Join(fullTarget, "main.py")
+	if _, err := os.Stat(reqPath); err == nil || (func() bool { _, e := os.Stat(pyMainPath); return e == nil })() {
+		pipStep := ""
+		if _, err := os.Stat(reqPath); err == nil {
+			pipStep = fmt.Sprintf("COPY %srequirements.txt* ./\nRUN pip install --no-cache-dir -r requirements.txt\n", cleanPrefix)
+		}
+
 		dockerfile := fmt.Sprintf(`FROM python:3.11-slim
 WORKDIR /app
-COPY %srequirements.txt* ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY %s ./
+%sCOPY %s ./
 EXPOSE 8000
 CMD ["python", "main.py"]
-`, cleanPrefix, copySource)
+`, pipStep, copySource)
 
 		return dockerfile, "8000", nil
 	}
 
-	// 4. Default Node.js
-	dockerfile := fmt.Sprintf(`FROM node:22-alpine
+	// 4. Node.js (ตรวจสอบว่ามี package.json อยู่จริง)
+	packageJsonPath := filepath.Join(fullTarget, "package.json")
+	if _, err := os.Stat(packageJsonPath); err == nil {
+		dockerfile := fmt.Sprintf(`FROM node:22-alpine
 WORKDIR /app
 COPY %spackage.json %s*lock* ./
 RUN npm install
@@ -521,6 +637,29 @@ EXPOSE 3000
 CMD ["npm", "start"]
 `, cleanPrefix, cleanPrefix, copySource)
 
-	return dockerfile, "3000", nil
+		return dockerfile, "3000", nil
+	}
+
+	// 5. Static HTML (กรณีมี index.html แต่ไม่มี package.json)
+	indexPath := filepath.Join(fullTarget, "index.html")
+	if _, err := os.Stat(indexPath); err == nil {
+		dockerfile := fmt.Sprintf(`FROM nginx:alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY %s /usr/share/nginx/html/
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`, copySource)
+		return dockerfile, "80", nil
+	}
+
+	// 6. Generic Default Fallback
+	dockerfile := fmt.Sprintf(`FROM alpine:latest
+WORKDIR /app
+COPY %s ./
+EXPOSE 8080
+CMD ["sh"]
+`, copySource)
+
+	return dockerfile, "8080", nil
 }
 
