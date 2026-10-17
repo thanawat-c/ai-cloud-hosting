@@ -763,7 +763,6 @@ const DeployForm = () => {
                 <Rocket className="w-7 h-7" />
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-neutral-400 font-mono text-xs font-semibold border border-emerald-200/80 mb-2">
               {(() => {
                 const isBackend = Boolean(
                   inspectResult?.detected_framework?.toLowerCase().includes('backend') ||
