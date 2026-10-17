@@ -101,7 +101,8 @@ func TestDeploy(c *gin.Context) {
 			frontendDir := filepath.Join(buildDir, feDirName)
 			frontendDockerfile := filepath.Join(frontendDir, "Dockerfile")
 			backendInternalEndpoint := fmt.Sprintf("%s:%s", backendImageName, backendPort)
-			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, frontendDir, feDirName, backendInternalEndpoint)
+			backendPublicURL := fmt.Sprintf("http://%s", beDomainName)
+			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, frontendDir, feDirName, backendPublicURL)
 			if err != nil {
 				logChan <- "Error: Failed to generate Dockerfile for frontend: " + err.Error() + "\n"
 				return
@@ -150,12 +151,13 @@ func TestDeploy(c *gin.Context) {
 				feEnvVars += "\n"
 			}
 			backendInternalURL := fmt.Sprintf("http://%s", backendInternalEndpoint)
-			backendPublicURL := fmt.Sprintf("http://%s", beDomainName)
+			backendPublicURL = fmt.Sprintf("http://%s", beDomainName)
 
-			feEnvVars += fmt.Sprintf("BACKEND_URL=%s\nINTERNAL_API_URL=%s\nAPI_URL=%s\nNUXT_PUBLIC_API_URL=%s\nVITE_API_URL=%s\nREACT_APP_API_URL=%s\nNEXT_PUBLIC_API_URL=%s",
+			feEnvVars += fmt.Sprintf("BACKEND_URL=%s\nINTERNAL_API_URL=%s\nAPI_URL=%s\nNUXT_PUBLIC_API_URL=%s\nVITE_API_URL=%s\nVITE_SERVER_URL=%s\nREACT_APP_API_URL=%s\nNEXT_PUBLIC_API_URL=%s",
 				backendInternalURL,
 				backendInternalURL,
 				backendInternalURL,
+				backendPublicURL,
 				backendPublicURL,
 				backendPublicURL,
 				backendPublicURL,

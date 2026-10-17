@@ -193,6 +193,8 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     ENV API_URL=%s
     ENV NUXT_PUBLIC_API_URL=%s
     ENV VITE_API_URL=%s
+    ENV VITE_SERVER_URL=%s
+    ENV REACT_APP_API_URL=%s
     ENV NEXT_PUBLIC_API_URL=%s
 - สำคัญมากเรื่อง Path: Build Context ของ Docker คือโฟลเดอร์ frontend นี้โดยตรง ทุกคำสั่ง COPY ต้องใช้ Relative Path ห้ามใส่ชื่อโฟลเดอร์ "%s/" ซ้ำในคำสั่ง COPY หรือ WORKDIR เด็ดขาด
 - ขั้นตอนการ Build:
@@ -213,7 +215,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
   * หากเป็น SSR App (Next.js standalone, Nuxt node-server):
     (ต้องใส่ ENV BACKEND_URL=%s และ ENV API_URL=%s ใน Runtime Stage นี้ด้วยเพื่อให้ SSR หรือ Server Proxy เรียก Backend ถูกต้อง)
     EXPOSE 3000
-    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, backendURL, backendURL, backendURL)
+    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, backendURL, backendURL, backendURL)
 	} else {
 		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับ [Standalone Project] ที่อยู่ที่ Root directory:
 - สแกนดูไฟล์และ config ใน Root เพื่อระบุประเภทโปรเจกต์ (Go, Node.js, Python, Java, PHP, Rust, หรือ Web Frontend)
