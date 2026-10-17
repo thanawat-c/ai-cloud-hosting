@@ -42,6 +42,9 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
+		// ดึงข้อมูล Git จริง (Branch, Commit Hash, Commit Message, Deployer/Author)
+		gitMeta := services.GetGitMetadata(buildDir, req.RepoURL)
+
 		// Auto-provision dedicated database if requested
 		if req.AutoCreateDB {
 			logChan <- "🐘 [Auto-DB] Auto-provisioning dedicated PostgreSQL database...\n"
@@ -136,13 +139,18 @@ func TestDeploy(c *gin.Context) {
 			}
 
 			config.DB.Create(&models.Deployment{
-				RepoURL:     req.RepoURL + " (Backend)",
-				GitToken:    req.GitToken,
-				ImageName:   backendImageName,
-				ContainerID: beContainerID[:12],
-				DomainName:  beDomainName,
-				Status:      "running",
-				ForceAI:     req.ForceAI,
+				RepoURL:       req.RepoURL + " (Backend)",
+				GitToken:      req.GitToken,
+				ImageName:     backendImageName,
+				ContainerID:   beContainerID[:12],
+				DomainName:    beDomainName,
+				Status:        "running",
+				ForceAI:       req.ForceAI,
+				Branch:        gitMeta.Branch,
+				CommitHash:    gitMeta.CommitHash,
+				CommitMessage: gitMeta.CommitMessage,
+				AuthorName:    gitMeta.AuthorName,
+				AuthorAvatar:  gitMeta.AuthorAvatar,
 			})
 			logChan <- fmt.Sprintf("✅ Backend service live at: http://%s\n", beDomainName)
 
@@ -244,13 +252,18 @@ func TestDeploy(c *gin.Context) {
 			}
 
 			config.DB.Create(&models.Deployment{
-				RepoURL:     req.RepoURL + " (Frontend)",
-				GitToken:    req.GitToken,
-				ImageName:   frontendImageName,
-				ContainerID: feContainerID[:12],
-				DomainName:  feDomainName,
-				Status:      "running",
-				ForceAI:     req.ForceAI,
+				RepoURL:       req.RepoURL + " (Frontend)",
+				GitToken:      req.GitToken,
+				ImageName:     frontendImageName,
+				ContainerID:   feContainerID[:12],
+				DomainName:    feDomainName,
+				Status:        "running",
+				ForceAI:       req.ForceAI,
+				Branch:        gitMeta.Branch,
+				CommitHash:    gitMeta.CommitHash,
+				CommitMessage: gitMeta.CommitMessage,
+				AuthorName:    gitMeta.AuthorName,
+				AuthorAvatar:  gitMeta.AuthorAvatar,
 			})
 
 			// Prune old unused images in background
@@ -299,13 +312,18 @@ func TestDeploy(c *gin.Context) {
 
 		// Record in database
 		newDeploy := models.Deployment{
-			RepoURL:     req.RepoURL,
-			GitToken:    req.GitToken,
-			ImageName:   imageName,
-			ContainerID: containerID[:12],
-			DomainName:  domainName,
-			Status:      "running",
-			ForceAI:     req.ForceAI,
+			RepoURL:       req.RepoURL,
+			GitToken:      req.GitToken,
+			ImageName:     imageName,
+			ContainerID:   containerID[:12],
+			DomainName:    domainName,
+			Status:        "running",
+			ForceAI:       req.ForceAI,
+			Branch:        gitMeta.Branch,
+			CommitHash:    gitMeta.CommitHash,
+			CommitMessage: gitMeta.CommitMessage,
+			AuthorName:    gitMeta.AuthorName,
+			AuthorAvatar:  gitMeta.AuthorAvatar,
 		}
 
 		if err := config.DB.Create(&newDeploy).Error; err != nil {

@@ -126,3 +126,66 @@ func CloneRepository(repoURL string, gitToken ...string) (string, error) {
 
 	return buildDir, nil
 }
+
+// GitMetadata เก็บข้อมูล Branch, Commit Hash, Commit Message และ Author จาก Git จริง
+type GitMetadata struct {
+	Branch        string
+	CommitHash    string
+	CommitMessage string
+	AuthorName    string
+	AuthorAvatar  string
+}
+
+// GetGitMetadata ดึงข้อมูล branch, commit, message และ author จากโฟลเดอร์ Git
+func GetGitMetadata(repoDir string, originalRepoURL string) GitMetadata {
+	meta := GitMetadata{
+		Branch:     "main",
+		CommitHash: "head",
+	}
+
+	// 1. ดึงชื่อ Branch ปัจจุบัน (เช่น main, master, dev)
+	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchCmd.Dir = repoDir
+	if out, err := branchCmd.Output(); err == nil {
+		b := strings.TrimSpace(string(out))
+		if b != "" && b != "HEAD" {
+			meta.Branch = b
+		}
+	}
+
+	// 2. ดึง Commit Hash ย่อ (7 ตัว), ชื่อผู้เขียน (Author), และข้อความ Commit
+	logCmd := exec.Command("git", "log", "-1", "--pretty=format:%h|%an|%s")
+	logCmd.Dir = repoDir
+	if out, err := logCmd.Output(); err == nil {
+		parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 3)
+		if len(parts) >= 1 && strings.TrimSpace(parts[0]) != "" {
+			meta.CommitHash = strings.TrimSpace(parts[0])
+		}
+		if len(parts) >= 2 && strings.TrimSpace(parts[1]) != "" {
+			meta.AuthorName = strings.TrimSpace(parts[1])
+		}
+		if len(parts) >= 3 && strings.TrimSpace(parts[2]) != "" {
+			meta.CommitMessage = strings.TrimSpace(parts[2])
+		}
+	}
+
+	// 3. กำหนด Avatar จากเจ้าของ GitHub Repository (เช่น https://github.com/owner.png)
+	cleanURL := strings.TrimSpace(originalRepoURL)
+	if strings.Contains(cleanURL, "github.com/") {
+		trimmed := strings.Split(cleanURL, "github.com/")[1]
+		parts := strings.Split(trimmed, "/")
+		if len(parts) >= 1 && parts[0] != "" {
+			owner := strings.TrimSpace(parts[0])
+			meta.AuthorAvatar = fmt.Sprintf("https://github.com/%s.png?size=64", owner)
+			if meta.AuthorName == "" {
+				meta.AuthorName = owner
+			}
+		}
+	}
+
+	if meta.AuthorName == "" {
+		meta.AuthorName = "Developer"
+	}
+
+	return meta
+}

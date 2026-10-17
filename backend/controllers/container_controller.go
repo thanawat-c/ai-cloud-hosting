@@ -220,6 +220,39 @@ func GetContainers(c *gin.Context) {
 			deployedAt = d.CreatedAt
 		}
 
+		// กำหนด Branch, Commit Hash, Author Name และ Author Avatar ให้สมบูรณ์
+		branch := d.Branch
+		if branch == "" {
+			branch = "main"
+		}
+
+		commitHash := d.CommitHash
+		if commitHash == "" && d.ContainerID != "" {
+			if len(d.ContainerID) >= 7 {
+				commitHash = d.ContainerID[:7]
+			} else {
+				commitHash = d.ContainerID
+			}
+		}
+
+		authorName := d.AuthorName
+		authorAvatar := d.AuthorAvatar
+		if authorName == "" {
+			if strings.Contains(d.RepoURL, "github.com/") {
+				trimmed := strings.Split(d.RepoURL, "github.com/")[1]
+				parts := strings.Split(trimmed, "/")
+				if len(parts) >= 1 && parts[0] != "" {
+					authorName = strings.TrimSpace(parts[0])
+					if authorAvatar == "" {
+						authorAvatar = fmt.Sprintf("https://github.com/%s.png?size=64", authorName)
+					}
+				}
+			}
+		}
+		if authorName == "" {
+			authorName = "Developer"
+		}
+
 		results = append(results, map[string]interface{}{
 			"id":             d.ContainerID,
 			"deployment_id":  d.ID,
@@ -234,6 +267,11 @@ func GetContainers(c *gin.Context) {
 			"deployed_at":    deployedAt.Format(time.RFC3339),
 			"domain_name":    d.DomainName,
 			"last_error":     lastError,
+			"branch":         branch,
+			"commit_hash":    commitHash,
+			"commit_message": d.CommitMessage,
+			"author_name":    authorName,
+			"author_avatar":  authorAvatar,
 			"linked_db_name": linkedDBName,
 			"linked_db_id":   linkedDBID,
 			"is_db_stopped":  isDBStopped,

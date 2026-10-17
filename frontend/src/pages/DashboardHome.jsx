@@ -1202,17 +1202,21 @@ const DashboardHome = () => {
 
                         {/* 5. Commit */}
                         <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5" title={item.commit_message || `Commit: ${item.commit_hash || item.id?.substring(0, 7)}`}>
                             <span className="text-[#666666] font-mono text-xs">-o-</span>
-                            <span className="text-[#a1a1a1] hover:text-white transition-colors">{item.id ? item.id.substring(0, 7) : 'head'}</span>
+                            <span className="text-[#a1a1a1] hover:text-white transition-colors">
+                              {item.commit_hash || (item.id ? item.id.substring(0, 7) : 'head')}
+                            </span>
                           </div>
                         </td>
 
                         {/* 6. Branch */}
                         <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5" title={`Branch: ${item.branch || 'main'}`}>
                             <GitBranch className="w-3.5 h-3.5 text-[#666666] shrink-0" />
-                            <span className="text-[#a1a1a1] hover:text-white transition-colors">main</span>
+                            <span className="text-[#a1a1a1] hover:text-white transition-colors">
+                              {item.branch || 'main'}
+                            </span>
                           </div>
                         </td>
 
@@ -1224,10 +1228,28 @@ const DashboardHome = () => {
                         {/* 8. Menu (...) & Visit & Avatar */}
                         <td className={`px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container ${isMenuOpen ? 'z-40' : ''}`}>
                           <div className="inline-flex items-center justify-end gap-2.5">
-                            {/* Vercel Avatar with gradient border */}
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-500 p-[1.5px] shrink-0" title="Deployer: Kan">
-                              <div className="w-full h-full bg-black rounded-full flex items-center justify-center text-[9px] font-mono font-bold text-white">
-                                K
+                            {/* Real Deployer Avatar or Initial */}
+                            <div 
+                              className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-500 p-[1.5px] shrink-0 overflow-hidden" 
+                              title={`Deployer: ${item.author_name || 'Developer'}`}
+                            >
+                              {item.author_avatar ? (
+                                <img 
+                                  src={item.author_avatar} 
+                                  alt={item.author_name || 'Deployer'} 
+                                  className="w-full h-full rounded-full object-cover bg-neutral-900"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    if (e.target.nextSibling) {
+                                      e.target.nextSibling.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              <div 
+                                className={`w-full h-full bg-black rounded-full flex items-center justify-center text-[9px] font-mono font-bold text-white ${item.author_avatar ? 'hidden' : 'flex'}`}
+                              >
+                                {(item.author_name ? item.author_name.charAt(0).toUpperCase() : 'D')}
                               </div>
                             </div>
                             {item.domain_name && isRunning && (
