@@ -1,5 +1,11 @@
 http:
   routers:
+    my-app-deploy-4127284411-frontend:
+      rule: "Host(`my-app-deploy-4127284411-frontend.localhost`)"
+      service: my-app-deploy-4127284411-frontend
+    my-app-deploy-4127284411-backend:
+      rule: "Host(`my-app-deploy-4127284411-backend.localhost`)"
+      service: my-app-deploy-4127284411-backend
     my-app-deploy-2895226822:
       rule: "Host(`my-app-deploy-2895226822.localhost`)"
       service: my-app-deploy-2895226822
@@ -22,6 +28,14 @@ http:
       rule: "Host(`my-app-deploy-1173458073-backend.localhost`)"
       service: my-app-deploy-1173458073-backend
   services:
+    my-app-deploy-4127284411-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://172.19.0.14:80"
+    my-app-deploy-4127284411-backend:
+      loadBalancer:
+        servers:
+          - url: "http://172.19.0.13:5000"
     my-app-deploy-2895226822:
       loadBalancer:
         servers:

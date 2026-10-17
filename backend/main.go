@@ -23,6 +23,7 @@ func main() {
 
 	// รัน sync_traefik.sh เป็น background process
 	go func() {
+		_ = exec.Command("pkill", "-f", "sync_traefik.sh").Run()
 		for {
 			cmd := exec.Command("bash", "sync_traefik.sh")
 			if err := cmd.Run(); err != nil {

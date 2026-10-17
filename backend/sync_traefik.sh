@@ -4,9 +4,16 @@ export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:~/.docker/bin:/Applications/D
 while true; do
   ROUTERS=""
   SERVICES=""
+  SEEN_NAMES=" "
   
   for container in $(docker ps -q --filter "label=traefik.enable=true"); do
     name=$(docker inspect -f '{{.Config.Image}}' $container | cut -d: -f1)
+    
+    # ข้ามทันทีถ้าเคยเพิ่ม router/service ชื่อนี้แล้ว เพื่อป้องกัน Duplicate Key ใน YAML
+    if [[ "$SEEN_NAMES" == *" $name "* ]]; then
+      continue
+    fi
+
     ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container | head -n 1)
     
     # Extract the rule Host(`...`)
@@ -19,6 +26,7 @@ while true; do
     fi
     
     if [ ! -z "$rule" ] && [ ! -z "$ip" ] && [ "$rule" != "<no value>" ]; then
+      SEEN_NAMES="$SEEN_NAMES$name "
       ROUTERS="$ROUTERS
     $name:
       rule: \"$rule\"
