@@ -105,6 +105,18 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		}
 	}
 
+	// มั่นใจได้เสมอว่าจะมี PORT เข้าไปใน Container ป้องกันกรณีโค้ดเรียก process.env.PORT แล้วเป็น undefined
+	hasPort := false
+	for _, env := range envList {
+		if strings.HasPrefix(env, "PORT=") {
+			hasPort = true
+			break
+		}
+	}
+	if !hasPort && targetPort != "" {
+		envList = append(envList, "PORT="+targetPort)
+	}
+
 	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
