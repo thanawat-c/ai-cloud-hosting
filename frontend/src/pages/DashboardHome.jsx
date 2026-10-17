@@ -1643,30 +1643,53 @@ const DashboardHome = () => {
 
             <div className="p-6 space-y-4">
               {envError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-700 text-xs">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-900/60 flex items-start gap-2.5 text-rose-300 text-xs">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-400" />
                   <span>{envError}</span>
                 </div>
               )}
 
               {envSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-emerald-700 text-xs">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/60 flex items-start gap-2.5 text-emerald-300 text-xs">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-400" />
                   <span>{envSuccess}</span>
                 </div>
               )}
 
               <p className="text-xs text-neutral-400 font-mono">
-                Add or edit environment variables (one per line, e.g. <code className="bg-slate-100 px-1 py-0.5 rounded text-neutral-300 font-mono">DB_URL=host=...</code>). The server will restart automatically:
+                Add or edit environment variables (one per line, e.g. <code className="bg-neutral-800 border border-neutral-700 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">DATABASE_URL=postgres://...</code>). The server will restart automatically:
               </p>
+
+              {databases.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] text-neutral-400 font-mono">Quick Insert DB:</span>
+                  {databases.map(db => (
+                    <button
+                      key={db.id}
+                      type="button"
+                      onClick={() => {
+                        const snippet = `DATABASE_URL=${db.internal_url}`;
+                        if (!currentEnvText.includes(snippet)) {
+                          setCurrentEnvText(prev => prev ? `${prev.trim()}\n${snippet}` : snippet);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-purple-300 font-mono text-[11px] transition-colors cursor-pointer"
+                      title={db.internal_url}
+                    >
+                      <Database className="w-3 h-3 text-purple-400" />
+                      <span>{db.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <textarea 
                 value={currentEnvText}
                 onChange={(e) => setCurrentEnvText(e.target.value)}
                 rows="7"
                 disabled={envSaving}
-                placeholder={"DB_URL=host=localhost user=postgres dbname=app\nPORT=8080\nAPI_KEY=secret123"}
-                className="w-full px-4 py-3 rounded-md border border-neutral-800 bg-black text-white font-mono text-xs focus:border-neutral-600 focus:outline-none"
+                placeholder={"DATABASE_URL=postgres://postgres:...@cloud-db-...:5432/app\nPORT=8080\nAPI_KEY=secret123"}
+                className="w-full px-4 py-3 rounded-md border border-neutral-800 bg-black text-white font-mono text-xs focus:border-neutral-600 focus:outline-none placeholder:text-neutral-600"
               ></textarea>
             </div>
 
@@ -1982,7 +2005,7 @@ const DashboardHome = () => {
                           setSqlQuery(query);
                           handleExecuteQuery(query);
                         }}
-                        className="text-[11px] text-neutral-400 hover:text-indigo-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="text-[11px] text-neutral-400 hover:text-indigo-400 font-medium px-2 py-0.5 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
                       >
                         View {sqlTables[0]}
                       </button>
@@ -1990,7 +2013,7 @@ const DashboardHome = () => {
                     <button
                       type="button"
                       onClick={() => setSqlQuery('')}
-                      className="text-[11px] text-neutral-500 hover:text-rose-600 font-medium px-2 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                      className="text-[11px] text-neutral-500 hover:text-rose-400 font-medium px-2 py-0.5 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
                     >
                       Clear
                     </button>
@@ -2442,7 +2465,7 @@ const DashboardHome = () => {
               <button
                 type="button"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors cursor-pointer"
               >
                 {confirmModal.cancelText || 'Cancel'}
               </button>

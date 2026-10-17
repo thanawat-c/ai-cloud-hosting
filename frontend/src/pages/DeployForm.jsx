@@ -631,7 +631,7 @@ const DeployForm = () => {
                               <button
                                 type="button"
                                 onClick={() => handleCopyUrl(publicPort)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-neutral-300 font-mono rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-mono rounded-lg text-xs font-semibold transition-all cursor-pointer border border-neutral-700"
                                 title="Copy public URL"
                               >
                                 {copiedUrl ? (
@@ -760,7 +760,7 @@ const DeployForm = () => {
             <button
               type="button"
               onClick={() => setShowSuccessModal(false)}
-              className="absolute top-4 right-4 text-neutral-500 font-mono hover:text-neutral-400 font-mono p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-neutral-400 hover:text-white p-1.5 rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
