@@ -40,14 +40,56 @@ func GenerateRandomSecret(length int) string {
 	return hex.EncodeToString(b)[:length]
 }
 
-// FindAvailablePort หาพอร์ต Host ที่ว่างอยู่
+// FindAvailablePort หาพอร์ต Host ที่ว่างอยู่ โดยตรวจสอบทั้งใน Database, Docker daemon และ OS
 func FindAvailablePort(startPort int) (int, error) {
-	for port := startPort; port < startPort+200; port++ {
-		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-		if err == nil {
-			_ = ln.Close()
-			return port, nil
+	usedPorts := make(map[int]bool)
+
+	// 1. ดึงพอร์ตที่ ManagedDatabase ในระบบใช้งานอยู่ทั้งหมด
+	if config.DB != nil {
+		var activeDBs []models.ManagedDatabase
+		config.DB.Where("status != ?", "deleted").Find(&activeDBs)
+		for _, db := range activeDBs {
+			if db.HostPort > 0 {
+				usedPorts[db.HostPort] = true
+			}
 		}
+	}
+
+	// 2. ดึงพอร์ตที่ Docker Container ใดๆ ในเครื่องกำลังใช้งานอยู่ทั้งหมด
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err == nil {
+		defer cli.Close()
+		containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
+		if err == nil {
+			for _, c := range containers {
+				for _, p := range c.Ports {
+					if p.PublicPort > 0 {
+						usedPorts[int(p.PublicPort)] = true
+					}
+				}
+			}
+		}
+	}
+
+	// 3. วนหาพอร์ตที่ว่างจริงทั้งใน Docker และบน Host OS (0.0.0.0)
+	for port := startPort; port < startPort+500; port++ {
+		if usedPorts[port] {
+			continue
+		}
+
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			continue
+		}
+		_ = ln.Close()
+
+		ln2, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+		if err != nil {
+			continue
+		}
+		_ = ln2.Close()
+
+		return port, nil
 	}
 	return 0, fmt.Errorf("ไม่พบพอร์ตที่ว่างสำหรับใช้งาน")
 }
@@ -188,6 +230,7 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 
 	// 9. สตาร์ต Container
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		_ = cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return nil, fmt.Errorf("เริ่มรัน Database Container ไม่สำเร็จ: %w", err)
 	}
 
