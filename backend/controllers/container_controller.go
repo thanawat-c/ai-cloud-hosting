@@ -77,10 +77,16 @@ func GetContainers(c *gin.Context) {
 		var isDBStopped bool
 		var dbWarning string
 
-		if d.ContainerID != "" && len(allDBs) > 0 {
+		var isMissingDB bool
+		if d.ContainerID != "" {
 			envs, err := services.GetContainerEnv(context.Background(), d.ContainerID)
 			if err == nil {
 				for _, env := range envs {
+					trimmed := strings.TrimSpace(env)
+					if trimmed == "DATABASE_URL=" || trimmed == "DB_URL=" || trimmed == "POSTGRES_URL=" {
+						isMissingDB = true
+						dbWarning = "DATABASE_URL ยังเป็นค่าว่างเปล่า กรุณาเชื่อมต่อ Database"
+					}
 					for _, db := range allDBs {
 						if strings.Contains(env, db.ContainerName) || strings.Contains(env, db.InternalURL) {
 							linkedDBName = db.Name
@@ -92,8 +98,17 @@ func GetContainers(c *gin.Context) {
 							break
 						}
 					}
-					if linkedDBName != "" {
-						break
+				}
+			}
+			// ตรวจสอบจาก Error Log ล่าสุดของ Container เพิ่มเติมด้วย
+			if !isMissingDB && (actualState == "running" || actualState == "exited") {
+				logs, err := services.GetContainerLogs(context.Background(), d.ContainerID)
+				if err == nil {
+					lowerLogs := strings.ToLower(logs)
+					if strings.Contains(lowerLogs, "database_url resolved to an empty string") ||
+						strings.Contains(lowerLogs, "you must provide a nonempty url") {
+						isMissingDB = true
+						dbWarning = "DATABASE_URL ว่างเปล่า: Prisma ใช้งาน Database ไม่ได้"
 					}
 				}
 			}
@@ -137,6 +152,7 @@ func GetContainers(c *gin.Context) {
 			"linked_db_name": linkedDBName,
 			"linked_db_id":   linkedDBID,
 			"is_db_stopped":  isDBStopped,
+			"is_missing_db":  isMissingDB,
 			"db_warning":     dbWarning,
 			"webhook_secret": d.WebhookSecret,
 			"webhook_url":    fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),

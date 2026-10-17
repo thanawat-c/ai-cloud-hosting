@@ -1064,6 +1064,7 @@ const DashboardHome = () => {
                     const isCrashed = item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting';
                     const isUpdating = item.state === 'redeploying';
                     const isDbStopped = isRunning && item.is_db_stopped;
+                    const isDbMissing = isRunning && (item.is_missing_db || (item.db_warning && !item.linked_db_name));
                     const shortName = getShortAppName(item.name, item.clean_name);
                     const isMenuOpen = activeMenuId === item.id;
 
@@ -1146,6 +1147,19 @@ const DashboardHome = () => {
                               <span>Failed</span>
                               <span className="text-[10px] text-rose-300 bg-rose-950 border border-rose-900 px-1 py-0.2 rounded">
                                 Logs
+                              </span>
+                            </button>
+                          ) : isDbMissing ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEnv(item.id, item.name)}
+                              className="flex items-center gap-1.5 text-xs font-mono text-amber-400 hover:text-amber-300 transition-colors group/warn cursor-pointer"
+                              title={item.db_warning || 'Database connection is missing! Click to connect.'}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                              <span className="font-medium text-amber-400">Missing DB</span>
+                              <span className="text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/80 px-1.5 py-0.2 rounded group-hover/warn:bg-amber-900 transition-colors">
+                                Connect
                               </span>
                             </button>
                           ) : isDbStopped ? (

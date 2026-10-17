@@ -332,18 +332,30 @@ const DeployForm = () => {
 
               {/* Row 2: Direct Database Attachment */}
               {databases.length > 0 && (
-                <div className="p-3 rounded-md bg-black border border-neutral-800 space-y-2">
+                <div className={`p-3 rounded-md bg-black border space-y-2 transition-all ${
+                  inspectResult.has_database && !selectedDbId ? 'border-amber-500/60 ring-1 ring-amber-500/20' : 'border-neutral-800'
+                }`}>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-200 font-mono">
                       <Database className="w-3.5 h-3.5 text-purple-400" />
                       <span>Database Attachment:</span>
                     </label>
                     {inspectResult.has_database && (
-                      <span className="text-[10px] text-purple-400 font-mono font-medium px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30">
-                        Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
+                      <span className="text-[10px] text-amber-400 font-mono font-medium px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
+                        ⚠️ Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
                       </span>
                     )}
                   </div>
+
+                  {inspectResult.has_database && !selectedDbId && (
+                    <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/20 flex items-start gap-2 text-amber-300 text-[11px] font-mono">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-amber-200">โปรเจกต์นี้จำเป็นต้องใช้ Database:</span> กรุณาเลือก Database ในช่องด้านล่าง หรือกรอกค่า <span className="underline">{inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'}</span> ใน .env มิฉะนั้นแอปจะทำงานไม่ได้ (500 Error)
+                      </div>
+                    </div>
+                  )}
+
                   <select
                     value={selectedDbId}
                     onChange={(e) => handleSelectDatabase(e.target.value)}
