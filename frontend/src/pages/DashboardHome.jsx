@@ -1778,7 +1778,7 @@ const DashboardHome = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-[10px] font-bold tracking-wider uppercase text-rose-400">
-                          Latest Root Cause Error (ข้อผิดพลาดล่าสุด)
+                          Latest Root Cause Error
                         </span>
                         <button
                           type="button"

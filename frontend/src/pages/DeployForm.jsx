@@ -387,7 +387,7 @@ const DeployForm = () => {
                         </span>
                       </div>
                       <p className="text-[11px] text-neutral-400 font-mono mt-1 leading-relaxed">
-                        ระบบจะสร้าง Database Container ให้เองอัตโนมัติ ผูก DATABASE_URL และ Sync โครงสร้าง/Seed ข้อมูลให้ครบในคลิกเดียว
+                        Automatically provisions a dedicated database container, injects DATABASE_URL, and syncs schema/seed in one click.
                       </p>
                     </div>
                   </div>
@@ -395,13 +395,13 @@ const DeployForm = () => {
                   {/* Manual / Existing DB Dropdown (Show when user unchecks auto-create or wants existing DB) */}
                   {!autoCreateDb && (
                     <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] text-neutral-400 font-mono block">หรือเลือก Database ที่มีอยู่แล้วในระบบ:</span>
+                      <span className="text-[11px] text-neutral-400 font-mono block">Or select an existing database in the cluster:</span>
                       <select
                         value={selectedDbId}
                         onChange={(e) => handleSelectDatabase(e.target.value)}
                         className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-neutral-950 text-xs font-mono text-white focus:outline-none focus:border-neutral-600 cursor-pointer"
                       >
-                        <option value="" className="bg-neutral-900 text-neutral-400">-- ไม่ผูก Database (กำหนดค่าเองใน .env) --</option>
+                        <option value="" className="bg-neutral-900 text-neutral-400">-- Do not attach database (Configure manually via .env) --</option>
                         {databases.map(db => (
                           <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
                             {db.name} ({db.db_type || 'PostgreSQL'} :5432)

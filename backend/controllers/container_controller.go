@@ -98,7 +98,7 @@ func GetContainers(c *gin.Context) {
 					trimmed := strings.TrimSpace(env)
 					if trimmed == "DATABASE_URL=" || trimmed == "DB_URL=" || trimmed == "POSTGRES_URL=" {
 						isMissingDB = true
-						dbWarning = "DATABASE_URL ยังเป็นค่าว่างเปล่า กรุณาเชื่อมต่อ Database"
+						dbWarning = "DATABASE_URL is empty. Please attach a database."
 					}
 
 					for _, db := range allDBs {
@@ -107,22 +107,22 @@ func GetContainers(c *gin.Context) {
 							linkedDBID = db.ID
 							if db.Status == "deleted" {
 								isMissingDB = true
-								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' ถูกลบออกจากระบบแล้ว กรุณาเชื่อมต่อ Database ใหม่", db.Name)
+								dbWarning = fmt.Sprintf("Database '%s' was deleted. Please attach a new database.", db.Name)
 							} else if db.Status != "running" {
 								isDBStopped = true
-								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' กำลังหยุดทำงาน (Stopped) ทำให้แอปไม่สามารถเชื่อมต่อได้", db.Name)
+								dbWarning = fmt.Sprintf("Database '%s' is stopped. Application cannot connect.", db.Name)
 							} else {
-								// เช็คสถานะจริงใน Docker ด้วยว่า Container DB ยังรันอยู่ไหม
+								// Check docker status for db
 								if state, ok := dockerStateMap[db.ContainerID]; !ok || state != "running" {
 									isDBStopped = true
-									dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' หยุดทำงานบนเซิร์ฟเวอร์", db.Name)
+									dbWarning = fmt.Sprintf("Database '%s' is offline on server.", db.Name)
 								}
 							}
 							break
 						}
 					}
 
-					// กรณีที่ DATABASE_URL ระบุชื่อ cloud-db-xxx แต่ DB นั้นถูกลบไปแล้ว หรือไม่มีใน Docker
+					// Check if DATABASE_URL refers to cloud-db-xxx that was deleted or doesn't exist
 					if !isMissingDB && strings.Contains(env, "cloud-db-") {
 						hasLiveDB := false
 						for _, dc := range dockerContainers {
@@ -135,14 +135,14 @@ func GetContainers(c *gin.Context) {
 						if !hasLiveDB {
 							isMissingDB = true
 							if dbWarning == "" {
-								dbWarning = "ฐานข้อมูลที่เชื่อมต่อไว้ถูกลบหรือไม่พบในระบบ กรุณาเชื่อมต่อ Database ใหม่"
+								dbWarning = "Attached database was deleted or not found. Please attach a database."
 							}
 						}
 					}
 				}
 			}
 
-			// ตรวจสอบจาก Error Log ล่าสุดของ Container เพิ่มเติม (สำหรับ backend / standalone)
+			// Check container error logs for backend / standalone
 			if !isMissingDB && !isDBStopped && (actualState == "running" || actualState == "exited") {
 				logs, err := services.GetContainerLogs(context.Background(), d.ContainerID)
 				if err == nil {
@@ -150,7 +150,7 @@ func GetContainers(c *gin.Context) {
 					if strings.Contains(lowerLogs, "database_url resolved to an empty string") ||
 						strings.Contains(lowerLogs, "you must provide a nonempty url") {
 						isMissingDB = true
-						dbWarning = "DATABASE_URL ว่างเปล่า: Prisma ใช้งาน Database ไม่ได้"
+						dbWarning = "DATABASE_URL is empty: Prisma cannot connect to database."
 					} else if strings.Contains(lowerLogs, "can't reach database server") ||
 						strings.Contains(lowerLogs, "code: 'p1001'") ||
 						strings.Contains(lowerLogs, "code: \"p1001\"") ||
@@ -163,9 +163,9 @@ func GetContainers(c *gin.Context) {
 						isMissingDB = true
 						if dbWarning == "" {
 							if linkedDBName != "" {
-								dbWarning = fmt.Sprintf("ไม่สามารถเชื่อมต่อฐานข้อมูล '%s' ได้ (Connection Refused / Can't reach DB)", linkedDBName)
+								dbWarning = fmt.Sprintf("Cannot reach database '%s' (Connection Refused / P1001)", linkedDBName)
 							} else {
-								dbWarning = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (Connection Refused / Can't reach DB)"
+								dbWarning = "Cannot reach database server (Connection Refused / P1001)"
 							}
 						}
 					}
