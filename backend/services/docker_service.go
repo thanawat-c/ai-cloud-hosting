@@ -105,16 +105,30 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		}
 	}
 
-	// มั่นใจได้เสมอว่าจะมี PORT เข้าไปใน Container ป้องกันกรณีโค้ดเรียก process.env.PORT แล้วเป็น undefined
-	hasPort := false
-	for _, env := range envList {
+	// มั่นใจได้เสมอว่าจะมี PORT เข้าไปใน Container ป้องกันกรณีโค้ดเรียก process.env.PORT แล้วเป็นค่าว่างหรือ undefined
+	hasValidPort := false
+	for i, env := range envList {
 		if strings.HasPrefix(env, "PORT=") {
-			hasPort = true
+			val := strings.TrimSpace(strings.TrimPrefix(env, "PORT="))
+			if val == "" && targetPort != "" {
+				envList[i] = "PORT=" + targetPort
+			}
+			hasValidPort = true
 			break
 		}
 	}
-	if !hasPort && targetPort != "" {
+	if !hasValidPort && targetPort != "" {
 		envList = append(envList, "PORT="+targetPort)
+	}
+
+	// รองรับกรณี SERVER_PORT มีค่าว่างด้วย (เช่น docker-compose ใช้ SERVER_PORT)
+	for i, env := range envList {
+		if strings.HasPrefix(env, "SERVER_PORT=") {
+			val := strings.TrimSpace(strings.TrimPrefix(env, "SERVER_PORT="))
+			if val == "" && targetPort != "" {
+				envList[i] = "SERVER_PORT=" + targetPort
+			}
+		}
 	}
 
 	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik
