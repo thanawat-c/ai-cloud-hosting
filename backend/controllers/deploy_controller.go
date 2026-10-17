@@ -56,20 +56,19 @@ func TestDeploy(c *gin.Context) {
 			logChan <- fmt.Sprintf("🚀 [1/2] Preparing Backend Service: '%s/'...\n", beDirName)
 			logChan <- "=========================================\n"
 
-			backendDockerfile := filepath.Join(buildDir, "Dockerfile.backend")
-			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, beDirName)
+			backendDir := filepath.Join(buildDir, beDirName)
+			backendDockerfile := filepath.Join(backendDir, "Dockerfile")
+			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, backendDir, beDirName)
 			if err != nil {
 				logChan <- "Error: Failed to generate Dockerfile for backend: " + err.Error() + "\n"
 				return
 			}
 			os.WriteFile(backendDockerfile, []byte(aiBackendDocker), 0644)
-			// Temporarily write to main Dockerfile to build backend
-			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiBackendDocker), 0644)
 
 			baseImageName := "my-app-" + filepath.Base(buildDir)
 
 			logChan <- "Building backend container image...\n"
-			backendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-backend")
+			backendImageName, err := services.BuildImage(ctx, backendDir, logChan, baseImageName+"-backend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return
@@ -99,13 +98,15 @@ func TestDeploy(c *gin.Context) {
 			logChan <- fmt.Sprintf("🔗 Binding API endpoint: NUXT_PUBLIC_API_URL=http://%s\n", beDomainName)
 			logChan <- "=========================================\n"
 
+			frontendDir := filepath.Join(buildDir, feDirName)
+			frontendDockerfile := filepath.Join(frontendDir, "Dockerfile")
 			backendInternalEndpoint := fmt.Sprintf("%s:%s", backendImageName, backendPort)
-			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, feDirName, backendInternalEndpoint)
+			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, frontendDir, feDirName, backendInternalEndpoint)
 			if err != nil {
 				logChan <- "Error: Failed to generate Dockerfile for frontend: " + err.Error() + "\n"
 				return
 			}
-			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiFrontendDocker), 0644)
+			os.WriteFile(frontendDockerfile, []byte(aiFrontendDocker), 0644)
 
 			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100%
 			// ใช้ resolver 127.0.0.11 (Docker DNS) และ set ตัวแปร เพื่อไม่ให้ Nginx แครชตอนสตาร์ตถ้า backend ดับอยู่
@@ -134,10 +135,10 @@ func TestDeploy(c *gin.Context) {
     }
 }
 `, backendInternalEndpoint)
-			os.WriteFile(filepath.Join(buildDir, "nginx.conf"), []byte(nginxConf), 0644)
+			os.WriteFile(filepath.Join(frontendDir, "nginx.conf"), []byte(nginxConf), 0644)
 
 			logChan <- "Building frontend container image...\n"
-			frontendImageName, err := services.BuildImage(ctx, buildDir, logChan, baseImageName+"-frontend")
+			frontendImageName, err := services.BuildImage(ctx, frontendDir, logChan, baseImageName+"-frontend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return

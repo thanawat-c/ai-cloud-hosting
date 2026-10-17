@@ -146,14 +146,15 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Backend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
 - สแกนดูภาษาและ framework ของโฟลเดอร์ "%s/" (เช่น Go, Python, Node.js, Java, Rust, PHP)
 - เลือก Base Image ให้เหมาะสม (Go: golang:alpine พร้อม ENV GOTOOLCHAIN=auto, Node: node:22-alpine, Python: python:3.11-slim)
-- คัดลอกและ Build จากโฟลเดอร์เป้าหมาย "%s/" ให้ถูกต้อง เช่น:
+- สำคัญมากเรื่อง Path: Build Context ของ Docker คือโฟลเดอร์บริการนี้โดยตรง ทุกคำสั่งใน Dockerfile ต้องใช้ Relative Path (เช่น WORKDIR /app, COPY package*.json ./, COPY . ./ หรือ COPY go.mod go.sum* ./) ห้ามใส่ชื่อโฟลเดอร์ "%s/" ซ้ำในคำสั่ง COPY หรือ WORKDIR เด็ดขาด
+- ตัวอย่างคำสั่ง:
   * หากเป็น Go:
     FROM golang:alpine AS builder
     ENV GOTOOLCHAIN=auto
-    WORKDIR /app/%s
-    COPY %s/go.mod %s/go.sum* ./
+    WORKDIR /app
+    COPY go.mod go.sum* ./
     RUN go mod download
-    COPY %s/ ./
+    COPY . ./
     RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
     FROM alpine:latest
     WORKDIR /app
@@ -162,22 +163,22 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     CMD ["/app/server"]
   * หากเป็น Node.js / TypeScript:
     FROM node:22-alpine AS builder
-    WORKDIR /app/%s
-    COPY %s/package.json %s/*lock* ./
+    WORKDIR /app
+    COPY package.json *lock* ./
     RUN (ตรวจ lockfile แล้วรัน pnpm/yarn/npm install)
-    COPY %s/ ./
+    COPY . ./
     RUN (ถ้ามี build script ให้รัน npm run build หรือ pnpm run build)
     EXPOSE <port>
     CMD ["node", ...] หรือ CMD ["npm", "start"]
   * หากเป็น Python:
     FROM python:3.11-slim
-    WORKDIR /app/%s
-    COPY %s/requirements.txt* %s/pyproject.toml* ./
+    WORKDIR /app
+    COPY requirements.txt* pyproject.toml* ./
     RUN pip install --no-cache-dir -r requirements.txt
-    COPY %s/ ./
+    COPY . ./
     EXPOSE <port>
     CMD ["uvicorn", ...] หรือ CMD ["python", "main.py"]
-- กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir, targetDir)
+- กำหนด EXPOSE พอร์ตที่ backend รันจริง (เช่น 8080, 8000, 3000, 5000)`, targetDir, targetDir, targetDir)
 	} else if isFrontend {
 		backendURL := endpoint
 		if backendURL != "" && !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
@@ -193,25 +194,26 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     ENV NUXT_PUBLIC_API_URL=%s
     ENV VITE_API_URL=%s
     ENV NEXT_PUBLIC_API_URL=%s
+- สำคัญมากเรื่อง Path: Build Context ของ Docker คือโฟลเดอร์ frontend นี้โดยตรง ทุกคำสั่ง COPY ต้องใช้ Relative Path ห้ามใส่ชื่อโฟลเดอร์ "%s/" ซ้ำในคำสั่ง COPY หรือ WORKDIR เด็ดขาด
 - ขั้นตอนการ Build:
-  WORKDIR /app/%s
-  COPY %s/package.json %s/*lock* ./
+  WORKDIR /app
+  COPY package.json *lock* ./
   (รันคำสั่งติดตั้ง dependencies ตาม lockfile เช่น npm ci, pnpm install, yarn install)
-  COPY %s/ ./
+  COPY . ./
   (ต้องใส่ ENV BACKEND_URL=%s และตัวแปรด้านบนก่อนคำสั่งรัน build เพื่อให้ frameworks เช่น Nuxt/Next/Vite compile proxy และ API URL ได้ถูกต้อง)
   (รัน build script เช่น pnpm run build หรือ pnpm run generate หรือ npm run build)
 - Stage สุดท้าย:
   * หากเป็น Static Web App (Vite, React, Vue, Nuxt static):
     FROM nginx:alpine
     RUN rm -rf /usr/share/nginx/html/*
-    COPY --from=builder /app/%s/(dist หรือ .output/public หรือ build) /usr/share/nginx/html/
+    COPY --from=builder /app/(dist หรือ .output/public หรือ build) /usr/share/nginx/html/
     COPY nginx.conf /etc/nginx/conf.d/default.conf
     EXPOSE 80
     CMD ["nginx", "-g", "daemon off;"]
   * หากเป็น SSR App (Next.js standalone, Nuxt node-server):
     (ต้องใส่ ENV BACKEND_URL=%s และ ENV API_URL=%s ใน Runtime Stage นี้ด้วยเพื่อให้ SSR หรือ Server Proxy เรียก Backend ถูกต้อง)
     EXPOSE 3000
-    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, targetDir, targetDir, targetDir, backendURL, targetDir, backendURL, backendURL)
+    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, backendURL, backendURL, backendURL)
 	} else {
 		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับ [Standalone Project] ที่อยู่ที่ Root directory:
 - สแกนดูไฟล์และ config ใน Root เพื่อระบุประเภทโปรเจกต์ (Go, Node.js, Python, Java, PHP, Rust, หรือ Web Frontend)

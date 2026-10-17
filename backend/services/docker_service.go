@@ -411,23 +411,26 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 
 	targetPort := "80"
 	isMonorepo, feDir, beDir := DetectMonorepoServices(ctx, buildDir)
+	activeDir := buildDir
 	if isMonorepo {
 		if isBackend {
-			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, beDir)
+			activeDir = filepath.Join(buildDir, beDir)
+			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, activeDir, beDir)
 			if err != nil {
 				return "", fmt.Errorf("AI สร้าง Dockerfile Backend ไม่สำเร็จ: %w", err)
 			}
 			targetPort = port
-			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiDocker), 0644)
+			os.WriteFile(filepath.Join(activeDir, "Dockerfile"), []byte(aiDocker), 0644)
 		} else if isFrontend {
+			activeDir = filepath.Join(buildDir, feDir)
 			backendName := strings.TrimSuffix(imageName, "-frontend") + "-backend"
 			backendEndpoint := fmt.Sprintf("%s:8080", backendName)
-			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, feDir, backendEndpoint)
+			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, activeDir, feDir, backendEndpoint)
 			if err != nil {
 				return "", fmt.Errorf("AI สร้าง Dockerfile Frontend ไม่สำเร็จ: %w", err)
 			}
 			targetPort = port
-			os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(aiDocker), 0644)
+			os.WriteFile(filepath.Join(activeDir, "Dockerfile"), []byte(aiDocker), 0644)
 
 			backendInternalURL := fmt.Sprintf("http://%s", backendEndpoint)
 			if !strings.Contains(oldEnvVars, "BACKEND_URL=") {
@@ -459,7 +462,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
     }
 }
 `, backendEndpoint)
-			os.WriteFile(filepath.Join(buildDir, "nginx.conf"), []byte(nginxConf), 0644)
+			os.WriteFile(filepath.Join(activeDir, "nginx.conf"), []byte(nginxConf), 0644)
 		}
 	} else {
 		dockerfilePath := filepath.Join(buildDir, "Dockerfile")
@@ -479,7 +482,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 			fmt.Print(msg)
 		}
 	}()
-	_, err = BuildImage(ctx, buildDir, logChan, imageName)
+	_, err = BuildImage(ctx, activeDir, logChan, imageName)
 	if err != nil {
 		return "", fmt.Errorf("สร้าง Image ใหม่ไม่สำเร็จ: %w", err)
 	}
