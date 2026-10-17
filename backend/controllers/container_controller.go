@@ -26,9 +26,9 @@ func GetContainers(c *gin.Context) {
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())
 	
-	// ดึงรายการ Managed Database ทั้งหมดเพื่อนำมาตรวจจับสถานะการเชื่อมต่อ DB
+	// ดึงรายการ Managed Database ทั้งหมด (รวมถึงที่ถูกลบไปแล้ว เพื่อเช็คว่า Service เดิมเคยผูกกับ DB ที่ถูกลบหรือไม่)
 	var allDBs []models.ManagedDatabase
-	config.DB.Where("status != ?", "deleted").Find(&allDBs)
+	config.DB.Find(&allDBs)
 
 	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร
 	dockerStateMap := make(map[string]string)
@@ -71,50 +71,7 @@ func GetContainers(c *gin.Context) {
 			continue
 		}
 
-		// ตรวจสอบว่า Container นี้ผูกกับ Managed Database ตัวไหน และ DB นั้นหยุดทำงานอยู่หรือไม่
-		var linkedDBName string
-		var linkedDBID uint
-		var isDBStopped bool
-		var dbWarning string
-
-		var isMissingDB bool
-		if d.ContainerID != "" {
-			envs, err := services.GetContainerEnv(context.Background(), d.ContainerID)
-			if err == nil {
-				for _, env := range envs {
-					trimmed := strings.TrimSpace(env)
-					if trimmed == "DATABASE_URL=" || trimmed == "DB_URL=" || trimmed == "POSTGRES_URL=" {
-						isMissingDB = true
-						dbWarning = "DATABASE_URL ยังเป็นค่าว่างเปล่า กรุณาเชื่อมต่อ Database"
-					}
-					for _, db := range allDBs {
-						if strings.Contains(env, db.ContainerName) || strings.Contains(env, db.InternalURL) {
-							linkedDBName = db.Name
-							linkedDBID = db.ID
-							if db.Status != "running" {
-								isDBStopped = true
-								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' กำลังหยุดทำงาน (Stopped) ทำให้แอปไม่สามารถเชื่อมต่อได้", db.Name)
-							}
-							break
-						}
-					}
-				}
-			}
-			// ตรวจสอบจาก Error Log ล่าสุดของ Container เพิ่มเติมด้วย
-			if !isMissingDB && (actualState == "running" || actualState == "exited") {
-				logs, err := services.GetContainerLogs(context.Background(), d.ContainerID)
-				if err == nil {
-					lowerLogs := strings.ToLower(logs)
-					if strings.Contains(lowerLogs, "database_url resolved to an empty string") ||
-						strings.Contains(lowerLogs, "you must provide a nonempty url") {
-						isMissingDB = true
-						dbWarning = "DATABASE_URL ว่างเปล่า: Prisma ใช้งาน Database ไม่ได้"
-					}
-				}
-			}
-		}
-
-		// สังเกตประเภท Service จากชื่อ RepoURL
+		// สังเกตประเภท Service จากชื่อ RepoURL ก่อนเป็นอันดับแรก
 		serviceType := "standalone"
 		cleanName := d.RepoURL
 		if strings.HasSuffix(d.RepoURL, " (Backend)") {
@@ -123,6 +80,97 @@ func GetContainers(c *gin.Context) {
 		} else if strings.HasSuffix(d.RepoURL, " (Frontend)") {
 			serviceType = "frontend"
 			cleanName = strings.TrimSuffix(d.RepoURL, " (Frontend)")
+		}
+
+		// ตรวจสอบว่า Container นี้ผูกกับ Managed Database ตัวไหน และ DB นั้นหยุดทำงาน/ถูกลบ หรือไม่
+		var linkedDBName string
+		var linkedDBID uint
+		var isDBStopped bool
+		var dbWarning string
+		var isMissingDB bool
+
+		// Frontend เป็น Web UI จะติดต่อกับ Backend ผ่าน API เสมอ ไม่ต้องเชื่อมต่อ Database โดยตรง
+		// ดังนั้นจะไม่ตรวจสอบ Database กับ Frontend เด็ดขาด
+		if serviceType != "frontend" && d.ContainerID != "" {
+			envs, err := services.GetContainerEnv(context.Background(), d.ContainerID)
+			if err == nil {
+				for _, env := range envs {
+					trimmed := strings.TrimSpace(env)
+					if trimmed == "DATABASE_URL=" || trimmed == "DB_URL=" || trimmed == "POSTGRES_URL=" {
+						isMissingDB = true
+						dbWarning = "DATABASE_URL ยังเป็นค่าว่างเปล่า กรุณาเชื่อมต่อ Database"
+					}
+
+					for _, db := range allDBs {
+						if strings.Contains(env, db.ContainerName) || (db.InternalURL != "" && strings.Contains(env, db.InternalURL)) {
+							linkedDBName = db.Name
+							linkedDBID = db.ID
+							if db.Status == "deleted" {
+								isMissingDB = true
+								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' ถูกลบออกจากระบบแล้ว กรุณาเชื่อมต่อ Database ใหม่", db.Name)
+							} else if db.Status != "running" {
+								isDBStopped = true
+								dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' กำลังหยุดทำงาน (Stopped) ทำให้แอปไม่สามารถเชื่อมต่อได้", db.Name)
+							} else {
+								// เช็คสถานะจริงใน Docker ด้วยว่า Container DB ยังรันอยู่ไหม
+								if state, ok := dockerStateMap[db.ContainerID]; !ok || state != "running" {
+									isDBStopped = true
+									dbWarning = fmt.Sprintf("ฐานข้อมูล '%s' หยุดทำงานบนเซิร์ฟเวอร์", db.Name)
+								}
+							}
+							break
+						}
+					}
+
+					// กรณีที่ DATABASE_URL ระบุชื่อ cloud-db-xxx แต่ DB นั้นถูกลบไปแล้ว หรือไม่มีใน Docker
+					if !isMissingDB && strings.Contains(env, "cloud-db-") {
+						hasLiveDB := false
+						for _, dc := range dockerContainers {
+							cleanDcName := strings.TrimPrefix(dc.Name, "/")
+							if strings.Contains(cleanDcName, "cloud-db-") && strings.Contains(env, cleanDcName) && dc.State == "running" {
+								hasLiveDB = true
+								break
+							}
+						}
+						if !hasLiveDB {
+							isMissingDB = true
+							if dbWarning == "" {
+								dbWarning = "ฐานข้อมูลที่เชื่อมต่อไว้ถูกลบหรือไม่พบในระบบ กรุณาเชื่อมต่อ Database ใหม่"
+							}
+						}
+					}
+				}
+			}
+
+			// ตรวจสอบจาก Error Log ล่าสุดของ Container เพิ่มเติม (สำหรับ backend / standalone)
+			if !isMissingDB && !isDBStopped && (actualState == "running" || actualState == "exited") {
+				logs, err := services.GetContainerLogs(context.Background(), d.ContainerID)
+				if err == nil {
+					lowerLogs := strings.ToLower(logs)
+					if strings.Contains(lowerLogs, "database_url resolved to an empty string") ||
+						strings.Contains(lowerLogs, "you must provide a nonempty url") {
+						isMissingDB = true
+						dbWarning = "DATABASE_URL ว่างเปล่า: Prisma ใช้งาน Database ไม่ได้"
+					} else if strings.Contains(lowerLogs, "can't reach database server") ||
+						strings.Contains(lowerLogs, "code: 'p1001'") ||
+						strings.Contains(lowerLogs, "code: \"p1001\"") ||
+						strings.Contains(lowerLogs, "prismaclientinitializationerror") ||
+						strings.Contains(lowerLogs, "connect econnrefused") ||
+						strings.Contains(lowerLogs, "connection refused") ||
+						strings.Contains(lowerLogs, "could not connect to server") ||
+						strings.Contains(lowerLogs, "password authentication failed") ||
+						strings.Contains(lowerLogs, "fatal: database") {
+						isMissingDB = true
+						if dbWarning == "" {
+							if linkedDBName != "" {
+								dbWarning = fmt.Sprintf("ไม่สามารถเชื่อมต่อฐานข้อมูล '%s' ได้ (Connection Refused / Can't reach DB)", linkedDBName)
+							} else {
+								dbWarning = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ (Connection Refused / Can't reach DB)"
+							}
+						}
+					}
+				}
+			}
 		}
 
 		if d.WebhookSecret == "" {

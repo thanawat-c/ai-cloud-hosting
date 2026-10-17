@@ -179,7 +179,29 @@ func TestDeploy(c *gin.Context) {
 			}
 
 			// ส่ง URL ของ Backend เข้าไปให้ Frontend ทั้งรูปแบบ Vite, Nuxt และ Next
-			feEnvVars := req.EnvVars
+			// กรองไม่ส่งข้อมูลการเชื่อมต่อ Database หรือ Secrets หลังบ้านไปให้ Frontend
+			var feCleanEnvLines []string
+			for _, line := range strings.Split(req.EnvVars, "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				parts := strings.SplitN(line, "=", 2)
+				keyUpper := strings.ToUpper(strings.TrimSpace(parts[0]))
+				// ตัดตัวแปรที่เกี่ยวกับฐานข้อมูล หรือ credentials หลังบ้านออก
+				if strings.Contains(keyUpper, "DATABASE") ||
+					strings.Contains(keyUpper, "POSTGRES") ||
+					strings.Contains(keyUpper, "MYSQL") ||
+					strings.Contains(keyUpper, "MONGO") ||
+					strings.Contains(keyUpper, "REDIS") ||
+					strings.HasPrefix(keyUpper, "DB_") ||
+					strings.Contains(keyUpper, "SECRET") ||
+					strings.Contains(keyUpper, "PASSWORD") {
+					continue
+				}
+				feCleanEnvLines = append(feCleanEnvLines, line)
+			}
+			feEnvVars := strings.Join(feCleanEnvLines, "\n")
 			if feEnvVars != "" {
 				feEnvVars += "\n"
 			}

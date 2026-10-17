@@ -267,9 +267,10 @@ const DashboardHome = () => {
             }
           }
 
-          // Detect stopped databases for running services
+          // Detect stopped databases for running backend services
           const wasDbStopped = prevDbStates[key];
-          const isDbStopped = !!c.is_db_stopped;
+          const isFrontendService = c.service_type === 'frontend' || c.name?.includes('(Frontend)');
+          const isDbStopped = !isFrontendService && !!c.is_db_stopped;
           if (currentState === 'running' && isDbStopped && !wasDbStopped) {
             const shortName = getShortAppName(c.name, c.clean_name);
             const dbName = c.linked_db_name || 'Database';
@@ -838,7 +839,7 @@ const DashboardHome = () => {
   );
 
   const crashedContainers = containers.filter(c => c.state === 'exited' || c.state === 'failed' || c.state === 'restarting');
-  const dbDisconnectedContainers = containers.filter(c => c.state === 'running' && c.is_db_stopped);
+  const dbDisconnectedContainers = containers.filter(c => c.state === 'running' && c.service_type !== 'frontend' && !c.name?.includes('(Frontend)') && c.is_db_stopped);
 
   return (
     <div className="space-y-6">
@@ -1063,8 +1064,9 @@ const DashboardHome = () => {
                     const isRunning = item.state === 'running';
                     const isCrashed = item.state === 'failed' || item.last_error || item.state === 'exited' || item.state === 'restarting';
                     const isUpdating = item.state === 'redeploying';
-                    const isDbStopped = isRunning && item.is_db_stopped;
-                    const isDbMissing = isRunning && (item.is_missing_db || (item.db_warning && !item.linked_db_name));
+                    const isFrontend = item.service_type === 'frontend' || item.name?.includes('(Frontend)');
+                    const isDbStopped = isRunning && !isFrontend && item.is_db_stopped;
+                    const isDbMissing = isRunning && !isFrontend && (item.is_missing_db || (item.db_warning && !item.linked_db_name));
                     const shortName = getShortAppName(item.name, item.clean_name);
                     const isMenuOpen = activeMenuId === item.id;
 
