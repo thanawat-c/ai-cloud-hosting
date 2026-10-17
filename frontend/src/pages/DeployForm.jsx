@@ -29,6 +29,7 @@ const DeployForm = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [databases, setDatabases] = useState([]);
   const [selectedDbId, setSelectedDbId] = useState('');
+  const [autoCreateDb, setAutoCreateDb] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [inspectResult, setInspectResult] = useState(null);
   const [inspectError, setInspectError] = useState('');
@@ -107,6 +108,9 @@ const DeployForm = () => {
       if (res.ok) {
         setInspectResult(data);
         setInspectError('');
+        if (data.has_database && !selectedDbId) {
+          setAutoCreateDb(true);
+        }
         if (!envVars.trim() && data.env_template) {
           setEnvVars(data.env_template);
         }
@@ -124,6 +128,9 @@ const DeployForm = () => {
 
   const handleSelectDatabase = (dbId) => {
     setSelectedDbId(dbId);
+    if (dbId) {
+      setAutoCreateDb(false);
+    }
     if (!dbId) return;
 
     const db = databases.find(d => String(d.id) === String(dbId));
@@ -154,7 +161,7 @@ const DeployForm = () => {
     });
   };
 
-  const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi), Boolean(selectedDbId)].filter(Boolean).length;
+  const activeAdvancedCount = [Boolean(gitToken.trim()), Boolean(envVars.trim()), Boolean(forceAi), Boolean(selectedDbId), Boolean(autoCreateDb)].filter(Boolean).length;
 
   const handleDeploy = async () => {
     const trimmedUrl = repoUrl.trim();
@@ -193,7 +200,8 @@ const DeployForm = () => {
           repo_url: repoUrl.trim(), 
           env_vars: envVars, 
           force_ai: forceAi,
-          git_token: gitToken.trim()
+          git_token: gitToken.trim(),
+          auto_create_db: autoCreateDb
         })
       });
       
@@ -330,10 +338,10 @@ const DeployForm = () => {
                 )}
               </div>
 
-              {/* Row 2: Direct Database Attachment */}
-              {databases.length > 0 && (
-                <div className={`p-3 rounded-md bg-black border space-y-2 transition-all ${
-                  inspectResult.has_database && !selectedDbId ? 'border-amber-500/60 ring-1 ring-amber-500/20' : 'border-neutral-800'
+              {/* Row 2: Database Attachment & Auto-Provisioning */}
+              {(inspectResult.has_database || databases.length > 0) && (
+                <div className={`p-3.5 rounded-md bg-black border space-y-3 transition-all ${
+                  inspectResult.has_database ? 'border-purple-500/40 ring-1 ring-purple-500/10' : 'border-neutral-800'
                 }`}>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-200 font-mono">
@@ -341,33 +349,67 @@ const DeployForm = () => {
                       <span>Database Attachment:</span>
                     </label>
                     {inspectResult.has_database && (
-                      <span className="text-[10px] text-amber-400 font-mono font-medium px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
-                        ⚠️ Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
+                      <span className="text-[10px] text-purple-300 font-mono font-medium px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30">
+                        ⚡ Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
                       </span>
                     )}
                   </div>
 
-                  {inspectResult.has_database && !selectedDbId && (
-                    <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/20 flex items-start gap-2 text-amber-300 text-[11px] font-mono">
-                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-                      <div>
-                        <span className="font-semibold text-amber-200">โปรเจกต์นี้จำเป็นต้องใช้ Database:</span> กรุณาเลือก Database ในช่องด้านล่าง หรือกรอกค่า <span className="underline">{inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'}</span> ใน .env มิฉะนั้นแอปจะทำงานไม่ได้ (500 Error)
+                  {/* 1-Click Auto-Provision Card */}
+                  <div 
+                    onClick={() => {
+                      const next = !autoCreateDb;
+                      setAutoCreateDb(next);
+                      if (next) setSelectedDbId('');
+                    }}
+                    className={`p-3 rounded-md border flex items-start gap-2.5 cursor-pointer transition-all ${
+                      autoCreateDb 
+                        ? 'bg-purple-950/20 border-purple-500/60 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                    }`}
+                  >
+                    <input 
+                      type="checkbox"
+                      checked={autoCreateDb}
+                      onChange={(e) => {
+                        setAutoCreateDb(e.target.checked);
+                        if (e.target.checked) setSelectedDbId('');
+                      }}
+                      className="mt-0.5 rounded border-neutral-700 text-purple-600 focus:ring-0 cursor-pointer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-purple-200 font-mono">
+                          Auto-create dedicated PostgreSQL Database
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono uppercase font-semibold">
+                          Recommended
+                        </span>
                       </div>
+                      <p className="text-[11px] text-neutral-400 font-mono mt-1 leading-relaxed">
+                        ระบบจะสร้าง Database Container ให้เองอัตโนมัติ ผูก DATABASE_URL และ Sync โครงสร้าง/Seed ข้อมูลให้ครบในคลิกเดียว
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Manual / Existing DB Dropdown (Show when user unchecks auto-create or wants existing DB) */}
+                  {!autoCreateDb && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] text-neutral-400 font-mono block">หรือเลือก Database ที่มีอยู่แล้วในระบบ:</span>
+                      <select
+                        value={selectedDbId}
+                        onChange={(e) => handleSelectDatabase(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-neutral-950 text-xs font-mono text-white focus:outline-none focus:border-neutral-600 cursor-pointer"
+                      >
+                        <option value="" className="bg-neutral-900 text-neutral-400">-- ไม่ผูก Database (กำหนดค่าเองใน .env) --</option>
+                        {databases.map(db => (
+                          <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
+                            {db.name} ({db.db_type || 'PostgreSQL'} :5432)
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
-
-                  <select
-                    value={selectedDbId}
-                    onChange={(e) => handleSelectDatabase(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-neutral-950 text-xs font-mono text-white focus:outline-none focus:border-neutral-600 cursor-pointer"
-                  >
-                    <option value="" className="bg-neutral-900 text-neutral-400">-- No Database Attached --</option>
-                    {databases.map(db => (
-                      <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
-                        {db.name} ({db.db_type || 'PostgreSQL'} :5432)
-                      </option>
-                    ))}
-                  </select>
                 </div>
               )}
 

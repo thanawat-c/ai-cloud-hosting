@@ -42,6 +42,35 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
+		// Auto-provision dedicated database if requested
+		if req.AutoCreateDB {
+			logChan <- "🐘 [Auto-DB] Auto-provisioning dedicated PostgreSQL database...\n"
+			dbBaseName := filepath.Base(strings.TrimSpace(req.RepoURL))
+			dbBaseName = strings.TrimSuffix(dbBaseName, ".git")
+			if dbBaseName == "" || dbBaseName == "." {
+				dbBaseName = "app-db"
+			}
+			newDB, err := services.CreateManagedDatabase(ctx, models.CreateDatabaseRequest{
+				Name: dbBaseName,
+				Type: "postgres",
+			})
+			if err != nil {
+				logChan <- fmt.Sprintf("⚠️ Warning: Auto-provision DB failed: %v (continuing deployment)\n", err)
+			} else {
+				logChan <- fmt.Sprintf("✅ Dedicated PostgreSQL created: '%s' (Container: %s)\n", newDB.Name, newDB.ContainerName)
+				logChan <- "🔗 Automatically binding DATABASE_URL to environment variables...\n"
+				dbAliases := fmt.Sprintf("\nDATABASE_URL=%s\nDB_URL=%s\nPOSTGRES_URL=%s\nDB_HOST=%s\nDB_PORT=5432\nDB_USER=postgres\nDB_PASSWORD=%s\nDB_NAME=%s",
+					newDB.InternalURL,
+					newDB.InternalURL,
+					newDB.InternalURL,
+					newDB.ContainerName,
+					newDB.Password,
+					newDB.DBName,
+				)
+				req.EnvVars += dbAliases
+			}
+		}
+
 		// Auto execute repository SQL schemas if connected to database
 		services.AutoExecuteRepoSQL(ctx, buildDir, req.EnvVars, logChan)
 
