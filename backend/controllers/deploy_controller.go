@@ -67,7 +67,28 @@ func TestDeploy(c *gin.Context) {
 					newDB.Password,
 					newDB.DBName,
 				)
-				req.EnvVars += dbAliases
+
+				// Strip existing empty DB keys to prevent duplicate keys in container environment
+				dbKeysToRemove := map[string]bool{
+					"DATABASE_URL": true, "DB_URL": true, "POSTGRES_URL": true,
+					"DB_HOST": true, "DB_PORT": true, "DB_USER": true,
+					"DB_PASSWORD": true, "DB_NAME": true,
+					"POSTGRES_USER": true, "POSTGRES_PASSWORD": true, "POSTGRES_DB": true,
+				}
+				var filteredLines []string
+				for _, line := range strings.Split(req.EnvVars, "\n") {
+					trimmedLine := strings.TrimSpace(line)
+					if trimmedLine == "" {
+						continue
+					}
+					parts := strings.SplitN(trimmedLine, "=", 2)
+					key := strings.ToUpper(strings.TrimSpace(parts[0]))
+					if dbKeysToRemove[key] {
+						continue
+					}
+					filteredLines = append(filteredLines, line)
+				}
+				req.EnvVars = strings.Join(filteredLines, "\n") + dbAliases
 			}
 		}
 

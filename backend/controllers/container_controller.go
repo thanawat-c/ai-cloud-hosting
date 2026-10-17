@@ -89,20 +89,55 @@ func GetContainers(c *gin.Context) {
 		var dbWarning string
 		var isMissingDB bool
 
-		// Frontend เป็น Web UI จะติดต่อกับ Backend ผ่าน API เสมอ ไม่ต้องเชื่อมต่อ Database โดยตรง
-		// ดังนั้นจะไม่ตรวจสอบ Database กับ Frontend เด็ดขาด
+		// Frontend is a web interface and never connects directly to a database.
 		if serviceType != "frontend" && d.ContainerID != "" {
 			envs, err := services.GetContainerEnv(context.Background(), d.ContainerID)
 			if err == nil {
+				// Parse environment variables into a key-value map.
+				// Later non-empty values take precedence over earlier empty values.
+				envMap := make(map[string]string)
 				for _, env := range envs {
 					trimmed := strings.TrimSpace(env)
-					if trimmed == "DATABASE_URL=" || trimmed == "DB_URL=" || trimmed == "POSTGRES_URL=" {
-						isMissingDB = true
-						dbWarning = "DATABASE_URL is empty. Please attach a database."
+					if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+						continue
 					}
+					parts := strings.SplitN(trimmed, "=", 2)
+					if len(parts) == 2 {
+						key := strings.ToUpper(strings.TrimSpace(parts[0]))
+						val := strings.TrimSpace(parts[1])
+						if val != "" || envMap[key] == "" {
+							envMap[key] = val
+						}
+					}
+				}
 
+				// Find the effective database URL
+				dbUrl := envMap["DATABASE_URL"]
+				if dbUrl == "" {
+					dbUrl = envMap["DB_URL"]
+				}
+				if dbUrl == "" {
+					dbUrl = envMap["POSTGRES_URL"]
+				}
+
+				// Check if the service specifies a DB key but its effective value is empty
+				_, hasDbUrlKey := envMap["DATABASE_URL"]
+				if !hasDbUrlKey {
+					_, hasDbUrlKey = envMap["DB_URL"]
+				}
+				if !hasDbUrlKey {
+					_, hasDbUrlKey = envMap["POSTGRES_URL"]
+				}
+
+				if hasDbUrlKey && dbUrl == "" {
+					isMissingDB = true
+					dbWarning = "DATABASE_URL is empty. Please attach a database."
+				} else if dbUrl != "" {
+					// A database URL is provided! Check which managed DB it connects to
+					foundManagedDB := false
 					for _, db := range allDBs {
-						if strings.Contains(env, db.ContainerName) || (db.InternalURL != "" && strings.Contains(env, db.InternalURL)) {
+						if strings.Contains(dbUrl, db.ContainerName) || (db.InternalURL != "" && strings.Contains(dbUrl, db.InternalURL)) {
+							foundManagedDB = true
 							linkedDBName = db.Name
 							linkedDBID = db.ID
 							if db.Status == "deleted" {
@@ -116,27 +151,29 @@ func GetContainers(c *gin.Context) {
 								if state, ok := dockerStateMap[db.ContainerID]; !ok || state != "running" {
 									isDBStopped = true
 									dbWarning = fmt.Sprintf("Database '%s' is offline on server.", db.Name)
+								} else {
+									isMissingDB = false
+									isDBStopped = false
+									dbWarning = ""
 								}
 							}
 							break
 						}
 					}
 
-					// Check if DATABASE_URL refers to cloud-db-xxx that was deleted or doesn't exist
-					if !isMissingDB && strings.Contains(env, "cloud-db-") {
+					// If it points to a cloud-db-xxx container that is not found or deleted
+					if !foundManagedDB && strings.Contains(dbUrl, "cloud-db-") {
 						hasLiveDB := false
 						for _, dc := range dockerContainers {
 							cleanDcName := strings.TrimPrefix(dc.Name, "/")
-							if strings.Contains(cleanDcName, "cloud-db-") && strings.Contains(env, cleanDcName) && dc.State == "running" {
+							if strings.Contains(cleanDcName, "cloud-db-") && strings.Contains(dbUrl, cleanDcName) && dc.State == "running" {
 								hasLiveDB = true
 								break
 							}
 						}
 						if !hasLiveDB {
 							isMissingDB = true
-							if dbWarning == "" {
-								dbWarning = "Attached database was deleted or not found. Please attach a database."
-							}
+							dbWarning = "Attached database was deleted or not found. Please attach a database."
 						}
 					}
 				}
