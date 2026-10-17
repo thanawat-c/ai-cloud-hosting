@@ -110,9 +110,6 @@ const DeployForm = () => {
         if (!envVars.trim() && data.env_template) {
           setEnvVars(data.env_template);
         }
-        if (data.has_database && databases.length > 0 && !selectedDbId) {
-          handleSelectDatabase(databases[0].id);
-        }
       } else {
         setInspectError(data.error || 'Failed to scan repository');
         setInspectResult(null);
