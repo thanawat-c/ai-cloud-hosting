@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
   Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
-  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw 
+  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw,
+  Sparkles, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,6 +31,7 @@ const DeployForm = () => {
   const [selectedDbId, setSelectedDbId] = useState('');
   const [inspecting, setInspecting] = useState(false);
   const [inspectResult, setInspectResult] = useState(null);
+  const [inspectError, setInspectError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
@@ -76,15 +78,25 @@ const DeployForm = () => {
       .catch(err => console.error('Failed to load databases in deploy form:', err));
   }, []);
 
-  const handleInspectRepo = async (targetUrl) => {
-    const url = (targetUrl || repoUrl).trim();
-    if (!url) {
-      toast.warning('Please specify a GitHub repository before scanning.');
+  // Debounced Auto-Inspect on URL change / paste
+  useEffect(() => {
+    const trimmed = repoUrl.trim();
+    if (!trimmed || !trimmed.startsWith('http') || !trimmed.includes('github.com')) {
+      setInspectResult(null);
+      setInspectError('');
       return;
     }
+    const timer = setTimeout(() => {
+      handleInspectRepo(trimmed);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [repoUrl, gitToken]);
+
+  const handleInspectRepo = async (targetUrl) => {
+    const url = (targetUrl || repoUrl).trim();
+    if (!url) return;
     setInspecting(true);
-    setInspectResult(null);
-    const toastId = toast.loading('Inspecting repository...');
+    setInspectError('');
     try {
       const res = await fetch('http://localhost:8080/api/inspect-repo', {
         method: 'POST',
@@ -94,18 +106,20 @@ const DeployForm = () => {
       const data = await res.json();
       if (res.ok) {
         setInspectResult(data);
-        toast.success('Project inspected successfully!', {
-          id: toastId,
-          description: `Framework: ${data.detected_framework} (${data.detected_envs?.length || 0} variables)`,
-        });
+        setInspectError('');
         if (!envVars.trim() && data.env_template) {
           setEnvVars(data.env_template);
         }
+        if (data.has_database && databases.length > 0 && !selectedDbId) {
+          handleSelectDatabase(databases[0].id);
+        }
       } else {
-        toast.error('Inspection failed', { id: toastId, description: data.error });
+        setInspectError(data.error || 'Failed to scan repository');
+        setInspectResult(null);
       }
     } catch (err) {
-      toast.error('Failed to connect to server', { id: toastId, description: err.message });
+      setInspectError(err.message || 'Failed to connect to server');
+      setInspectResult(null);
     } finally {
       setInspecting(false);
     }
@@ -268,86 +282,115 @@ const DeployForm = () => {
                 placeholder="https://github.com/username/project" 
                 className="w-full bg-black border border-neutral-800 text-white pl-3.5 pr-28 py-2.5 rounded-md focus:outline-none focus:border-neutral-600 transition-colors text-xs font-mono placeholder:text-neutral-600" 
               />
-              <button
-                type="button"
-                onClick={() => handleInspectRepo()}
-                disabled={inspecting || !repoUrl.trim()}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black border border-white rounded-md text-xs font-medium transition-colors cursor-pointer"
-              >
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
                 {inspecting ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                    <span>Inspecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-3.5 h-3.5" />
-                    <span>Inspect</span>
-                  </>
-                )}
-              </button>
+                  <div className="flex items-center gap-1.5 text-neutral-400 font-mono text-[11px]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-400" />
+                    <span>Scanning...</span>
+                  </div>
+                ) : inspectResult ? (
+                  <div className="flex items-center gap-1 text-emerald-400 font-mono text-[11px]">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Ready</span>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          {/* Repository Insights Card */}
+          {/* Error Banner when repo fails pre-flight check */}
+          {inspectError && (
+            <div className="p-3.5 rounded-md bg-rose-950/40 border border-rose-800/60 text-xs text-rose-200 flex items-start gap-2.5 animate-in fade-in duration-150">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex-1 font-mono text-xs leading-relaxed">
+                {inspectError}
+              </div>
+            </div>
+          )}
+
+          {/* Project Configuration & Insights Card (Auto-populated) */}
           {inspectResult && (
-            <div className="p-3.5 rounded-md bg-neutral-950 border border-neutral-800 text-xs space-y-2.5 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
+            <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 text-xs space-y-3.5 animate-in fade-in duration-200">
+              
+              {/* Row 1: Framework & Architecture */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-900 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-neutral-300 font-mono">Framework:</span>
-                  <span className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-200 font-mono font-medium">
-                    {inspectResult.detected_framework}
+                  <span className="text-neutral-400 font-mono">Detected Architecture:</span>
+                  <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-white font-mono font-medium text-xs">
+                    {inspectResult.detected_framework || 'Standard Project'}
                   </span>
+                  {inspectResult.is_monorepo && (
+                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono text-[11px]">
+                      Fullstack Monorepo
+                    </span>
+                  )}
                 </div>
+
                 {inspectResult.detected_envs?.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAdvanced(true);
-                      if (inspectResult.env_template) setEnvVars(inspectResult.env_template);
-                      toast.success('Added variables to .env');
-                    }}
-                    className="text-neutral-300 hover:text-white font-medium text-[11px] cursor-pointer"
-                  >
-                    Copy to .env
-                  </button>
+                  <span className="text-[11px] text-neutral-500 font-mono">
+                    {inspectResult.detected_envs.length} env variables loaded
+                  </span>
                 )}
               </div>
 
-              {inspectResult.detected_envs?.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {inspectResult.detected_envs.map(envKey => (
-                    <span 
-                      key={envKey} 
-                      className="px-2 py-0.5 rounded bg-black border border-neutral-800 font-mono text-[11px] text-neutral-300 font-mono"
-                    >
-                      {envKey}
-                    </span>
-                  ))}
+              {/* Row 2: Direct Database Attachment */}
+              {databases.length > 0 && (
+                <div className="p-3 rounded-md bg-black border border-neutral-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-200 font-mono">
+                      <Database className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Database Attachment:</span>
+                    </label>
+                    {inspectResult.has_database && (
+                      <span className="text-[10px] text-purple-400 font-mono font-medium px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30">
+                        Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={selectedDbId}
+                    onChange={(e) => handleSelectDatabase(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-neutral-950 text-xs font-mono text-white focus:outline-none focus:border-neutral-600 cursor-pointer"
+                  >
+                    <option value="" className="bg-neutral-900 text-neutral-400">-- No Database Attached --</option>
+                    {databases.map(db => (
+                      <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
+                        {db.name} ({db.db_type || 'PostgreSQL'} :5432)
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                <p className="text-neutral-500 font-mono text-[11px]">
-                  No special environment variables required. Ready to deploy.
-                </p>
               )}
 
-              {inspectResult.has_database && (
-                <div className="p-2.5 rounded-md bg-black border border-neutral-800 flex items-center justify-between gap-2 text-xs text-neutral-300 font-mono">
-                  <span>This app requires a database ({inspectResult.db_var_names?.join(', ') || 'DB_URL'})</span>
-                  {databases.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAdvanced(true);
-                        if (databases[0]) handleSelectDatabase(databases[0].id);
-                      }}
-                      className="px-2.5 py-1 bg-white hover:bg-neutral-200 text-black border border-white rounded-md text-[11px] font-medium cursor-pointer shrink-0"
-                    >
-                      Bind with {databases[0].name}
-                    </button>
-                  )}
+              {/* Row 3: Build Mode (AI Dockerfile Switch) */}
+              <div className="p-3 rounded-md bg-black border border-neutral-800 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-white font-mono">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>AI Auto-Dockerize</span>
+                    {forceAi && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                    {forceAi 
+                      ? 'AI will generate a fresh, cloud-optimized Dockerfile for this build' 
+                      : 'Use repository Dockerfile (or AI will generate one if none exists)'}
+                  </p>
                 </div>
-              )}
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={forceAi} 
+                    onChange={(e) => setForceAi(e.target.checked)} 
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-black"></div>
+                </label>
+              </div>
+
             </div>
           )}
 
@@ -538,15 +581,29 @@ const DeployForm = () => {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
                           <button
                             type="button"
                             onClick={handleDeploy}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-700 rounded-md text-xs font-medium transition-colors cursor-pointer"
                           >
                             <RefreshCw className="w-3.5 h-3.5 text-neutral-400" />
-                            <span>Retry Deployment</span>
+                            <span>Retry</span>
                           </button>
+                          {!forceAi && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForceAi(true);
+                                toast.info("Switched to ✨ AI Auto-Dockerize mode. Retrying deployment...");
+                                setTimeout(() => handleDeploy(), 100);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-neutral-200 text-black border border-white rounded-md text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-black" />
+                              <span>✨ Retry with AI Dockerfile</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
