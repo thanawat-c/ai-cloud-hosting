@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ai-cloud-api/models"
 
@@ -308,7 +309,34 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 		return "", fmt.Errorf("เริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
 	}
 
+	// ถ้ามีการผูก DATABASE_URL ให้ sync Prisma schema ลงฐานข้อมูลให้อัตโนมัติ (เช่น npx prisma db push)
+	if strings.Contains(newEnvVars, "DATABASE_URL=") {
+		AutoSyncPrismaSchema(newID)
+	}
+
 	return newID, nil
+}
+
+// AutoSyncPrismaSchema ตรวจสอบและ sync database schema อัตโนมัติในเบื้องหลัง
+func AutoSyncPrismaSchema(containerID string) {
+	go func() {
+		time.Sleep(2 * time.Second)
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return
+		}
+		defer cli.Close()
+
+		execConfig := types.ExecConfig{
+			Cmd:          []string{"npx", "prisma", "db", "push", "--skip-generate"},
+			AttachStdout: false,
+			AttachStderr: false,
+		}
+		execResp, err := cli.ContainerExecCreate(context.Background(), containerID, execConfig)
+		if err == nil {
+			_ = cli.ContainerExecStart(context.Background(), execResp.ID, types.ExecStartCheck{})
+		}
+	}()
 }
 
 func GetContainerLogs(ctx context.Context, containerID string) (string, error) {

@@ -81,6 +81,10 @@ func TestDeploy(c *gin.Context) {
 				return
 			}
 
+			if strings.Contains(req.EnvVars, "DATABASE_URL=") {
+				services.AutoSyncPrismaSchema(beContainerID)
+			}
+
 			config.DB.Create(&models.Deployment{
 				RepoURL:     req.RepoURL + " (Backend)",
 				GitToken:    req.GitToken,
