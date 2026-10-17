@@ -16,6 +16,7 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/containers/:id/stop", controllers.StopContainer)
 		api.POST("/containers/:id/start", controllers.StartContainer)
 		api.DELETE("/containers/:id", controllers.DeleteContainer)
+		api.POST("/containers/:id/delete", controllers.DeleteContainer)
 		api.GET("/containers/:id/logs", controllers.GetContainerLogs)
 		api.GET("/containers/:id/stats", controllers.GetContainerStats)
 		api.POST("/containers/:id/redeploy", controllers.RedeployContainer)

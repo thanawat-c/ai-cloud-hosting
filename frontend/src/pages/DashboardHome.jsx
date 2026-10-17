@@ -654,6 +654,10 @@ const DashboardHome = () => {
   };
 
   const handleAction = async (id, action, containerName) => {
+    if (action === 'delete') {
+      handleDelete(id);
+      return;
+    }
     try {
       setLoading(true); // Prevent spamming actions
       const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
@@ -1339,7 +1343,7 @@ const DashboardHome = () => {
                                     type="button"
                                     onClick={() => {
                                       setActiveMenuId(null);
-                                      handleAction(item.id, 'delete', item.name);
+                                      handleDelete(item.deployment_id || item.id);
                                     }}
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
                                   >
