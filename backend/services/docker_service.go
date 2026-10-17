@@ -459,6 +459,15 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 			os.WriteFile(filepath.Join(activeDir, "Dockerfile"), []byte(aiDocker), 0644)
 
 			backendInternalURL := fmt.Sprintf("http://%s", backendEndpoint)
+			feApiKeys := DetectFrontendAPIEnvKeys(activeDir)
+			for _, k := range feApiKeys {
+				if !strings.Contains(oldEnvVars, k+"=") {
+					if oldEnvVars != "" {
+						oldEnvVars += "\n"
+					}
+					oldEnvVars += fmt.Sprintf("%s=%s", k, backendInternalURL)
+				}
+			}
 			if !strings.Contains(oldEnvVars, "BACKEND_URL=") {
 				if oldEnvVars != "" {
 					oldEnvVars += "\n"

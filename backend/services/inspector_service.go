@@ -48,52 +48,64 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 
 	envMap := make(map[string]string)
 
-	// 1. ตรวจหาไฟล์ .env.example หรือไฟล์ template อื่นๆ
+	// 1. ตรวจหาไฟล์ .env.example หรือไฟล์ template ทั้งหมดในโปรเจกต์ (รวมถึงโฟลเดอร์ client/ และ server/ ใน Monorepo)
 	sampleFiles := []string{
 		".env.example", ".env.sample", ".env.template", ".env.local.example",
 		"example.env", "sample.env", "env.example",
 	}
 
-	var foundSampleFile string
 	_ = filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil {
 			return nil
 		}
+		if info.IsDir() {
+			name := info.Name()
+			if name == ".git" || name == "node_modules" || name == "vendor" || name == ".next" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		baseName := strings.ToLower(info.Name())
+		isSample := false
 		for _, s := range sampleFiles {
-			if baseName == s {
-				foundSampleFile = path
-				return filepath.SkipAll
+			if baseName == s || strings.HasPrefix(baseName, ".env.") {
+				isSample = true
+				break
+			}
+		}
+
+		if isSample {
+			if file, err := os.Open(path); err == nil {
+				scanner := bufio.NewScanner(file)
+				for scanner.Scan() {
+					line := strings.TrimSpace(scanner.Text())
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+					parts := strings.SplitN(line, "=", 2)
+					key := strings.TrimSpace(parts[0])
+					val := ""
+					if len(parts) > 1 {
+						val = strings.TrimSpace(parts[1])
+					}
+					if isValidEnvKey(key) {
+						if _, exists := envMap[key]; !exists {
+							envMap[key] = val
+						}
+					}
+				}
+				file.Close()
 			}
 		}
 		return nil
 	})
 
-	if foundSampleFile != "" {
-		if file, err := os.Open(foundSampleFile); err == nil {
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line == "" || strings.HasPrefix(line, "#") {
-					continue
-				}
-				parts := strings.SplitN(line, "=", 2)
-				key := strings.TrimSpace(parts[0])
-				val := ""
-				if len(parts) > 1 {
-					val = strings.TrimSpace(parts[1])
-				}
-				if isValidEnvKey(key) {
-					envMap[key] = val
-				}
-			}
-			file.Close()
-		}
-	}
-
-	// 2. Regex สแกนหาการเรียกใช้ env ในไฟล์โค้ด (.go, .js, .ts, .py, .prisma)
+	// 2. Regex สแกนหาการเรียกใช้ env ในไฟล์โค้ด (.go, .js, .ts, .jsx, .tsx, .vue, .py, .prisma)
 	reGo := regexp.MustCompile(`(?:os\.Getenv|os\.LookupEnv)\(["']([A-Za-z0-9_]+)["']\)`)
 	reNode := regexp.MustCompile(`process\.env\.([A-Za-z0-9_]+)`)
+	reVite := regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`)
+	reNuxt := regexp.MustCompile(`(?:process\.env\.|env\.)?(NUXT_PUBLIC_[A-Za-z0-9_]+)`)
 	rePy := regexp.MustCompile(`(?:os\.environ(?:\.get)?|os\.getenv)\(["']([A-Za-z0-9_]+)["']\)`)
 	rePrisma := regexp.MustCompile(`env\(["']([A-Za-z0-9_]+)["']\)`)
 
@@ -110,7 +122,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if ext != ".go" && ext != ".js" && ext != ".ts" && ext != ".jsx" && ext != ".tsx" && ext != ".py" && ext != ".prisma" {
+		if ext != ".go" && ext != ".js" && ext != ".ts" && ext != ".jsx" && ext != ".tsx" && ext != ".vue" && ext != ".py" && ext != ".prisma" {
 			return nil
 		}
 
@@ -133,6 +145,20 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 			}
 		}
 		for _, m := range reNode.FindAllStringSubmatch(content, -1) {
+			if len(m) > 1 && isValidEnvKey(m[1]) {
+				if _, ok := envMap[m[1]]; !ok {
+					envMap[m[1]] = ""
+				}
+			}
+		}
+		for _, m := range reVite.FindAllStringSubmatch(content, -1) {
+			if len(m) > 1 && isValidEnvKey(m[1]) {
+				if _, ok := envMap[m[1]]; !ok {
+					envMap[m[1]] = ""
+				}
+			}
+		}
+		for _, m := range reNuxt.FindAllStringSubmatch(content, -1) {
 			if len(m) > 1 && isValidEnvKey(m[1]) {
 				if _, ok := envMap[m[1]]; !ok {
 					envMap[m[1]] = ""
@@ -252,3 +278,102 @@ func detectFramework(dir string) string {
 
 	return "Web Application"
 }
+
+// DetectFrontendAPIEnvKeys สแกนโค้ดและไฟล์ .env ใน Frontend เพื่อหาชื่อตัวแปรที่ใช้เชื่อมต่อกับ Backend โดยอัตโนมัติ (เช่น VITE_SERVER_URL, REACT_APP_BACKEND, NEXT_PUBLIC_API_URL ฯลฯ)
+func DetectFrontendAPIEnvKeys(frontendDir string) []string {
+	detectedMap := make(map[string]bool)
+
+	// 1. Regex สแกนหาตัวแปร Frontend ยอดนิยมจากทุก Framework
+	rePatterns := []*regexp.Regexp{
+		regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`),             // Vite (React/Vue/Svelte)
+		regexp.MustCompile(`import\.meta\.env\[['"]([A-Za-z0-9_]+)['"]\]`),  // Vite bracket syntax
+		regexp.MustCompile(`process\.env\.(NEXT_PUBLIC_[A-Za-z0-9_]+)`),      // Next.js
+		regexp.MustCompile(`process\.env\.(REACT_APP_[A-Za-z0-9_]+)`),       // Create React App
+		regexp.MustCompile(`(?:process\.env\.|env\.)?(NUXT_PUBLIC_[A-Za-z0-9_]+)`), // Nuxt
+		regexp.MustCompile(`process\.env\.([A-Za-z0-9_]+)`),                 // General process.env
+		regexp.MustCompile(`process\.env\[['"]([A-Za-z0-9_]+)['"]\]`),       // General bracket syntax
+	}
+
+	isAPIKeyword := func(key string) bool {
+		upper := strings.ToUpper(key)
+		return strings.Contains(upper, "URL") ||
+			strings.Contains(upper, "URI") ||
+			strings.Contains(upper, "API") ||
+			strings.Contains(upper, "BACKEND") ||
+			strings.Contains(upper, "SERVER") ||
+			strings.Contains(upper, "HOST") ||
+			strings.Contains(upper, "ENDPOINT") ||
+			strings.Contains(upper, "BASE") ||
+			strings.Contains(upper, "GATEWAY") ||
+			strings.Contains(upper, "ORIGIN") ||
+			strings.Contains(upper, "DOMAIN") ||
+			strings.Contains(upper, "PROXY")
+	}
+
+	// 2. สแกนไฟล์ .env, .env.example, .env.sample ภายใน frontend directory
+	_ = filepath.Walk(frontendDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			name := info.Name()
+			if name == ".git" || name == "node_modules" || name == "dist" || name == ".next" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		baseName := strings.ToLower(info.Name())
+		if strings.HasPrefix(baseName, ".env") || strings.HasSuffix(baseName, ".env") {
+			if file, err := os.Open(path); err == nil {
+				scanner := bufio.NewScanner(file)
+				for scanner.Scan() {
+					line := strings.TrimSpace(scanner.Text())
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+					parts := strings.SplitN(line, "=", 2)
+					key := strings.TrimSpace(parts[0])
+					if isAPIKeyword(key) {
+						detectedMap[key] = true
+					}
+				}
+				file.Close()
+			}
+		}
+
+		// 3. สแกนไฟล์ Source code (.js, .jsx, .ts, .tsx, .vue, .svelte, .html)
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".js" || ext == ".jsx" || ext == ".ts" || ext == ".tsx" || ext == ".vue" || ext == ".svelte" || ext == ".html" {
+			if info.Size() < 500*1024 {
+				if contentBytes, err := os.ReadFile(path); err == nil {
+					content := string(contentBytes)
+					for _, re := range rePatterns {
+						for _, m := range re.FindAllStringSubmatch(content, -1) {
+							if len(m) > 1 {
+								key := m[1]
+								if isAPIKeyword(key) {
+									detectedMap[key] = true
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	// Default fallback keys ที่จำเป็นเสมอ
+	defaultKeys := []string{"VITE_API_URL", "VITE_SERVER_URL", "BACKEND_URL", "API_URL", "REACT_APP_API_URL", "NEXT_PUBLIC_API_URL", "NUXT_PUBLIC_API_URL"}
+	for _, k := range defaultKeys {
+		detectedMap[k] = true
+	}
+
+	var result []string
+	for k := range detectedMap {
+		result = append(result, k)
+	}
+	return result
+}
+

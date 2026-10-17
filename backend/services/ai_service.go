@@ -184,25 +184,27 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 		if backendURL != "" && !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
 			backendURL = "http://" + backendURL
 		}
+
+		// สแกนหาชื่อตัวแปรที่ Frontend นี้เรียกใช้เชื่อมต่อกับ Backend จริงจากโค้ดและไฟล์ .env แบบไดนามิก 100%
+		apiKeys := DetectFrontendAPIEnvKeys(buildDir)
+		var envListStr strings.Builder
+		for _, k := range apiKeys {
+			envListStr.WriteString(fmt.Sprintf("    ENV %s=%s\n", k, backendURL))
+		}
+
 		targetInstruction = fmt.Sprintf(`เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับรัน [Frontend Service] ที่โฟลเดอร์ "%s/" เท่านั้น!
 - สโคปการทำงานเฉพาะโฟลเดอร์ "%s/"
 - ตรวจสอบ Package Manager จาก lockfile (pnpm, yarn, npm, bun) เพื่อติดตั้ง dependency ให้ตรงรุ่น
 - เซิร์ฟเวอร์ Backend ทำงานอยู่ที่: "%s"
-- สำคัญมาก! ต้องกำหนด Environment Variables ชี้ไปยัง Backend ก่อนรัน Build และใน Runtime Stage เสมอ:
-    ENV BACKEND_URL=%s
-    ENV API_URL=%s
-    ENV NUXT_PUBLIC_API_URL=%s
-    ENV VITE_API_URL=%s
-    ENV VITE_SERVER_URL=%s
-    ENV REACT_APP_API_URL=%s
-    ENV NEXT_PUBLIC_API_URL=%s
+- สำคัญมาก! ระบบสแกนพบตัวแปรเชื่อมต่อ API จากโค้ดและไฟล์ .env ของ Frontend นี้โดยตรง ต้องใส่ Environment Variables เหล่านี้ให้ครบถ้วนก่อนคำสั่งรัน Build และใน Runtime Stage เสมอ (ห้ามขาดแม้แต่ตัวเดียว เพราะไม่งั้น Vite/React จะ compile ออกมาเป็น undefined):
+%s
 - สำคัญมากเรื่อง Path: Build Context ของ Docker คือโฟลเดอร์ frontend นี้โดยตรง ทุกคำสั่ง COPY ต้องใช้ Relative Path ห้ามใส่ชื่อโฟลเดอร์ "%s/" ซ้ำในคำสั่ง COPY หรือ WORKDIR เด็ดขาด
 - ขั้นตอนการ Build:
   WORKDIR /app
   COPY package.json *lock* ./
   (รันคำสั่งติดตั้ง dependencies ตาม lockfile เช่น npm ci, pnpm install, yarn install)
   COPY . ./
-  (ต้องใส่ ENV BACKEND_URL=%s และตัวแปรด้านบนก่อนคำสั่งรัน build เพื่อให้ frameworks เช่น Nuxt/Next/Vite compile proxy และ API URL ได้ถูกต้อง)
+  (ต้องใส่ Environment Variables ที่ระบุข้างบนทั้งหมดก่อนคำสั่งรัน build เพื่อให้ frameworks เช่น Nuxt/Next/Vite compile proxy และ API URL ได้ถูกต้อง)
   (รัน build script เช่น pnpm run build หรือ pnpm run generate หรือ npm run build)
 - Stage สุดท้าย:
   * หากเป็น Static Web App (Vite, React, Vue, Nuxt static):
@@ -213,9 +215,9 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     EXPOSE 80
     CMD ["nginx", "-g", "daemon off;"]
   * หากเป็น SSR App (Next.js standalone, Nuxt node-server):
-    (ต้องใส่ ENV BACKEND_URL=%s และ ENV API_URL=%s ใน Runtime Stage นี้ด้วยเพื่อให้ SSR หรือ Server Proxy เรียก Backend ถูกต้อง)
+    (ต้องใส่ Environment Variables ด้านบนใน Runtime Stage นี้ด้วยเพื่อให้ SSR หรือ Server Proxy เรียก Backend ถูกต้อง)
     EXPOSE 3000
-    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, backendURL, targetDir, backendURL, backendURL, backendURL)
+    CMD ["node", ...] หรือ CMD ["npm", "start"]`, targetDir, targetDir, backendURL, envListStr.String(), targetDir)
 	} else {
 		targetInstruction = `เป้าหมายรอบนี้: สร้าง Dockerfile สำหรับ [Standalone Project] ที่อยู่ที่ Root directory:
 - สแกนดูไฟล์และ config ใน Root เพื่อระบุประเภทโปรเจกต์ (Go, Node.js, Python, Java, PHP, Rust, หรือ Web Frontend)
@@ -365,6 +367,40 @@ GitHub Repository: %s
 		}
 		if injected {
 			finalDockerfile = strings.Join(newLines, "\n")
+		}
+	}
+
+	// Auto-fix: ป้องกัน Frontend Bundlers (Vite, Next.js, Create React App, Nuxt) ขาดตัวแปร Backend API ก่อนคำสั่ง RUN ... build
+	if isFrontend && endpoint != "" {
+		feBackendURL := endpoint
+		if !strings.HasPrefix(feBackendURL, "http://") && !strings.HasPrefix(feBackendURL, "https://") {
+			feBackendURL = "http://" + feBackendURL
+		}
+		apiKeys := DetectFrontendAPIEnvKeys(buildDir)
+		var missingEnvs []string
+		for _, k := range apiKeys {
+			pattern := fmt.Sprintf("ENV %s=", k)
+			if !strings.Contains(finalDockerfile, pattern) && !strings.Contains(finalDockerfile, fmt.Sprintf("ENV %s ", k)) {
+				missingEnvs = append(missingEnvs, fmt.Sprintf("ENV %s=%s", k, feBackendURL))
+			}
+		}
+
+		if len(missingEnvs) > 0 {
+			envBlock := strings.Join(missingEnvs, "\n")
+			// ค้นหาตำแหน่ง build command เพื่อแทรกไว้ข้างหน้า
+			reBuildCmd := regexp.MustCompile(`(?m)^RUN\s+.*(build|generate).*$`)
+			loc := reBuildCmd.FindStringIndex(finalDockerfile)
+			if loc != nil {
+				finalDockerfile = finalDockerfile[:loc[0]] + envBlock + "\n" + finalDockerfile[loc[0]:]
+			} else {
+				reCopy := regexp.MustCompile(`(?m)^COPY\s+\.\s+.*$`)
+				locCopy := reCopy.FindStringIndex(finalDockerfile)
+				if locCopy != nil {
+					finalDockerfile = finalDockerfile[:locCopy[1]] + "\n" + envBlock + "\n" + finalDockerfile[locCopy[1]:]
+				} else {
+					finalDockerfile = envBlock + "\n" + finalDockerfile
+				}
+			}
 		}
 	}
 
@@ -604,7 +640,12 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 		}
 		envSnippet := ""
 		if backendURL != "" {
-			envSnippet = fmt.Sprintf("ENV BACKEND_URL=%s\nENV API_URL=%s\nENV NUXT_PUBLIC_API_URL=%s\nENV VITE_API_URL=%s\n", backendURL, backendURL, backendURL, backendURL)
+			apiKeys := DetectFrontendAPIEnvKeys(fullTarget)
+			var sb strings.Builder
+			for _, k := range apiKeys {
+				sb.WriteString(fmt.Sprintf("ENV %s=%s\n", k, backendURL))
+			}
+			envSnippet = sb.String()
 		}
 
 		dockerfile := fmt.Sprintf(`FROM node:22-alpine AS builder

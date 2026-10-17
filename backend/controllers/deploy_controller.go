@@ -95,7 +95,7 @@ func TestDeploy(c *gin.Context) {
 			// --- 2. DEPLOY FRONTEND AND INJECT BACKEND URL ---
 			logChan <- "\n=========================================\n"
 			logChan <- fmt.Sprintf("🎨 [2/2] Preparing Frontend Service: '%s/'...\n", feDirName)
-			logChan <- fmt.Sprintf("🔗 Binding API endpoint: NUXT_PUBLIC_API_URL=http://%s\n", beDomainName)
+			logChan <- fmt.Sprintf("🔗 Binding Backend API: http://%s\n", beDomainName)
 			logChan <- "=========================================\n"
 
 			frontendDir := filepath.Join(buildDir, feDirName)
@@ -153,16 +153,12 @@ func TestDeploy(c *gin.Context) {
 			backendInternalURL := fmt.Sprintf("http://%s", backendInternalEndpoint)
 			backendPublicURL = fmt.Sprintf("http://%s", beDomainName)
 
-			feEnvVars += fmt.Sprintf("BACKEND_URL=%s\nINTERNAL_API_URL=%s\nAPI_URL=%s\nNUXT_PUBLIC_API_URL=%s\nVITE_API_URL=%s\nVITE_SERVER_URL=%s\nREACT_APP_API_URL=%s\nNEXT_PUBLIC_API_URL=%s",
-				backendInternalURL,
-				backendInternalURL,
-				backendInternalURL,
-				backendPublicURL,
-				backendPublicURL,
-				backendPublicURL,
-				backendPublicURL,
-				backendPublicURL,
-			)
+			// สแกนหาตัวแปร API ทั้งหมดที่ Frontend เรียกใช้จริงแบบไดนามิก 100%
+			feApiKeys := services.DetectFrontendAPIEnvKeys(frontendDir)
+			for _, k := range feApiKeys {
+				feEnvVars += fmt.Sprintf("\n%s=%s", k, backendPublicURL)
+			}
+			feEnvVars += fmt.Sprintf("\nBACKEND_URL=%s\nINTERNAL_API_URL=%s", backendInternalURL, backendInternalURL)
 
 			logChan <- "Starting frontend container...\n"
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
