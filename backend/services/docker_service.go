@@ -328,7 +328,7 @@ func AutoSyncPrismaSchema(containerID string) {
 		defer cli.Close()
 
 		execConfig := types.ExecConfig{
-			Cmd:          []string{"npx", "prisma", "db", "push", "--skip-generate"},
+			Cmd:          []string{"sh", "-c", "npx prisma db push --skip-generate || true; node prisma/seed.js || npx prisma db seed || true"},
 			AttachStdout: false,
 			AttachStderr: false,
 		}
