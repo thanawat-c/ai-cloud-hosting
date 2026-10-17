@@ -247,7 +247,8 @@ GitHub Repository: %s
 5. ในโปรเจกต์ Node.js/TypeScript/Monorepo หากต้องการสั่ง Build ให้ใช้คำสั่งมาตรฐานตาม scripts ใน package.json เสมอ เช่น RUN npm run build (หรือ pnpm run build หรือ yarn build) ห้ามคิดเดาหรือเรียกคำสั่งเจาะจงเองเช่น RUN npx nx build <ชื่อที่เดา> เด็ดขาด เพราะคำสั่ง npm run build จะเรียก build target ที่ถูกต้องตาม package.json โดยอัตโนมัติ!
 6. ห้ามเขียนคำสั่ง COPY dist/... หรือ COPY build/... จาก host โดยเด็ดขาด เพราะโฟลเดอร์เหล่านี้ถูก .gitignore และไม่มีอยู่ใน repository จริงบน GitHub หากโปรเจกต์ต้องมีการ build (เช่น Node/TypeScript/NestJS/React/Vite/Next) ต้องใส่ขั้นตอน RUN npm run build หรือ multi-stage build (COPY --from=builder ...) ภายใน Dockerfile เสมอ!
 7. หากใน dependencies มี @prisma/client หรือ prisma ให้ใส่คำสั่ง RUN npx prisma generate ก่อนขั้นตอน build เสมอ และหากใช้ Alpine Linux ต้องใส่คำสั่ง RUN apk add --no-cache openssl libc6-compat ในทุกๆ Stage (ทั้ง builder และ runner stage) เพื่อให้ Prisma engine ทำงานได้บน Alpine arm64/amd64
-8. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น`,
+8. ตอบกลับมาแค่ตัวโค้ด Dockerfile ล้วนๆ เท่านั้น ห้ามมีคำอธิบาย และห้ามมีเครื่องหมาย markdown block code ใดๆ ทั้งสิ้น
+9. หากเป็นโปรเจกต์ Go ที่ใช้ SQLite (มี go-sqlite3 หรือ gorm/sqlite) ต้องใส่ RUN apk add --no-cache gcc musl-dev ใน builder stage และกำหนด ENV CGO_ENABLED=1 เสมอ เพราะ SQLite ใน Go จำเป็นต้องใช้ CGO จึงจะทำงานได้จริง`,
 		repoURL, targetInstruction, fileListStr, configsStr)
 
 	fmt.Printf("🤖 กำลังส่ง Prompt ให้ AI สร้าง Dockerfile สำหรับ %s...\n", targetDir)
@@ -308,6 +309,23 @@ GitHub Repository: %s
 			}
 		}
 		finalDockerfile = strings.Join(newLines, "\n")
+	}
+
+	// Auto-fix: ป้องกัน Go SQLite ขาด CGO (go-sqlite3 requires cgo to work)
+	if (strings.Contains(configsStr, "sqlite") || strings.Contains(configsStr, "go-sqlite3")) && strings.Contains(finalDockerfile, "golang") {
+		finalDockerfile = strings.ReplaceAll(finalDockerfile, "CGO_ENABLED=0", "CGO_ENABLED=1")
+		if !strings.Contains(finalDockerfile, "gcc") && !strings.Contains(finalDockerfile, "build-base") {
+			lines := strings.Split(finalDockerfile, "\n")
+			var newLines []string
+			for _, l := range lines {
+				newLines = append(newLines, l)
+				trimmedL := strings.TrimSpace(l)
+				if strings.HasPrefix(trimmedL, "FROM golang") {
+					newLines = append(newLines, "RUN apk add --no-cache gcc musl-dev")
+				}
+			}
+			finalDockerfile = strings.Join(newLines, "\n")
+		}
 	}
 
 	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
