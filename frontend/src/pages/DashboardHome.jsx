@@ -317,20 +317,7 @@ const DashboardHome = () => {
         prevStatesRef.current = prevStates;
         prevDbStatesRef.current = prevDbStates;
 
-        // Fetch stats for all running containers asynchronously
-        containerList.forEach(async (c) => {
-          if (c.state === 'running') {
-            try {
-              const statRes = await fetch(`http://localhost:8080/api/containers/${c.id}/stats`);
-              if (statRes.ok) {
-                const statData = await statRes.json();
-                setStats(prev => ({ ...prev, [c.id]: statData }));
-              }
-            } catch (err) {
-              console.error("Failed to fetch stats for", c.id, err);
-            }
-          }
-        });
+        // Container list loaded (stats not needed for deployments table)
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -339,7 +326,7 @@ const DashboardHome = () => {
     }
   }, []);
 
-  const fetchDatabases = useCallback(async () => {
+  const fetchDatabases = useCallback(async (shouldFetchStats = false) => {
     try {
       const res = await fetch('http://localhost:8080/api/databases');
       if (res.ok) {
@@ -347,18 +334,20 @@ const DashboardHome = () => {
         const dbList = data || [];
         setDatabases(dbList);
 
-        // Fetch stats for all running database containers
-        dbList.forEach(async (db) => {
-          if (db.status === 'running' && db.container_id) {
-            try {
-              const statRes = await fetch(`http://localhost:8080/api/containers/${db.container_id}/stats`);
-              if (statRes.ok) {
-                const statData = await statRes.json();
-                setStats(prev => ({ ...prev, [db.container_id]: statData }));
-              }
-            } catch (err) {}
-          }
-        });
+        // Fetch stats only when viewing Storage & Databases tab
+        if (shouldFetchStats) {
+          dbList.forEach(async (db) => {
+            if (db.status === 'running' && db.container_id) {
+              try {
+                const statRes = await fetch(`http://localhost:8080/api/containers/${db.container_id}/stats`);
+                if (statRes.ok) {
+                  const statData = await statRes.json();
+                  setStats(prev => ({ ...prev, [db.container_id]: statData }));
+                }
+              } catch (err) {}
+            }
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to fetch databases:', err);
@@ -366,18 +355,21 @@ const DashboardHome = () => {
   }, []);
 
   useEffect(() => {
-    const initFetch = async () => {
-      await Promise.all([fetchContainers(), fetchDatabases()]);
-    };
-    initFetch();
+    const isStorageTab = activeTab === 'storage';
+    // Initial fetch
+    fetchContainers();
+    fetchDatabases(isStorageTab);
     
     const interval = setInterval(() => {
+      // Pause polling when browser tab is inactive / backgrounded
+      if (document.hidden) return;
+
       fetchContainers();
-      fetchDatabases();
-    }, 5000);
+      fetchDatabases(activeTab === 'storage');
+    }, 6000);
     
     return () => clearInterval(interval);
-  }, [fetchContainers, fetchDatabases]);
+  }, [fetchContainers, fetchDatabases, activeTab]);
 
   const handleCreateDatabase = async (e) => {
     e.preventDefault();
