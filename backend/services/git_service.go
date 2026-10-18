@@ -95,8 +95,71 @@ func ValidateGitRepository(repoURL string, gitToken ...string) error {
 	return nil
 }
 
-// CloneRepository ทำการดาวน์โหลด Repository โดยทำการ Pre-flight Validate ก่อนเสมอ
-func CloneRepository(repoURL string, gitToken ...string) (string, error) {
+// GetRepoBranches ดึงรายชื่อ Branch ทั้งหมดจาก Remote Git โดยไม่ต้อง Clone เต็มรูปแบบ
+func GetRepoBranches(repoURL string, gitToken ...string) ([]string, string, error) {
+	cleanRepoURL := strings.TrimSpace(repoURL)
+	if cleanRepoURL == "" {
+		return []string{"main"}, "main", fmt.Errorf("empty repo url")
+	}
+
+	authURL, _ := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", authURL)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return []string{"main"}, "main", nil
+	}
+
+	lines := strings.Split(string(output), "\n")
+	var branches []string
+	defaultBranch := "main"
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "refs/heads/")
+		if len(parts) == 2 {
+			branch := strings.TrimSpace(parts[1])
+			if branch != "" {
+				branches = append(branches, branch)
+			}
+		}
+	}
+
+	if len(branches) == 0 {
+		branches = []string{"main"}
+	}
+
+	hasMain := false
+	hasMaster := false
+	for _, b := range branches {
+		if b == "main" {
+			hasMain = true
+		}
+		if b == "master" {
+			hasMaster = true
+		}
+	}
+	if hasMain {
+		defaultBranch = "main"
+	} else if hasMaster {
+		defaultBranch = "master"
+	} else {
+		defaultBranch = branches[0]
+	}
+
+	return branches, defaultBranch, nil
+}
+
+// CloneRepository ทำการดาวน์โหลด Repository โดยทำการ Pre-flight Validate ก่อนเสมอ และรองรับการเลือก Branch
+func CloneRepository(repoURL string, branch string, gitToken ...string) (string, error) {
 	cleanRepoURL := strings.TrimSpace(repoURL)
 
 	// Step 1: Pre-flight Check ความมีอยู่และสิทธิ์ของ Repo ก่อนสร้างโฟลเดอร์หรือเปลืองเน็ต
@@ -113,9 +176,15 @@ func CloneRepository(repoURL string, gitToken ...string) (string, error) {
 	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
 	fmt.Println("📂 สร้าง Workspace ที่:", buildDir)
-	fmt.Println("⬇️ กำลังดาวน์โหลดโค้ดจาก:", cleanRepoURL)
+	fmt.Printf("⬇️ กำลังดาวน์โหลดโค้ดจาก: %s (Branch: %s)\n", cleanRepoURL, branch)
 
-	cmd := exec.Command("git", "clone", authURL, buildDir)
+	args := []string{"clone"}
+	if strings.TrimSpace(branch) != "" {
+		args = append(args, "--branch", strings.TrimSpace(branch), "--single-branch")
+	}
+	args = append(args, authURL, buildDir)
+
+	cmd := exec.Command("git", args...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
 	if output, err := cmd.CombinedOutput(); err != nil {

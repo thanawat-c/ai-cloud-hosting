@@ -34,8 +34,13 @@ func TestDeploy(c *gin.Context) {
 		defer close(logChan)
 		ctx := context.Background()
 
-		logChan <- "Cloning repository from GitHub...\n"
-		buildDir, err := services.CloneRepository(req.RepoURL, req.GitToken)
+		logChan <- fmt.Sprintf("Cloning repository from GitHub (Branch: %s)...\n", func() string {
+			if req.Branch != "" {
+				return req.Branch
+			}
+			return "default"
+		}())
+		buildDir, err := services.CloneRepository(req.RepoURL, req.Branch, req.GitToken)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
 			return

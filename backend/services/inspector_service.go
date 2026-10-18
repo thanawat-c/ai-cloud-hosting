@@ -17,6 +17,8 @@ type InspectResult struct {
 	DBVarNames        []string `json:"db_var_names"`
 	DetectedFramework string   `json:"detected_framework"`
 	IsMonorepo        bool     `json:"is_monorepo"`
+	Branches          []string `json:"branches"`
+	DefaultBranch     string   `json:"default_branch"`
 }
 
 // InspectRepository โคลน repo แบบตื้น (--depth 1) มาสแกนหาตัวแปรและโครงสร้างโค้ด
@@ -25,6 +27,9 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 	if err := ValidateGitRepository(cleanRepoURL, gitToken...); err != nil {
 		return nil, err
 	}
+
+	// ดึง Branches แบบรวดเร็ว
+	branches, defBranch, _ := GetRepoBranches(cleanRepoURL, gitToken...)
 
 	tempDir, err := os.MkdirTemp("", "inspect-*")
 	if err != nil {
@@ -42,8 +47,10 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 	}
 
 	result := &InspectResult{
-		DetectedEnvs: []string{},
-		DBVarNames:   []string{},
+		DetectedEnvs:  []string{},
+		DBVarNames:    []string{},
+		Branches:      branches,
+		DefaultBranch: defBranch,
 	}
 
 	envMap := make(map[string]string)

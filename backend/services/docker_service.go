@@ -457,7 +457,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 		token = gitToken[0]
 	}
 
-	buildDir, err := CloneRepository(cleanRepoURL, token)
+	buildDir, err := CloneRepository(cleanRepoURL, "", token)
 	if err != nil {
 		return "", fmt.Errorf("โหลดโค้ดใหม่ไม่สำเร็จ: %w", err)
 	}

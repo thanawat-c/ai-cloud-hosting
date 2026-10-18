@@ -266,6 +266,7 @@ func GetContainers(c *gin.Context) {
 			"updated_at":     d.UpdatedAt.Format(time.RFC3339),
 			"deployed_at":    deployedAt.Format(time.RFC3339),
 			"domain_name":    d.DomainName,
+			"custom_domain":  d.CustomDomain,
 			"last_error":     lastError,
 			"branch":         branch,
 			"commit_hash":    commitHash,
@@ -490,4 +491,32 @@ func UpdateContainerEnv(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "อัปเดต Environment Variables และรีสตาร์ตสำเร็จ!", "new_id": newID[:12]})
+}
+
+func UpdateContainerDomain(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		CustomDomain string `json:"custom_domain"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
+		return
+	}
+
+	cleanDomain := strings.TrimSpace(req.CustomDomain)
+	cleanDomain = strings.TrimPrefix(cleanDomain, "http://")
+	cleanDomain = strings.TrimPrefix(cleanDomain, "https://")
+	cleanDomain = strings.TrimSuffix(cleanDomain, "/")
+
+	var deploy models.Deployment
+	if err := config.DB.Where("container_id LIKE ?", id+"%").First(&deploy).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Deployment not found"})
+		return
+	}
+
+	config.DB.Model(&deploy).Update("custom_domain", cleanDomain)
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Custom domain updated successfully",
+		"custom_domain": cleanDomain,
+	})
 }

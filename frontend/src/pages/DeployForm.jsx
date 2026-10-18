@@ -4,7 +4,7 @@ import {
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
   Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
   FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw,
-  Sparkles, Loader2
+  Sparkles, Loader2, Clock, Layers, Box, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ const DeployForm = () => {
   const resultRef = useRef(null);
   const logsEndRef = useRef(null);
   const terminalBoxRef = useRef(null);
+  const liveModalTerminalRef = useRef(null);
 
   const [repoUrl, setRepoUrl] = useState('');
   const [gitToken, setGitToken] = useState('');
@@ -35,6 +36,15 @@ const DeployForm = () => {
   const [inspectError, setInspectError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // Git Branch & Live Stream States
+  const [selectedBranch, setSelectedBranch] = useState('main');
+  const [availableBranches, setAvailableBranches] = useState(['main']);
+  const [isCustomBranch, setIsCustomBranch] = useState(false);
+  const [deployStartTime, setDeployStartTime] = useState(null);
+  const [deployElapsedTime, setDeployElapsedTime] = useState('00:00');
+  const [deployModalOpen, setDeployModalOpen] = useState(false);
+  const [deployStage, setDeployStage] = useState('cloning'); // 'cloning', 'inspecting', 'building', 'routing', 'done', 'error'
 
   const handleCopyUrl = (url) => {
     if (!url) return;
@@ -65,10 +75,29 @@ const DeployForm = () => {
   };
 
   useEffect(() => {
-    if (deployLogs && terminalBoxRef.current) {
-      terminalBoxRef.current.scrollTop = terminalBoxRef.current.scrollHeight;
+    if (deployLogs) {
+      if (terminalBoxRef.current) {
+        terminalBoxRef.current.scrollTop = terminalBoxRef.current.scrollHeight;
+      }
+      if (liveModalTerminalRef.current) {
+        liveModalTerminalRef.current.scrollTop = liveModalTerminalRef.current.scrollHeight;
+      }
     }
   }, [deployLogs]);
+
+  // Live Elapsed Timer
+  useEffect(() => {
+    let interval;
+    if (isLoading && deployStartTime) {
+      interval = setInterval(() => {
+        const diffSec = Math.floor((Date.now() - deployStartTime) / 1000);
+        const m = String(Math.floor(diffSec / 60)).padStart(2, '0');
+        const s = String(diffSec % 60).padStart(2, '0');
+        setDeployElapsedTime(`${m}:${s}`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading, deployStartTime]);
 
   useEffect(() => {
     fetch('http://localhost:8080/api/databases')
@@ -108,6 +137,12 @@ const DeployForm = () => {
       if (res.ok) {
         setInspectResult(data);
         setInspectError('');
+        if (data.branches && data.branches.length > 0) {
+          setAvailableBranches(data.branches);
+          if (!data.branches.includes(selectedBranch)) {
+            setSelectedBranch(data.default_branch || data.branches[0]);
+          }
+        }
         if (data.has_database && !selectedDbId) {
           setAutoCreateDb(true);
         }
@@ -188,8 +223,13 @@ const DeployForm = () => {
     setContainerId('');
     setPublicPort('');
     setDeployLogs('');
+    setDeployStartTime(Date.now());
+    setDeployElapsedTime('00:00');
+    setDeployStage('cloning');
+    setDeployModalOpen(true);
+
     toast.info("Starting deployment...", {
-      description: "Connecting and analyzing repository structure",
+      description: `Targeting branch: ${selectedBranch || 'main'}`,
     });
 
     try {
@@ -198,6 +238,7 @@ const DeployForm = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           repo_url: repoUrl.trim(), 
+          branch: selectedBranch || 'main',
           env_vars: envVars, 
           force_ai: forceAi,
           git_token: gitToken.trim(),
@@ -217,6 +258,16 @@ const DeployForm = () => {
         fullLog += chunk;
         setDeployLogs(fullLog);
         
+        if (chunk.includes("Cloning repository")) {
+          setDeployStage('cloning');
+        } else if (chunk.includes("Packaging workspace") || chunk.includes("Auto-DB") || chunk.includes("Preparing")) {
+          setDeployStage('inspecting');
+        } else if (chunk.includes("Building Docker image") || chunk.includes("Step ") || chunk.includes("Building backend") || chunk.includes("Building frontend")) {
+          setDeployStage('building');
+        } else if (chunk.includes("Starting") || chunk.includes("Traefik") || chunk.includes("Binding") || chunk.includes("Syncing")) {
+          setDeployStage('routing');
+        }
+
         if (chunk.includes("SUCCESS: DOMAIN=")) {
           const domainMatch = chunk.match(/DOMAIN=([a-zA-Z0-9.-]+)/);
           const idMatch = chunk.match(/ID=([a-zA-Z0-9]+)/);
@@ -224,12 +275,13 @@ const DeployForm = () => {
           if (domainMatch) setPublicPort(domainMatch[1]);
           if (idMatch) setContainerId(idMatch[1]);
           
+          setDeployStage('done');
           setMessage("Deployment successful! Your server is ready.");
-          setShowSuccessModal(true);
           toast.success("Deployment successful!", {
             description: domainMatch ? `Available at ${domainMatch[1]}` : "Server is now running",
           });
         } else if (chunk.includes("Error:") || chunk.includes("failed:") || chunk.includes("Error response from daemon:")) {
+          setDeployStage('error');
           const detectedError = extractLastError(fullLog);
           setLastError(detectedError);
           setMessage("Deployment failed. Root cause details highlighted below.");
@@ -300,6 +352,75 @@ const DeployForm = () => {
                   </div>
                 ) : null}
               </div>
+            </div>
+          </div>
+
+          {/* Git Branch Selector */}
+          <div className="pt-0.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-neutral-300 font-mono flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Git Branch</span>
+              </label>
+              <span className={`px-2 py-0.2 rounded-full text-[10px] font-mono font-medium ${
+                selectedBranch === 'main' || selectedBranch === 'master'
+                  ? 'bg-[#0070f3]/15 text-[#0070f3] border border-[#0070f3]/30'
+                  : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+              }`}>
+                {selectedBranch === 'main' || selectedBranch === 'master' ? '● Production Environment' : '● Preview Environment'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                {isCustomBranch ? (
+                  <input
+                    type="text"
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    placeholder="e.g. main, staging, feature/login"
+                    className="w-full bg-black border border-neutral-800 text-white px-3.5 py-2.5 rounded-md focus:outline-none focus:border-neutral-600 transition-colors text-xs font-mono"
+                  />
+                ) : (
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomBranch(true);
+                        setSelectedBranch('');
+                      } else {
+                        setSelectedBranch(e.target.value);
+                      }
+                    }}
+                    className="w-full bg-black border border-neutral-800 text-white px-3.5 py-2.5 rounded-md focus:outline-none focus:border-neutral-600 transition-colors text-xs font-mono appearance-none cursor-pointer"
+                  >
+                    {availableBranches.map((b) => (
+                      <option key={b} value={b} className="bg-neutral-950 text-white">
+                        {b} {b === 'main' || b === 'master' ? '(default)' : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__" className="bg-neutral-950 text-neutral-400">
+                      + Custom Branch...
+                    </option>
+                  </select>
+                )}
+                {!isCustomBranch && (
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                )}
+              </div>
+
+              {isCustomBranch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomBranch(false);
+                    setSelectedBranch(availableBranches[0] || 'main');
+                  }}
+                  className="px-3 py-2.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white text-xs font-mono transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
 
@@ -913,6 +1034,229 @@ const DeployForm = () => {
               })()}
 
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Live Build Stepper & Terminal Modal */}
+      {deployModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] border border-neutral-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-black">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                  deployStage === 'done'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-[#00df8f]'
+                    : deployStage === 'error'
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    : 'bg-blue-500/10 border-blue-500/30 text-[#0070f3]'
+                }`}>
+                  {deployStage === 'done' ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : deployStage === 'error' ? (
+                    <XCircle className="w-4 h-4" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white font-mono">
+                      {deployStage === 'done' 
+                        ? 'Deployment Ready' 
+                        : deployStage === 'error' 
+                        ? 'Deployment Failed' 
+                        : 'Deploying Application...'}
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
+                      selectedBranch === 'main' || selectedBranch === 'master'
+                        ? 'bg-[#0070f3]/20 text-[#0070f3] border border-[#0070f3]/30'
+                        : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    }`}>
+                      {selectedBranch}
+                    </span>
+                  </div>
+                  <p className="text-neutral-500 font-mono text-[11px] truncate max-w-sm sm:max-w-md">
+                    {repoUrl}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="px-2.5 py-1 rounded bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono text-xs flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>{deployElapsedTime}</span>
+                </div>
+                {(deployStage === 'done' || deployStage === 'error') && (
+                  <button
+                    onClick={() => setDeployModalOpen(false)}
+                    className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stepper Pipeline Bar */}
+            <div className="grid grid-cols-4 border-b border-neutral-900 bg-neutral-950/80 text-[11px] font-mono">
+              {[
+                { id: 'cloning', label: '1. Git Clone', sub: selectedBranch },
+                { id: 'inspecting', label: '2. Inspect & DB', sub: autoCreateDb ? 'Auto-DB' : 'Env Scan' },
+                { id: 'building', label: '3. Docker Build', sub: 'Image Package' },
+                { id: 'routing', label: '4. Traefik Routing', sub: 'Live Gateway' },
+              ].map((step, idx) => {
+                const stageOrder = ['cloning', 'inspecting', 'building', 'routing', 'done'];
+                const currentIdx = stageOrder.indexOf(deployStage === 'error' ? 'building' : deployStage);
+                const stepIdx = idx;
+                const isPassed = currentIdx > stepIdx || deployStage === 'done';
+                const isCurrent = currentIdx === stepIdx && deployStage !== 'done' && deployStage !== 'error';
+                const isFailed = deployStage === 'error' && currentIdx === stepIdx;
+
+                return (
+                  <div 
+                    key={step.id} 
+                    className={`p-3 border-r border-neutral-900 last:border-r-0 transition-colors ${
+                      isCurrent ? 'bg-neutral-900/60 text-white' : 'text-neutral-500'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {isPassed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00df8f] shrink-0" />
+                      ) : isFailed ? (
+                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      ) : isCurrent ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[#0070f3] animate-spin shrink-0" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full border border-neutral-700 shrink-0"></div>
+                      )}
+                      <span className={`truncate font-medium ${isCurrent ? 'text-white' : isPassed ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-neutral-600 block pl-5 truncate">
+                      {step.sub}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Embedded Live Terminal */}
+            <div className="p-4 bg-black flex-1 overflow-hidden flex flex-col min-h-[260px] max-h-[380px]">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                  <span className="text-neutral-500 font-mono text-[11px] ml-1.5">Live Build Stream</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(deployLogs);
+                    toast.success('Logs copied to clipboard');
+                  }}
+                  className="text-neutral-400 hover:text-white text-[11px] font-mono flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              <div 
+                ref={liveModalTerminalRef}
+                className="flex-1 overflow-y-auto font-mono text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed pr-2 select-text"
+              >
+                {deployLogs || (
+                  <div className="text-neutral-600 flex items-center gap-2 py-8 justify-center">
+                    <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
+                    <span>Connecting to build pipeline...</span>
+                  </div>
+                )}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
+
+            {/* Modal Footer / Outcomes */}
+            {deployStage === 'done' ? (
+              <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="min-w-0">
+                  <span className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+                    Live Production URL
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs font-mono font-bold text-white truncate">
+                      http://{publicPort}
+                    </span>
+                    <button
+                      onClick={() => handleCopyUrl(publicPort)}
+                      className="p-1 rounded hover:bg-neutral-800 text-neutral-400 hover:text-white"
+                      title="Copy URL"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`http://${publicPort}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-neutral-200 text-black text-xs font-semibold transition-colors"
+                  >
+                    <span>Open Live Site</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-medium transition-colors"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-neutral-400" />
+                    <span>Dashboard</span>
+                  </button>
+                </div>
+              </div>
+            ) : deployStage === 'error' ? (
+              <div className="p-4 border-t border-neutral-800 bg-rose-950/30 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-mono uppercase tracking-wider text-rose-400 font-semibold">
+                    Build Error Detected
+                  </span>
+                  <p className="text-xs font-mono text-rose-200 truncate mt-0.5">
+                    {lastError || 'Process terminated with errors'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDeploy}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-medium transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Retry</span>
+                  </button>
+                  <button
+                    onClick={() => setDeployModalOpen(false)}
+                    className="px-3 py-1.5 rounded-md border border-neutral-800 hover:bg-neutral-800 text-neutral-400 text-xs font-mono transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 border-t border-neutral-800 bg-neutral-950 flex items-center justify-between text-xs font-mono text-neutral-400">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#0070f3] animate-pulse"></div>
+                  <span>Streaming build output from Docker engine...</span>
+                </div>
+                <span className="text-[11px] text-neutral-500">Auto-deploying to Traefik proxy</span>
+              </div>
+            )}
 
           </div>
         </div>

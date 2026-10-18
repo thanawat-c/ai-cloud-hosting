@@ -194,6 +194,79 @@ const DashboardHome = () => {
     }
   };
 
+  // Metrics Modal State
+  const [metricsModalOpen, setMetricsModalOpen] = useState(false);
+  const [metricsContainer, setMetricsContainer] = useState(null);
+  const [metricsData, setMetricsData] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  const fetchMetrics = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/containers/${id}/stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setMetricsData(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch container metrics:', e);
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  const handleOpenMetrics = (container) => {
+    setMetricsContainer(container);
+    setMetricsModalOpen(true);
+    setMetricsLoading(true);
+    fetchMetrics(container.id);
+  };
+
+  useEffect(() => {
+    let interval;
+    if (metricsModalOpen && metricsContainer) {
+      interval = setInterval(() => {
+        fetchMetrics(metricsContainer.id);
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [metricsModalOpen, metricsContainer]);
+
+  // Custom Domain Modal State
+  const [domainModalOpen, setDomainModalOpen] = useState(false);
+  const [domainContainer, setDomainContainer] = useState(null);
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [savingDomain, setSavingDomain] = useState(false);
+
+  const handleOpenDomainModal = (container) => {
+    setDomainContainer(container);
+    setCustomDomainInput(container.custom_domain || '');
+    setDomainModalOpen(true);
+  };
+
+  const handleSaveCustomDomain = async () => {
+    if (!domainContainer) return;
+    setSavingDomain(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/containers/${domainContainer.id}/domain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_domain: customDomainInput }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Custom domain saved successfully!');
+        setDomainModalOpen(false);
+        fetchContainers();
+      } else {
+        toast.error(data.error || 'Failed to update custom domain');
+      }
+    } catch (err) {
+      toast.error('Network error saving domain');
+    } finally {
+      setSavingDomain(false);
+    }
+  };
+
   // Universal Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -1376,6 +1449,30 @@ const DashboardHome = () => {
                                     type="button"
                                     onClick={() => {
                                       setActiveMenuId(null);
+                                      handleOpenMetrics(item);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <Activity className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>Live Metrics (CPU/RAM)</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleOpenDomainModal(item);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                                  >
+                                    <Globe className="w-3.5 h-3.5 text-neutral-400" />
+                                    <span>Custom Domain</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
                                       handleOpenEnv(item.id, item.name);
                                     }}
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
@@ -2512,6 +2609,198 @@ const DashboardHome = () => {
                 className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 rounded-md text-xs font-medium transition-colors cursor-pointer"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Resource Metrics Modal */}
+      {metricsModalOpen && metricsContainer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-neutral-800 flex items-center justify-between bg-black">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-emerald-400">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white font-mono">Real-time Performance Metrics</h3>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  </div>
+                  <p className="text-neutral-500 font-mono text-[11px] truncate max-w-xs">
+                    {metricsContainer.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMetricsModalOpen(false)}
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body Stats */}
+            <div className="p-6 space-y-5 bg-[#0a0a0a]">
+              {/* CPU Usage Card */}
+              <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-neutral-400 flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-blue-400" />
+                    <span>CPU Usage</span>
+                  </span>
+                  <span className="font-bold text-white text-sm">
+                    {metricsData?.cpu_percent != null ? `${Number(metricsData.cpu_percent).toFixed(1)}%` : '0.0%'}
+                  </span>
+                </div>
+                <div className="w-full bg-neutral-900 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(2, Number(metricsData?.cpu_percent || 0)))}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Memory Usage Card */}
+              <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-neutral-400 flex items-center gap-1.5">
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Memory (RAM)</span>
+                  </span>
+                  <div className="text-right">
+                    <span className="font-bold text-white text-sm">
+                      {metricsData?.memory_usage_mb != null ? `${Number(metricsData.memory_usage_mb).toFixed(1)} MB` : '0.0 MB'}
+                    </span>
+                    <span className="text-neutral-500 text-[11px] ml-1">
+                      / {metricsData?.memory_limit_mb != null ? `${Number(metricsData.memory_limit_mb).toFixed(0)} MB` : '256 MB'}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full bg-neutral-900 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${Math.min(100, Math.max(3, (Number(metricsData?.memory_usage_mb || 0) / Number(metricsData?.memory_limit_mb || 256)) * 100))}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Network & Diagnostics Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800">
+                  <span className="text-neutral-500 text-[10px] uppercase block mb-1">Status</span>
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span>Online / Healthy</span>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800">
+                  <span className="text-neutral-500 text-[10px] uppercase block mb-1">Polling Rate</span>
+                  <span className="text-neutral-200">2.0s Live Stream</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex items-center justify-between">
+              <span className="text-[11px] text-neutral-500 font-mono">
+                Container ID: {metricsContainer.id.substring(0, 12)}
+              </span>
+              <button
+                onClick={() => setMetricsModalOpen(false)}
+                className="px-4 py-1.5 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-xs font-medium text-white transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Domain Settings Modal */}
+      {domainModalOpen && domainContainer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-neutral-800 flex items-center justify-between bg-black">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-blue-400">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white font-mono">Custom Domain Settings</h3>
+                  <p className="text-neutral-500 font-mono text-[11px] truncate max-w-xs">
+                    {domainContainer.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDomainModalOpen(false)}
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 bg-[#0a0a0a]">
+              <div>
+                <label className="text-xs font-mono text-neutral-400 block mb-1.5">
+                  Default Internal Domain (Assigned by Traefik)
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={domainContainer.domain_name || 'Not assigned'}
+                  className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 px-3 py-2 rounded-md font-mono text-xs cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-mono text-neutral-200 block mb-1.5 flex items-center justify-between">
+                  <span>Custom Domain or Subdomain</span>
+                  <span className="text-[10px] text-neutral-500">e.g. api.yourdomain.com</span>
+                </label>
+                <input
+                  type="text"
+                  value={customDomainInput}
+                  onChange={(e) => setCustomDomainInput(e.target.value)}
+                  placeholder="api.mysite.com or myapp.localhost"
+                  className="w-full bg-black border border-neutral-700 text-white px-3 py-2 rounded-md font-mono text-xs focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+
+              {/* DNS Configuration Helper Note */}
+              <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-mono text-neutral-400 space-y-1">
+                <div className="flex items-center gap-1.5 text-neutral-300 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                  <span>DNS Configuration Tip</span>
+                </div>
+                <p className="text-neutral-500 leading-relaxed">
+                  Point a <strong className="text-neutral-300">CNAME</strong> record for your domain to your cluster host, or an <strong className="text-neutral-300">A Record</strong> to <code className="text-neutral-300">127.0.0.1</code> or public server IP.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setDomainModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-md border border-neutral-800 hover:bg-neutral-900 text-neutral-400 text-xs font-mono transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveCustomDomain}
+                disabled={savingDomain}
+                className="px-4 py-1.5 rounded-md bg-white hover:bg-neutral-200 text-black text-xs font-semibold font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {savingDomain ? 'Saving...' : 'Save & Route'}
               </button>
             </div>
           </div>

@@ -3,6 +3,7 @@ package models
 // DeployRequest represents the incoming JSON payload for deployment
 type DeployRequest struct {
     RepoURL      string `json:"repo_url" binding:"required"`
+    Branch       string `json:"branch"`
     EnvVars      string `json:"env_vars"`
     ForceAI      bool   `json:"force_ai"`
     GitToken     string `json:"git_token"`
