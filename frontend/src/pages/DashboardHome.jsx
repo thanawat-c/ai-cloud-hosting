@@ -21,6 +21,26 @@ const getShortAppName = (rawName, cleanName) => {
   return cleaned;
 };
 
+// Helper to get GitHub commit link
+const getGitCommitUrl = (repoUrl, commitHash) => {
+  if (!repoUrl || !commitHash) return null;
+  const clean = repoUrl.replace(/\.git\/?$/, '').replace(/\s*\((Backend|Frontend)\)$/, '').trim();
+  if (clean.includes('github.com')) {
+    return `${clean}/commit/${commitHash}`;
+  }
+  return null;
+};
+
+// Helper to get GitHub branch link
+const getGitBranchUrl = (repoUrl, branch) => {
+  if (!repoUrl || !branch) return null;
+  const clean = repoUrl.replace(/\.git\/?$/, '').replace(/\s*\((Backend|Frontend)\)$/, '').trim();
+  if (clean.includes('github.com')) {
+    return `${clean}/tree/${branch}`;
+  }
+  return null;
+};
+
 // Calculate relative time ago, e.g., 'just now', '2m ago', '1h ago'
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return '-';
@@ -1119,8 +1139,14 @@ const DashboardHome = () => {
                         </td>
 
                         {/* 2. Description / Commit */}
-                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-[160px] lg:max-w-[240px] font-sans" title={description}>
-                          {description}
+                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-[160px] lg:max-w-[240px] font-sans" title={item.commit_message || description}>
+                          {item.commit_message ? (
+                            <span className="text-neutral-300 font-mono text-[11px] truncate block">
+                              {item.commit_message}
+                            </span>
+                          ) : (
+                            description
+                          )}
                         </td>
 
                         {/* 3. Status */}
@@ -1185,39 +1211,80 @@ const DashboardHome = () => {
                           )}
                         </td>
 
-                        {/* 4. Environment */}
+                        {/* 4. Environment (Production vs Preview) */}
                         <td className="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap">
-                          {isRunning ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-[#0070f3] text-white shadow-[0_0_12px_rgba(0,112,243,0.25)]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                              Production
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-[#888888] border border-[#333333] bg-transparent">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#666666]"></span>
-                              Production
-                            </span>
-                          )}
+                          {(() => {
+                            const isProd = !item.branch || item.branch === 'main' || item.branch === 'master';
+                            if (isRunning) {
+                              return isProd ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-[#0070f3] text-white shadow-[0_0_12px_rgba(0,112,243,0.25)]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                  Production
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-neutral-900 text-neutral-300 border border-neutral-700 shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                  Preview
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-[#888888] border border-[#333333] bg-transparent">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#666666]"></span>
+                                {isProd ? 'Production' : 'Preview'}
+                              </span>
+                            );
+                          })()}
                         </td>
 
-                        {/* 5. Commit */}
+                        {/* 5. Commit with GitHub Link */}
                         <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
-                          <div className="flex items-center gap-1.5" title={item.commit_message || `Commit: ${item.commit_hash || item.id?.substring(0, 7)}`}>
-                            <span className="text-[#666666] font-mono text-xs">-o-</span>
-                            <span className="text-[#a1a1a1] hover:text-white transition-colors">
-                              {item.commit_hash || (item.id ? item.id.substring(0, 7) : 'head')}
-                            </span>
-                          </div>
+                          {(() => {
+                            const commitUrl = getGitCommitUrl(item.clean_name || item.name, item.commit_hash);
+                            const shortHash = item.commit_hash || (item.id ? item.id.substring(0, 7) : 'head');
+                            return (
+                              <div className="flex items-center gap-1.5" title={item.commit_message || `Commit: ${shortHash}`}>
+                                <span className="text-[#666666] font-mono text-xs">-o-</span>
+                                {commitUrl ? (
+                                  <a
+                                    href={commitUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#a1a1a1] hover:text-white hover:underline transition-colors"
+                                  >
+                                    {shortHash}
+                                  </a>
+                                ) : (
+                                  <span className="text-[#a1a1a1] hover:text-white transition-colors">{shortHash}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
-                        {/* 6. Branch */}
+                        {/* 6. Branch with GitHub Link */}
                         <td className="hidden lg:table-cell px-4 py-3.5 whitespace-nowrap font-mono text-xs text-[#888888]">
-                          <div className="flex items-center gap-1.5" title={`Branch: ${item.branch || 'main'}`}>
-                            <GitBranch className="w-3.5 h-3.5 text-[#666666] shrink-0" />
-                            <span className="text-[#a1a1a1] hover:text-white transition-colors">
-                              {item.branch || 'main'}
-                            </span>
-                          </div>
+                          {(() => {
+                            const branchName = item.branch || 'main';
+                            const branchUrl = getGitBranchUrl(item.clean_name || item.name, branchName);
+                            return (
+                              <div className="flex items-center gap-1.5" title={`Branch: ${branchName}`}>
+                                <GitBranch className="w-3.5 h-3.5 text-[#666666] shrink-0" />
+                                {branchUrl ? (
+                                  <a
+                                    href={branchUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#a1a1a1] hover:text-white hover:underline transition-colors"
+                                  >
+                                    {branchName}
+                                  </a>
+                                ) : (
+                                  <span className="text-[#a1a1a1] hover:text-white transition-colors">{branchName}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* 7. Age */}

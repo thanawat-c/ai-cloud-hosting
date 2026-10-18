@@ -103,15 +103,20 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </NavLink>
         </nav>
 
-        {/* Bottom Profile Area */}
+        {/* Bottom Profile Area - Vercel Workspace */}
         <div className="p-3 border-t border-neutral-800">
-          <div className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800/80 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center font-mono text-xs font-bold text-white">
-              K
+          <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800/80 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 p-[1.5px] shrink-0">
+              <div className="w-full h-full bg-black rounded-full flex items-center justify-center font-mono text-[10px] font-bold text-white">
+                P
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-medium text-white truncate font-mono">kan (admin)</p>
-              <p className="text-[10px] text-neutral-500 truncate font-mono">localhost:8080</p>
+            <div className="flex-1 overflow-hidden min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-medium text-white truncate font-mono">Personal</p>
+                <span className="text-[9px] px-1 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-mono uppercase">Pro</span>
+              </div>
+              <p className="text-[10px] text-neutral-500 truncate font-mono">Local Cluster • 8080</p>
             </div>
           </div>
         </div>
