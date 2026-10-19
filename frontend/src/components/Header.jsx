@@ -130,12 +130,6 @@ const Header = ({ setIsSidebarOpen }) => {
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
             </button>
-
-            {/* Quick status pill */}
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span>Gateway 8080</span>
-            </div>
           </div>
         </div>
       </header>
