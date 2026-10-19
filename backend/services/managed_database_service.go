@@ -16,6 +16,7 @@ import (
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
+	"ai-cloud-api/utils"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -263,14 +264,50 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 		Status:        "running",
 		VolumeName:    volumeName,
 		MemoryLimitMB: 512,
-		StorageUsage:  "~35 MB",
+		StorageUsage:  "~28 MB",
 	}
 
 	if err := config.DB.Create(&dbRecord).Error; err != nil {
 		return nil, fmt.Errorf("บันทึกข้อมูล Database ลงฐานข้อมูลไม่สำเร็จ: %w", err)
 	}
 
+	utils.CreateNotification(wsID, "Database Provisioned", fmt.Sprintf("Dedicated PostgreSQL '%s' is ready on host port %d", cleanName, hostPort), "info", cleanName)
+
 	return &dbRecord, nil
+}
+
+// GetDatabaseStorageUsage คำนวณขนาด Disk จริงของ Database Container
+func GetDatabaseStorageUsage(ctx context.Context, cli *client.Client, containerID string) string {
+	if containerID == "" || cli == nil {
+		return "~28 MB"
+	}
+	execConfig := types.ExecConfig{
+		Cmd:          []string{"du", "-sh", "/var/lib/postgresql/data"},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+	execID, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "~32 MB"
+	}
+	resp, err := cli.ContainerExecAttach(ctx, execID.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "~32 MB"
+	}
+	defer resp.Close()
+
+	var outBuf bytes.Buffer
+	_, _ = stdcopy.StdCopy(&outBuf, io.Discard, resp.Reader)
+	output := strings.TrimSpace(outBuf.String())
+	parts := strings.Fields(output)
+	if len(parts) > 0 && parts[0] != "" {
+		size := parts[0]
+		if !strings.HasSuffix(size, "B") {
+			size += "B"
+		}
+		return size
+	}
+	return "~32 MB"
 }
 
 // ListManagedDatabases ดึงรายการ Database พร้อมสถานะปัจจุบัน (รองรับการกรองตาม Workspace)
@@ -300,6 +337,14 @@ func ListManagedDatabases(ctx context.Context, workspaceID ...string) ([]models.
 				databases[i].Status = state
 				config.DB.Model(&databases[i]).Update("status", state)
 			}
+			// คำนวณขนาด Storage จริงเมื่อ Container รันอยู่
+			if state == "running" {
+				realUsage := GetDatabaseStorageUsage(ctx, cli, databases[i].ContainerID)
+				if realUsage != "" && realUsage != databases[i].StorageUsage {
+					databases[i].StorageUsage = realUsage
+					config.DB.Model(&databases[i]).Update("storage_usage", realUsage)
+				}
+			}
 		} else if databases[i].Status != "deleted" {
 			databases[i].Status = "exited"
 			config.DB.Model(&databases[i]).Update("status", "exited")
@@ -325,6 +370,11 @@ func StopManagedDatabase(ctx context.Context, id uint) error {
 	timeout := 10
 	_ = cli.ContainerStop(ctx, db.ContainerID, container.StopOptions{Timeout: &timeout})
 	config.DB.Model(&db).Update("status", "exited")
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Stopped", fmt.Sprintf("Database '%s' was stopped", db.Name), "warning", db.Name)
 	return nil
 }
 
@@ -345,6 +395,11 @@ func StartManagedDatabase(ctx context.Context, id uint) error {
 		return fmt.Errorf("เริ่มรันไม่สำเร็จ: %w", err)
 	}
 	config.DB.Model(&db).Update("status", "running")
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Resumed", fmt.Sprintf("Database '%s' is back online", db.Name), "info", db.Name)
 	return nil
 }
 
@@ -367,6 +422,11 @@ func DeleteManagedDatabase(ctx context.Context, id uint) error {
 	}
 
 	config.DB.Model(&db).Update("status", "deleted")
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Deleted", fmt.Sprintf("Database '%s' was removed along with its persistent volume", db.Name), "warning", db.Name)
 	return nil
 }
 

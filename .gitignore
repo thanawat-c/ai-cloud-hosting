@@ -1,5 +1,6 @@
 # Binaries & Executables
 backend/ai-cloud-api
+backend/server
 backend/*.exe
 backend/*.dll
 backend/*.so

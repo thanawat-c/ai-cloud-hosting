@@ -26,8 +26,14 @@ func ConnectDatabase() {
 	}
 
 	// ฟีเจอร์เด็ดของ GORM: Auto Migrate
-	// สร้างตาราง workspaces, deployments และ managed_databases ให้อัตโนมัติ
-	err = database.AutoMigrate(&models.Workspace{}, &models.Deployment{}, &models.ManagedDatabase{})
+	// สร้างตาราง workspaces, deployments, managed_databases, notifications และ api_tokens ให้อัตโนมัติ
+	err = database.AutoMigrate(
+		&models.Workspace{}, 
+		&models.Deployment{}, 
+		&models.ManagedDatabase{},
+		&models.Notification{},
+		&models.APIToken{},
+	)
 	if err != nil {
 		log.Fatal("❌ สร้างตารางอัตโนมัติล้มเหลว: ", err)
 	}

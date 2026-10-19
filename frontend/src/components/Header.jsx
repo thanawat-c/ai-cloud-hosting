@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, Check, Clock } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -13,6 +13,11 @@ const Header = ({ setIsSidebarOpen }) => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [containers, setContainers] = useState([]);
+
+  // Notifications State
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Listen for Cmd+K or Ctrl+K shortcut
   useEffect(() => {
@@ -42,6 +47,51 @@ const Header = ({ setIsSidebarOpen }) => {
         .catch(() => {});
     }
   }, [paletteOpen, activeWorkspaceId]);
+
+  // Fetch real notification events from backend
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8080/api/notifications', {
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unread_count || 0);
+      }
+    } catch {}
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchNotifications();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await fetch('http://localhost:8080/api/notifications/read-all', {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch {}
+  };
+
+  const handleClearNotifications = async () => {
+    try {
+      await fetch('http://localhost:8080/api/notifications', {
+        method: 'DELETE',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      setNotifications([]);
+      setUnreadCount(0);
+      toast.success('All notifications cleared');
+    } catch {}
+  };
 
   const quickNavItems = [
     { label: 'Deployments Overview', sub: 'View all active containers', path: '/', icon: LayoutDashboard },
@@ -129,15 +179,110 @@ const Header = ({ setIsSidebarOpen }) => {
               </div>
             </button>
 
-            {/* Notifications */}
-            <button 
-              onClick={() => toast.info('No new system alerts: Local cluster healthy.')}
-              className="relative p-2 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-            </button>
+            {/* Interactive Notification Popover */}
+            <div className="relative">
+              <button 
+                type="button"
+                onClick={() => {
+                  setNotifOpen(prev => !prev);
+                  if (!notifOpen && unreadCount > 0) {
+                    handleMarkAllRead();
+                  }
+                }}
+                className="relative p-2 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-colors cursor-pointer"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 ? (
+                  <span className="absolute top-1 right-1 min-w-[15px] h-[15px] px-0.5 bg-rose-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                ) : (
+                  notifications.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                  )
+                )}
+              </button>
+
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#0a0a0a] border border-neutral-800 rounded-xl shadow-2xl z-40 p-0 text-xs font-mono overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-3 border-b border-neutral-800 flex items-center justify-between bg-neutral-950">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white">System Activity</span>
+                        {unreadCount > 0 && (
+                          <span className="text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded font-mono">
+                            {unreadCount} unread
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {notifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClearNotifications}
+                            className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Clear</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setNotifOpen(false)}
+                          className="text-neutral-500 hover:text-white p-0.5 rounded cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[360px] overflow-y-auto divide-y divide-neutral-900 scrollbar-thin">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-neutral-500">
+                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                          <p className="text-xs">No notifications yet</p>
+                          <p className="text-[10px] text-neutral-600 mt-0.5">Events from deployments & databases appear here</p>
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id} 
+                            className={`p-3 transition-colors hover:bg-neutral-900/50 ${
+                              !n.is_read ? 'bg-neutral-900/30' : ''
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <div className="mt-0.5 shrink-0">
+                                {n.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                                {n.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
+                                {n.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-400" />}
+                                {n.type === 'info' && <Database className="w-4 h-4 text-cyan-400" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <span className="font-semibold text-white text-xs truncate">{n.title}</span>
+                                  <span className="text-[10px] text-neutral-500 shrink-0 font-sans">
+                                    {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-400 leading-relaxed break-words">{n.message}</p>
+                                {n.resource_name && (
+                                  <div className="mt-1 inline-block text-[9px] px-1.5 py-0.2 rounded bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono">
+                                    {n.resource_name}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>

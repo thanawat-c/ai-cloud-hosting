@@ -283,6 +283,8 @@ func TestDeploy(c *gin.Context) {
 			// Prune old unused images in background
 			go services.PruneUnusedImages(context.Background())
 
+			utils.CreateNotification(wsID, "Fullstack Deployed", fmt.Sprintf("Frontend: http://%s | Backend: http://%s", feDomainName, beDomainName), "success", baseImageName)
+
 			logChan <- fmt.Sprintf("\n🎉 Fullstack services deployed successfully!\nBackend API: http://%s\nFrontend UI: http://%s\n", beDomainName, feDomainName)
 			logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", feDomainName, feContainerID[:12])
 			return
@@ -349,6 +351,8 @@ func TestDeploy(c *gin.Context) {
 
 		// Prune old unused images in background
 		go services.PruneUnusedImages(context.Background())
+
+		utils.CreateNotification(wsID, "Deployment Succeeded", fmt.Sprintf("Service %s live at http://%s", imageName, domainName), "success", imageName)
 
 		logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", domainName, containerID[:12])
 	}()

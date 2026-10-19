@@ -1705,6 +1705,11 @@ const DashboardHome = () => {
                         <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-400">
                           512 MB Cap
                         </span>
+                        {db.storage_usage && (
+                          <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-emerald-400 font-mono">
+                            Disk: {db.storage_usage}
+                          </span>
+                        )}
                       </div>
 
                       {/* Live RAM Stats */}

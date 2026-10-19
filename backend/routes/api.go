@@ -41,6 +41,16 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/workspaces", controllers.GetWorkspaces)
 		api.POST("/workspaces", controllers.CreateWorkspace)
 
+		// Notifications (System Alerts & Audit Log)
+		api.GET("/notifications", controllers.GetNotifications)
+		api.POST("/notifications/read-all", controllers.MarkAllNotificationsRead)
+		api.DELETE("/notifications", controllers.ClearNotifications)
+
+		// API Tokens (User Token Management)
+		api.GET("/tokens", controllers.GetTokens)
+		api.POST("/tokens", controllers.CreateToken)
+		api.DELETE("/tokens/:id", controllers.RevokeToken)
+
 		// GitHub Webhooks (Auto-Deploy on Push)
 		api.POST("/webhooks/deploy/:id", controllers.HandleDeploymentWebhook)
 		api.POST("/webhooks/github", controllers.HandleGlobalGitHubWebhook)

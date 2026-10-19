@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"log"
+	"os"
 	"os/exec"
 )
 
@@ -35,9 +36,21 @@ func main() {
 
 	r := gin.Default()
 
+	corsOrigin := "http://localhost:5173"
+	if envOrigin := os.Getenv("CORS_ALLOWED_ORIGIN"); envOrigin != "" {
+		corsOrigin = envOrigin
+	}
+
 	// เปิดใช้งาน CORS ให้ React (Port 5173) สามารถยิง API เข้ามาได้
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		origin := c.Request.Header.Get("Origin")
+		if corsOrigin == "*" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" || origin == corsOrigin {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Workspace-Id, Authorization")
 		if c.Request.Method == "OPTIONS" {
