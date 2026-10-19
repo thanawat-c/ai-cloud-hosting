@@ -1090,14 +1090,19 @@ const DeployForm = () => {
                   <Clock className="w-3.5 h-3.5 text-neutral-500" />
                   <span>{deployElapsedTime}</span>
                 </div>
-                {(deployStage === 'done' || deployStage === 'error') && (
-                  <button
-                    onClick={() => setDeployModalOpen(false)}
-                    className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeployModalOpen(false);
+                    if (deployStage !== 'done' && deployStage !== 'error') {
+                      toast.info('Deployment continuing in background. View status on the Dashboard.');
+                    }
+                  }}
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+                  title={deployStage === 'done' || deployStage === 'error' ? 'Close' : 'Run in background'}
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -1105,9 +1110,9 @@ const DeployForm = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-neutral-900 bg-neutral-950/80 text-[11px] font-mono">
               {[
                 { id: 'cloning', label: '1. Git Clone', sub: selectedBranch },
-                { id: 'inspecting', label: '2. Inspect & DB', sub: autoCreateDb ? 'Auto-DB' : 'Env Scan' },
-                { id: 'building', label: '3. Docker Build', sub: 'Image Package' },
-                { id: 'routing', label: '4. Traefik Routing', sub: 'Live Gateway' },
+                { id: 'inspecting', label: '2. Inspect & DB', sub: autoCreateDb ? 'Dedicated DB' : 'Env Scan' },
+                { id: 'building', label: '3. Build Container', sub: 'Docker Engine' },
+                { id: 'routing', label: '4. Assign Domain', sub: 'Active Proxy' },
               ].map((step, idx) => {
                 const stageOrder = ['cloning', 'inspecting', 'building', 'routing', 'done'];
                 const currentIdx = stageOrder.indexOf(deployStage === 'error' ? 'building' : deployStage);
@@ -1148,11 +1153,10 @@ const DeployForm = () => {
             {/* Embedded Live Terminal */}
             <div className="p-3 sm:p-4 bg-black flex-1 overflow-hidden flex flex-col min-h-[220px] sm:min-h-[260px] max-h-[380px]">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <span className="text-neutral-500 font-mono text-[11px] ml-1.5">Live Build Stream</span>
+                <div className="flex items-center gap-2 text-neutral-400">
+                  <Terminal className="w-3.5 h-3.5 text-neutral-500" />
+                  <span className="font-mono text-xs font-medium text-neutral-300">Build Logs</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5"></span>
                 </div>
                 <button
                   type="button"
@@ -1249,12 +1253,21 @@ const DeployForm = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-3.5 border-t border-neutral-800 bg-neutral-950 flex items-center justify-between text-xs font-mono text-neutral-400">
+              <div className="p-3 border-t border-neutral-800 bg-neutral-950/80 flex items-center justify-between text-xs font-mono text-neutral-400">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#0070f3] animate-pulse"></div>
-                  <span>Streaming build output from Docker engine...</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0070f3] animate-pulse"></span>
+                  <span className="text-[11px] text-neutral-300">Building container in progress...</span>
                 </div>
-                <span className="text-[11px] text-neutral-500">Auto-deploying to Traefik proxy</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeployModalOpen(false);
+                    toast.info('Building in background. Check Dashboard for status.');
+                  }}
+                  className="text-[11px] text-neutral-400 hover:text-white transition-colors cursor-pointer hover:underline"
+                >
+                  Run in background →
+                </button>
               </div>
             )}
 
