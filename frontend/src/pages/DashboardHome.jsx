@@ -929,12 +929,12 @@ const DashboardHome = () => {
   return (
     <div className="space-y-6">
       {/* Vercel Geist Subnavigation Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-800 pb-3">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-neutral-800 pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
           <button
             type="button"
             onClick={() => setSearchParams({ tab: 'deployments' })}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'deployments'
                 ? 'bg-neutral-900 text-white border border-neutral-800'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'
@@ -952,7 +952,7 @@ const DashboardHome = () => {
           <button
             type="button"
             onClick={() => setSearchParams({ tab: 'storage' })}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'storage'
                 ? 'bg-neutral-900 text-white border border-neutral-800'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-950 border border-transparent'
@@ -968,7 +968,7 @@ const DashboardHome = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
           {activeTab === 'deployments' ? (
             <Link
               to="/deploy"
@@ -993,20 +993,20 @@ const DashboardHome = () => {
 
       {/* Tab 1: Deployments (Server / Microservices) */}
       {activeTab === 'deployments' && (
-        <div className="bg-[#0a0a0a] p-6 rounded-xl border border-neutral-800 relative">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="bg-[#0a0a0a] p-3.5 sm:p-5 md:p-6 rounded-xl border border-neutral-800 relative">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight flex items-center gap-2">
                 <Server className="w-4 h-4 text-neutral-300" />
                 Active Deployments
               </h3>
               <p className="text-neutral-400 text-xs mt-0.5">Manage deployed microservices, APIs, and frontends.</p>
             </div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <button
                 type="button"
                 onClick={requestNotificationPermission}
-                className={`px-3 py-1 rounded-md text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
                   notificationsEnabled
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-white'
@@ -1021,7 +1021,7 @@ const DashboardHome = () => {
                 {notificationsEnabled ? 'Desktop Alerts: On' : 'Alerts: Off'}
               </button>
 
-              <span className="bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-mono px-3 py-1 rounded-md flex items-center gap-2">
+              <span className="bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-mono px-2.5 sm:px-3 py-1 rounded-md flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 Running: {containers.filter(c => c.state === 'running').length} / {containers.length}
               </span>
@@ -1115,17 +1115,17 @@ const DashboardHome = () => {
         </div>
       ) : (
         <div className="relative z-10 w-full">
-          <div className="bg-black border border-neutral-800 rounded-lg overflow-visible">
-            <table className="w-full table-auto text-left">
+          <div className="bg-black border border-neutral-800 rounded-lg overflow-x-auto scrollbar-thin scrollbar-thumb-neutral-800 min-h-[180px] pb-4">
+            <table className="w-full min-w-[580px] lg:min-w-full table-auto text-left">
                 <thead className="bg-neutral-950/90 border-b border-neutral-800">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                    <th scope="col" className="px-3 sm:px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
                       Deployment
                     </th>
-                    <th scope="col" className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                    <th scope="col" className="hidden xl:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
                       Description / Commit
                     </th>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                    <th scope="col" className="px-3 sm:px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
                       Status
                     </th>
                     <th scope="col" className="hidden sm:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
@@ -1137,10 +1137,10 @@ const DashboardHome = () => {
                     <th scope="col" className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
                       Branch
                     </th>
-                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                    <th scope="col" className="hidden sm:table-cell px-4 py-3 text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
                       Age
                     </th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-20">
+                    <th scope="col" className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-neutral-400 font-mono text-[11px] uppercase tracking-wider w-16 sm:w-20">
                     </th>
                   </tr>
                 </thead>
@@ -1164,47 +1164,55 @@ const DashboardHome = () => {
                     return (
                       <tr key={item.id} className={`hover:bg-neutral-900/40 transition-colors group ${isMenuOpen ? 'relative z-30' : ''}`}>
                         {/* 1. Deployment / Project Name with Tooltip */}
-                        <td className="px-4 py-3.5 max-w-[180px] sm:max-w-[220px] lg:max-w-[260px]">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <td className="px-3 sm:px-4 py-3.5 max-w-[150px] sm:max-w-[200px] lg:max-w-[260px]">
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                             <div className="w-5 h-5 flex items-center justify-center shrink-0">
                               <svg viewBox="0 0 76 65" fill="none" stroke="currentColor" strokeWidth="8" strokeLinejoin="round" className="w-3.5 h-3.5 text-[#00df8f]">
                                 <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
                               </svg>
                             </div>
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {item.domain_name && isRunning ? (
-                                <a 
-                                  href={`http://${item.domain_name}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  title={shortName}
-                                  className="text-sm font-medium text-white hover:underline truncate tracking-tight font-sans block"
-                                >
-                                  {shortName}
-                                </a>
-                              ) : (
-                                <span 
-                                  title={shortName}
-                                  className="text-sm font-medium text-white truncate tracking-tight font-sans block cursor-help"
-                                >
-                                  {shortName}
-                                </span>
-                              )}
-                              {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                                  API
-                                </span>
-                              ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
-                                  UI
-                                </span>
-                              ) : null}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {item.domain_name && isRunning ? (
+                                  <a 
+                                    href={`http://${item.domain_name}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    title={shortName}
+                                    className="text-xs sm:text-sm font-medium text-white hover:underline truncate tracking-tight font-sans block"
+                                  >
+                                    {shortName}
+                                  </a>
+                                ) : (
+                                  <span 
+                                    title={shortName}
+                                    className="text-xs sm:text-sm font-medium text-white truncate tracking-tight font-sans block cursor-help"
+                                  >
+                                    {shortName}
+                                  </span>
+                                )}
+                                {item.service_type === 'backend' || item.name?.includes('(Backend)') ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                                    API
+                                  </span>
+                                ) : item.service_type === 'frontend' || item.name?.includes('(Frontend)') ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                                    UI
+                                  </span>
+                                ) : null}
+                              </div>
+                              {/* Mobile helper under title */}
+                              <div className="sm:hidden flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mt-0.5 truncate">
+                                <span>{item.branch || 'main'}</span>
+                                <span>•</span>
+                                <span>{formatTimeAgo(item.deployed_at || item.created_at)}</span>
+                              </div>
                             </div>
                           </div>
                         </td>
 
                         {/* 2. Description / Commit */}
-                        <td className="hidden md:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-[160px] lg:max-w-[240px] font-sans" title={item.commit_message || description}>
+                        <td className="hidden xl:table-cell px-4 py-3.5 text-xs text-neutral-400 truncate max-w-[180px] lg:max-w-[240px] font-sans" title={item.commit_message || description}>
                           {item.commit_message ? (
                             <span className="text-neutral-300 font-mono text-[11px] truncate block">
                               {item.commit_message}
@@ -1353,12 +1361,12 @@ const DashboardHome = () => {
                         </td>
 
                         {/* 7. Age */}
-                        <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-500">
+                        <td className="hidden sm:table-cell px-3 sm:px-4 py-3.5 whitespace-nowrap font-mono text-xs text-neutral-500">
                           {formatTimeAgo(item.deployed_at || item.created_at)}
                         </td>
 
                         {/* 8. Menu (...) & Visit & Avatar */}
-                        <td className={`px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container ${isMenuOpen ? 'z-40' : ''}`}>
+                        <td className={`px-3 sm:px-4 py-3.5 text-right whitespace-nowrap relative dropdown-menu-container ${isMenuOpen ? 'z-40' : ''}`}>
                           <div className="inline-flex items-center justify-end gap-2.5">
                             {/* Real Deployer Avatar or Initial */}
                             <div 
@@ -1418,7 +1426,11 @@ const DashboardHome = () => {
                               {isMenuOpen && (
                                 <div 
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1.5 w-48 bg-[#0a0a0a] border border-neutral-800 rounded-lg shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-100"
+                                  className={`absolute right-0 ${
+                                    containers.indexOf(item) >= containers.length - 2 && containers.length > 2
+                                      ? 'bottom-full mb-1.5'
+                                      : 'top-full mt-1.5'
+                                  } w-48 bg-[#0a0a0a] border border-neutral-800 rounded-lg shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-100`}
                                 >
                                   {item.domain_name && isRunning && (
                                     <a
@@ -1563,14 +1575,14 @@ const DashboardHome = () => {
       {/* Tab 2: Storage & Databases (Managed PostgreSQL) */}
       {activeTab === 'storage' && (
         <div className="bg-[#0a0a0a] rounded-xl border border-neutral-800 overflow-hidden">
-          <div className="p-6 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-neutral-950/60">
+          <div className="p-4 sm:p-6 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-neutral-950/60">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-300 border border-neutral-800 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-300 border border-neutral-800 flex items-center justify-center shrink-0">
                 <Database className="w-4 h-4" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-white tracking-tight">Managed PostgreSQL Instances</h2>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h2 className="text-sm sm:text-base font-semibold text-white tracking-tight">Managed PostgreSQL Instances</h2>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300">
                     v16.2
                   </span>
@@ -1578,20 +1590,20 @@ const DashboardHome = () => {
                     {databases.length} / 5 Active
                   </span>
                 </div>
-                <p className="text-xs text-neutral-400 mt-0.5 font-mono">
+                <p className="text-xs text-neutral-400 mt-0.5 font-mono truncate">
                   Dedicated isolated memory • Persistent Docker Volume storage
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-mono text-neutral-400">
+            <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 shrink-0">
               <span className="w-2 h-2 rounded-full bg-[#00df8f] shadow-[0_0_8px_rgba(0,223,143,0.5)]"></span>
               <span>Cluster Online</span>
             </div>
           </div>
 
           {databases.length === 0 ? (
-            <div className="p-16 text-center bg-black">
+            <div className="p-8 sm:p-16 text-center bg-black">
               <div className="w-12 h-12 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 flex items-center justify-center mx-auto mb-3">
                 <Database className="w-5 h-5" />
               </div>
@@ -1609,7 +1621,7 @@ const DashboardHome = () => {
               </button>
             </div>
           ) : (
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
               {databases.map((db) => {
                 const isRunning = db.status === 'running';
                 return (

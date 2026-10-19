@@ -305,8 +305,8 @@ const DeployForm = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-4">
-      <div className="bg-[#0a0a0a] p-8 md:p-10 rounded-xl border border-neutral-800 relative text-white">
+    <div className="max-w-2xl mx-auto mt-2 sm:mt-4 px-1 sm:px-0">
+      <div className="bg-[#0a0a0a] p-4 sm:p-7 md:p-10 rounded-xl border border-neutral-800 relative text-white">
         
         {/* Decorative subtle ambient glows */}
         
@@ -1102,7 +1102,7 @@ const DeployForm = () => {
             </div>
 
             {/* Stepper Pipeline Bar */}
-            <div className="grid grid-cols-4 border-b border-neutral-900 bg-neutral-950/80 text-[11px] font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-neutral-900 bg-neutral-950/80 text-[11px] font-mono">
               {[
                 { id: 'cloning', label: '1. Git Clone', sub: selectedBranch },
                 { id: 'inspecting', label: '2. Inspect & DB', sub: autoCreateDb ? 'Auto-DB' : 'Env Scan' },
@@ -1119,11 +1119,11 @@ const DeployForm = () => {
                 return (
                   <div 
                     key={step.id} 
-                    className={`p-3 border-r border-neutral-900 last:border-r-0 transition-colors ${
+                    className={`p-2.5 sm:p-3 border-r border-b sm:border-b-0 border-neutral-900 even:border-r-0 sm:even:border-r sm:last:border-r-0 transition-colors ${
                       isCurrent ? 'bg-neutral-900/60 text-white' : 'text-neutral-500'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       {isPassed ? (
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#00df8f] shrink-0" />
                       ) : isFailed ? (
@@ -1133,7 +1133,7 @@ const DeployForm = () => {
                       ) : (
                         <div className="w-3.5 h-3.5 rounded-full border border-neutral-700 shrink-0"></div>
                       )}
-                      <span className={`truncate font-medium ${isCurrent ? 'text-white' : isPassed ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      <span className={`truncate font-medium text-[11px] ${isCurrent ? 'text-white' : isPassed ? 'text-neutral-300' : 'text-neutral-500'}`}>
                         {step.label}
                       </span>
                     </div>
@@ -1146,7 +1146,7 @@ const DeployForm = () => {
             </div>
 
             {/* Embedded Live Terminal */}
-            <div className="p-4 bg-black flex-1 overflow-hidden flex flex-col min-h-[260px] max-h-[380px]">
+            <div className="p-3 sm:p-4 bg-black flex-1 overflow-hidden flex flex-col min-h-[220px] sm:min-h-[260px] max-h-[380px]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>

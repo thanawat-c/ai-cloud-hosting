@@ -25,7 +25,7 @@ function App() {
           <Header setIsSidebarOpen={setIsSidebarOpen} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 bg-black">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-5 md:p-6 lg:p-8 bg-black">
             <div className="max-w-7xl mx-auto pb-20">
               <Routes>
                 <Route path="/" element={<DashboardHome />} />
