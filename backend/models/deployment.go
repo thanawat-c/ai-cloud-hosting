@@ -7,6 +7,7 @@ import (
 // Deployment คือโครงสร้างตารางที่จะจำประวัติว่ามีโปรเจกต์ไหนถูก Deploy ไปบ้าง
 type Deployment struct {
 	ID          uint      `gorm:"primaryKey"`          // รหัสลำดับ
+	WorkspaceID string    `gorm:"type:varchar(50);default:'personal';index" json:"workspace_id"` // Workspace ที่สังกัด
 	RepoURL     string    `gorm:"not null"`            // ลิงก์ GitHub ของลูกค้า
 	GitToken    string    `gorm:"type:text"`           // Token สำหรับดึง Private Repo
 	ImageName   string    // ชื่อ Image ที่ Build ได้

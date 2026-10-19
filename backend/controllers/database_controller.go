@@ -12,13 +12,15 @@ import (
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
+	"ai-cloud-api/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
-// GetDatabases ดึงรายการ Database ทั้งหมด
+// GetDatabases ดึงรายการ Database ทั้งหมด ตาม Workspace
 func GetDatabases(c *gin.Context) {
-	dbs, err := services.ListManagedDatabases(context.Background())
+	wsID := utils.GetWorkspaceID(c)
+	dbs, err := services.ListManagedDatabases(context.Background(), wsID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -32,6 +34,11 @@ func CreateDatabase(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง กรุณาระบุชื่อ Database"})
 		return
+	}
+
+	wsID := utils.GetWorkspaceID(c)
+	if req.WorkspaceID == "" {
+		req.WorkspaceID = wsID
 	}
 
 	dbRecord, err := services.CreateManagedDatabase(context.Background(), req)

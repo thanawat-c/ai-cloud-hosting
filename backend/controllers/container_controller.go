@@ -10,6 +10,7 @@ import (
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
+	"ai-cloud-api/utils"
 
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
@@ -19,16 +20,26 @@ func GetContainers(c *gin.Context) {
 	// ล้างประวัติ Deployment ผีที่ไม่มี Container จริงๆ (เช่น พิมพ์ URL มั่วแล้ว Clone ไม่ผ่าน)
 	config.DB.Where("container_id = '' OR container_id IS NULL").Delete(&models.Deployment{})
 
-	// 1. ดึงประวัติทั้งหมดจาก Database (เฉพาะที่มี ContainerID จริง และไม่รวมที่ลบทิ้งไปแล้ว)
+	wsID := utils.GetWorkspaceID(c)
+
+	// 1. ดึงประวัติทั้งหมดจาก Database (เฉพาะที่มี ContainerID จริง และไม่รวมที่ลบทิ้งไปแล้ว ตาม Workspace)
 	var deployments []models.Deployment
-	config.DB.Where("status != ? AND container_id != ''", "deleted").Order("created_at desc").Find(&deployments)
+	query := config.DB.Where("status != ? AND container_id != ''", "deleted")
+	if wsID != "" {
+		query = query.Where("workspace_id = ?", wsID)
+	}
+	query.Order("created_at desc").Find(&deployments)
 
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())
 	
-	// ดึงรายการ Managed Database ทั้งหมด (รวมถึงที่ถูกลบไปแล้ว เพื่อเช็คว่า Service เดิมเคยผูกกับ DB ที่ถูกลบหรือไม่)
+	// ดึงรายการ Managed Database ทั้งหมดของ Workspace นี้ (รวมถึงที่ถูกลบไปแล้ว เพื่อเช็คว่า Service เดิมเคยผูกกับ DB ที่ถูกลบหรือไม่)
 	var allDBs []models.ManagedDatabase
-	config.DB.Find(&allDBs)
+	dbQuery := config.DB.Model(&models.ManagedDatabase{})
+	if wsID != "" {
+		dbQuery = dbQuery.Where("workspace_id = ?", wsID)
+	}
+	dbQuery.Find(&allDBs)
 
 	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร
 	dockerStateMap := make(map[string]string)

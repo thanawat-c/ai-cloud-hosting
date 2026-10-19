@@ -8,6 +8,7 @@ type DeployRequest struct {
     ForceAI      bool   `json:"force_ai"`
     GitToken     string `json:"git_token"`
     AutoCreateDB bool   `json:"auto_create_db"`
+    WorkspaceID  string `json:"workspace_id"`
 }
 
 

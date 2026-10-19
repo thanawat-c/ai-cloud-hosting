@@ -11,6 +11,7 @@ import (
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
+	"ai-cloud-api/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +21,11 @@ func TestDeploy(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
+	}
+
+	wsID := utils.GetWorkspaceID(c)
+	if req.WorkspaceID != "" {
+		wsID = req.WorkspaceID
 	}
 
 	// 1. Channel for streaming deployment progress
@@ -59,8 +65,9 @@ func TestDeploy(c *gin.Context) {
 				dbBaseName = "app-db"
 			}
 			newDB, err := services.CreateManagedDatabase(ctx, models.CreateDatabaseRequest{
-				Name: dbBaseName,
-				Type: "postgres",
+				Name:        dbBaseName,
+				Type:        "postgres",
+				WorkspaceID: wsID,
 			})
 			if err != nil {
 				logChan <- fmt.Sprintf("⚠️ Warning: Auto-provision DB failed: %v (continuing deployment)\n", err)
@@ -133,7 +140,7 @@ func TestDeploy(c *gin.Context) {
 			}
 
 			logChan <- fmt.Sprintf("Starting backend container (Port %s)...\n", backendPort)
-			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort)
+			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort, wsID)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return
@@ -144,6 +151,7 @@ func TestDeploy(c *gin.Context) {
 			}
 
 			config.DB.Create(&models.Deployment{
+				WorkspaceID:   wsID,
 				RepoURL:       req.RepoURL + " (Backend)",
 				GitToken:      req.GitToken,
 				ImageName:     backendImageName,
@@ -250,13 +258,14 @@ func TestDeploy(c *gin.Context) {
 			feEnvVars += fmt.Sprintf("\nBACKEND_URL=%s\nINTERNAL_API_URL=%s", backendInternalURL, backendInternalURL)
 
 			logChan <- "Starting frontend container...\n"
-			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort)
+			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort, wsID)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				return
 			}
 
 			config.DB.Create(&models.Deployment{
+				WorkspaceID:   wsID,
 				RepoURL:       req.RepoURL + " (Frontend)",
 				GitToken:      req.GitToken,
 				ImageName:     frontendImageName,
@@ -309,7 +318,7 @@ func TestDeploy(c *gin.Context) {
 		}
 
 		logChan <- fmt.Sprintf("Starting container on port %s and configuring Traefik gateway...\n", targetPort)
-		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort)
+		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort, wsID)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
 			return
@@ -317,6 +326,7 @@ func TestDeploy(c *gin.Context) {
 
 		// Record in database
 		newDeploy := models.Deployment{
+			WorkspaceID:   wsID,
 			RepoURL:       req.RepoURL,
 			GitToken:      req.GitToken,
 			ImageName:     imageName,

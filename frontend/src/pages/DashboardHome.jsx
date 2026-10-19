@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send, MoreHorizontal, ArrowUpRight, GitCommit } from 'lucide-react';
 import { toast } from 'sonner';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 // Extract short repository name, e.g. mock-api-server from git URL
 const getShortAppName = (rawName, cleanName) => {
@@ -103,6 +104,7 @@ const formatDateTime = (dateStr) => {
 };
 
 const DashboardHome = () => {
+  const { activeWorkspaceId, currentWorkspace, refreshWorkspaces } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'storage' ? 'storage' : 'deployments';
   const [containers, setContainers] = useState([]);
@@ -325,7 +327,9 @@ const DashboardHome = () => {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/containers');
+      const response = await fetch('http://localhost:8080/api/containers', {
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      });
       const data = await response.json();
       if (response.ok) {
         const containerList = data || [];
@@ -397,11 +401,13 @@ const DashboardHome = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspaceId]);
 
   const fetchDatabases = useCallback(async (shouldFetchStats = false) => {
     try {
-      const res = await fetch('http://localhost:8080/api/databases');
+      const res = await fetch('http://localhost:8080/api/databases', {
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      });
       if (res.ok) {
         const data = await res.json();
         const dbList = data || [];
@@ -425,7 +431,7 @@ const DashboardHome = () => {
     } catch (err) {
       console.error('Failed to fetch databases:', err);
     }
-  }, []);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     const isStorageTab = activeTab === 'storage';
@@ -455,8 +461,15 @@ const DashboardHome = () => {
     try {
       const res = await fetch('http://localhost:8080/api/databases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newDbName.trim(), type: 'postgres' }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Workspace-Id': activeWorkspaceId,
+        },
+        body: JSON.stringify({ 
+          name: newDbName.trim(), 
+          type: 'postgres',
+          workspace_id: activeWorkspaceId,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -467,6 +480,7 @@ const DashboardHome = () => {
         setNewDbName('');
         setCreateDbModalOpen(false);
         fetchDatabases();
+        refreshWorkspaces();
       } else {
         toast.error('Failed to create database', {
           id: toastId,
@@ -514,6 +528,7 @@ const DashboardHome = () => {
           if (res.ok) {
             toast.success('Database deleted successfully', { id: toastId });
             fetchDatabases();
+            refreshWorkspaces();
           } else {
             const data = await res.json();
             toast.error('Deletion failed', { id: toastId, description: data.error });
@@ -793,10 +808,12 @@ const DashboardHome = () => {
             toast.success("Server deleted successfully", { id: toastId });
           }
           await fetchContainers();
+          refreshWorkspaces();
         } catch (error) {
           console.log("Deletion failed", error);
           toast.error("Server connection failed", { id: toastId, description: error.message });
           await fetchContainers();
+          refreshWorkspaces();
         }
       }
     });

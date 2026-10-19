@@ -82,12 +82,17 @@ func BuildImage(ctx context.Context, buildDir string, logChan chan<- string, cus
 }
 
 // CreateAndStartContainer creates a container from the image and starts it, returning ID and public port
-func CreateAndStartContainer(ctx context.Context, imageName string, envVars string, targetPort string) (string, string, error) {
+func CreateAndStartContainer(ctx context.Context, imageName string, envVars string, targetPort string, workspaceID ...string) (string, string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", "", fmt.Errorf("failed to connect to Docker daemon: %w", err)
 	}
 	defer cli.Close()
+
+	wsID := "personal"
+	if len(workspaceID) > 0 && strings.TrimSpace(workspaceID[0]) != "" {
+		wsID = strings.TrimSpace(workspaceID[0])
+	}
 
 	if targetPort == "" {
 		targetPort = "80"
@@ -132,7 +137,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		}
 	}
 
-	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik
+	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik และป้ายกำกับ Workspace
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			"ai-cloud-network": {
@@ -148,6 +153,8 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 			"traefik.enable": "true", // บอก Traefik ว่าให้ช่วยจัดการตัวนี้หน่อย
 			"traefik.http.routers." + imageName + ".rule": "Host(`" + domainName + "`)", // กำหนดชื่อโดเมน
 			"traefik.http.services." + imageName + ".loadbalancer.server.port": targetPort, // พอร์ตภายในตาม Service จริง
+			"ach.workspace": wsID,
+			"ach.type":      "service",
 		},
 	}, &container.HostConfig{
 		NetworkMode: "ai-cloud-network", // พระเอก! จับมันยัดเข้าเครือข่ายเดียวกับ Traefik

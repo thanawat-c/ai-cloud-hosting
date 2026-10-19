@@ -37,6 +37,10 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/databases/:id/backup", controllers.BackupDatabase)
 		api.POST("/databases/:id/restore", controllers.RestoreDatabase)
 
+		// Workspaces (Multi-Tenancy)
+		api.GET("/workspaces", controllers.GetWorkspaces)
+		api.POST("/workspaces", controllers.CreateWorkspace)
+
 		// GitHub Webhooks (Auto-Deploy on Push)
 		api.POST("/webhooks/deploy/:id", controllers.HandleDeploymentWebhook)
 		api.POST("/webhooks/github", controllers.HandleGlobalGitHubWebhook)

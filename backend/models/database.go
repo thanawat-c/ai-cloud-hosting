@@ -6,6 +6,7 @@ import (
 
 type ManagedDatabase struct {
 	ID            uint      `json:"id" gorm:"primaryKey"`
+	WorkspaceID   string    `json:"workspace_id" gorm:"type:varchar(50);default:'personal';index"`
 	Name          string    `json:"name" gorm:"not null"`
 	Type          string    `json:"type" gorm:"default:'postgres'"` // postgres, mysql, redis
 	Version       string    `json:"version" gorm:"default:'16'"`
@@ -27,6 +28,7 @@ type ManagedDatabase struct {
 }
 
 type CreateDatabaseRequest struct {
-	Name string `json:"name" binding:"required"`
-	Type string `json:"type"` // postgres, mysql, redis
+	Name        string `json:"name" binding:"required"`
+	Type        string `json:"type"` // postgres, mysql, redis
+	WorkspaceID string `json:"workspace_id"`
 }

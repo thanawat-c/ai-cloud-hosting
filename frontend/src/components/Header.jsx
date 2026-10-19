@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 const Header = ({ setIsSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname === '/' ? 'overview' : location.pathname.replace('/', '');
+  const { activeWorkspaceId, currentWorkspace } = useWorkspace();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,17 +29,19 @@ const Header = ({ setIsSidebarOpen }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Fetch containers when palette opens
+  // Fetch containers when palette opens (scoped to active workspace)
   useEffect(() => {
     if (paletteOpen) {
-      fetch('http://localhost:8080/api/containers')
+      fetch('http://localhost:8080/api/containers', {
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setContainers(data);
         })
         .catch(() => {});
     }
-  }, [paletteOpen]);
+  }, [paletteOpen, activeWorkspaceId]);
 
   const quickNavItems = [
     { label: 'Deployments Overview', sub: 'View all active containers', path: '/', icon: LayoutDashboard },
@@ -91,6 +95,10 @@ const Header = ({ setIsSidebarOpen }) => {
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
                 <span className="font-semibold text-neutral-200">ai-cloud</span>
               </Link>
+              <span className="text-neutral-600">/</span>
+              <span className="text-neutral-300 font-medium truncate max-w-[120px] sm:max-w-none">
+                {currentWorkspace?.name || 'Personal'}
+              </span>
               <span className="text-neutral-600">/</span>
               <span className="text-neutral-400 uppercase tracking-wider truncate">{currentPath}</span>
             </div>

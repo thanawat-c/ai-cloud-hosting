@@ -187,12 +187,21 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 		return nil, err
 	}
 
+	wsID := strings.TrimSpace(req.WorkspaceID)
+	if wsID == "" {
+		wsID = "personal"
+	}
+
 	// 8. สร้าง Container พร้อมจำกัด Resource (RAM 512MB, 1 CPU)
 	containerConfig := &container.Config{
 		Image: imageName,
 		Env:   env,
 		ExposedPorts: nat.PortSet{
 			portNat: struct{}{},
+		},
+		Labels: map[string]string{
+			"ach.workspace": wsID,
+			"ach.type":      "database",
 		},
 	}
 
@@ -238,6 +247,7 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 	externalURL := fmt.Sprintf("postgres://%s:%s@localhost:%d/%s", username, password, hostPort, dbName)
 
 	dbRecord := models.ManagedDatabase{
+		WorkspaceID:   wsID,
 		Name:          cleanName,
 		Type:          dbType,
 		Version:       "16-alpine",
@@ -263,10 +273,14 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 	return &dbRecord, nil
 }
 
-// ListManagedDatabases ดึงรายการ Database พร้อมสถานะปัจจุบัน
-func ListManagedDatabases(ctx context.Context) ([]models.ManagedDatabase, error) {
+// ListManagedDatabases ดึงรายการ Database พร้อมสถานะปัจจุบัน (รองรับการกรองตาม Workspace)
+func ListManagedDatabases(ctx context.Context, workspaceID ...string) ([]models.ManagedDatabase, error) {
 	var databases []models.ManagedDatabase
-	config.DB.Where("status != ?", "deleted").Order("created_at desc").Find(&databases)
+	query := config.DB.Where("status != ?", "deleted")
+	if len(workspaceID) > 0 && workspaceID[0] != "" {
+		query = query.Where("workspace_id = ?", workspaceID[0])
+	}
+	query.Order("created_at desc").Find(&databases)
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

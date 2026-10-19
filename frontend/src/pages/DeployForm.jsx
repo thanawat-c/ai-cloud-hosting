@@ -7,9 +7,11 @@ import {
   Sparkles, Loader2, Clock, Layers, Box, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 const DeployForm = () => {
   const navigate = useNavigate();
+  const { activeWorkspaceId, currentWorkspace, refreshWorkspaces } = useWorkspace();
   const resultRef = useRef(null);
   const logsEndRef = useRef(null);
   const terminalBoxRef = useRef(null);
@@ -100,13 +102,15 @@ const DeployForm = () => {
   }, [isLoading, deployStartTime]);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/databases')
+    fetch('http://localhost:8080/api/databases', {
+      headers: { 'X-Workspace-Id': activeWorkspaceId }
+    })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setDatabases(data);
       })
       .catch(err => console.error('Failed to load databases in deploy form:', err));
-  }, []);
+  }, [activeWorkspaceId]);
 
   // Debounced Auto-Inspect on URL change / paste
   useEffect(() => {
@@ -235,14 +239,18 @@ const DeployForm = () => {
     try {
       const response = await fetch('http://localhost:8080/api/test-deploy', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Workspace-Id': activeWorkspaceId,
+        },
         body: JSON.stringify({ 
           repo_url: repoUrl.trim(), 
           branch: selectedBranch || 'main',
           env_vars: envVars, 
           force_ai: forceAi,
           git_token: gitToken.trim(),
-          auto_create_db: autoCreateDb
+          auto_create_db: autoCreateDb,
+          workspace_id: activeWorkspaceId,
         })
       });
       
@@ -298,6 +306,7 @@ const DeployForm = () => {
       });
     } finally {
       setIsLoading(false);
+      refreshWorkspaces();
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 150);

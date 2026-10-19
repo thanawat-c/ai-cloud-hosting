@@ -6,14 +6,16 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardHome from './pages/DashboardHome';
 import DeployForm from './pages/DeployForm';
+import { WorkspaceProvider } from './context/WorkspaceContext';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <Router>
-      <Toaster position="top-right" theme="dark" richColors closeButton expand={false} />
-      <div className="flex h-screen bg-black text-neutral-100 font-sans overflow-hidden selection:bg-neutral-800 selection:text-white">
+    <WorkspaceProvider>
+      <Router>
+        <Toaster position="top-right" theme="dark" richColors closeButton expand={false} />
+        <div className="flex h-screen bg-black text-neutral-100 font-sans overflow-hidden selection:bg-neutral-800 selection:text-white">
         
         {/* Sidebar */}
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
@@ -37,6 +39,7 @@ function App() {
         </div>
       </div>
     </Router>
+    </WorkspaceProvider>
   );
 }
 
