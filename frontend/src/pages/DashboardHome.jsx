@@ -506,6 +506,7 @@ const DashboardHome = () => {
         toast.success(action === 'stop' ? 'Database stopped successfully' : 'Database started successfully', { id: toastId });
         fetchDatabases();
         fetchContainers();
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         const data = await res.json();
         toast.error('Operation failed', { id: toastId, description: data.error });
@@ -529,6 +530,7 @@ const DashboardHome = () => {
             toast.success('Database deleted successfully', { id: toastId });
             fetchDatabases();
             refreshWorkspaces();
+            window.dispatchEvent(new CustomEvent('notification-refresh'));
           } else {
             const data = await res.json();
             toast.error('Deletion failed', { id: toastId, description: data.error });
@@ -759,22 +761,36 @@ const DashboardHome = () => {
       handleDelete(id);
       return;
     }
+    const shortName = getShortAppName(containerName);
+    const actionLabel = action === 'stop' ? `Stopping ${shortName}...` : `Starting ${shortName}...`;
+    const toastId = toast.loading(actionLabel);
     try {
       setLoading(true); // Prevent spamming actions
-      const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, { method: 'POST' });
+      const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         // If start fails or app crashes, show error modal
         const errorTitle = data.error || `Command ${action} failed`;
         const errorDetails = data.details || errorTitle;
+        toast.error('Operation failed', { id: toastId, description: errorDetails });
         setActiveErrorContainerName(containerName || id);
         setActiveErrorDetails(errorDetails);
         setErrorModalOpen(true);
+      } else {
+        toast.success(action === 'stop' ? `Service stopped (${shortName})` : `Service started (${shortName})`, {
+          id: toastId,
+          description: action === 'stop' ? 'Container is now offline' : 'Container is now running',
+        });
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       }
       await fetchContainers(); // Refresh container data
     } catch (error) {
       console.error("Operation failed:", error);
+      toast.error("Connection failed", { id: toastId, description: error.message });
       setActiveErrorContainerName(containerName || id);
       setActiveErrorDetails(error.message);
       setErrorModalOpen(true);
@@ -800,12 +816,16 @@ const DashboardHome = () => {
         const toastId = toast.loading("Deleting server...");
 
         try {
-          const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, { method: 'DELETE' });
+          const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, {
+            method: 'DELETE',
+            headers: { 'X-Workspace-Id': activeWorkspaceId },
+          });
           if (!res.ok) {
             const errJson = await res.json().catch(() => ({}));
             toast.error("Failed to delete server", { id: toastId, description: errJson.error || "Deletion failed" });
           } else {
             toast.success("Server deleted successfully", { id: toastId });
+            window.dispatchEvent(new CustomEvent('notification-refresh'));
           }
           await fetchContainers();
           refreshWorkspaces();

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -298,13 +299,46 @@ func GetContainers(c *gin.Context) {
 }
 
 
+func findDeployment(id string) models.Deployment {
+	var dep models.Deployment
+	if uintID, err := strconv.ParseUint(id, 10, 64); err == nil {
+		config.DB.Where("id = ? OR container_id = ?", uintID, id).First(&dep)
+	} else {
+		config.DB.Where("container_id LIKE ?", id+"%").First(&dep)
+	}
+	return dep
+}
+
+func getDeploymentDisplayName(dep models.Deployment, fallback string) string {
+	if dep.RepoURL != "" {
+		clean := strings.TrimSuffix(dep.RepoURL, ".git")
+		parts := strings.Split(clean, "/")
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+	}
+	if dep.ImageName != "" {
+		return dep.ImageName
+	}
+	return fallback
+}
+
 func StopContainer(c *gin.Context) {
 	id := c.Param("id")
 	if err := services.StopContainer(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Stop ไม่สำเร็จ: " + err.Error()})
 		return
 	}
-	config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Update("status", "stopped")
+	dep := findDeployment(id)
+	config.DB.Model(&models.Deployment{}).Where("container_id LIKE ? OR id = ?", id+"%", dep.ID).Update("status", "stopped")
+
+	wsID := dep.WorkspaceID
+	if wsID == "" {
+		wsID = utils.GetWorkspaceID(c)
+	}
+	serviceName := getDeploymentDisplayName(dep, id)
+	utils.CreateNotification(wsID, "Service Stopped", fmt.Sprintf("Service '%s' has been stopped", serviceName), "warning", serviceName)
+
 	c.JSON(http.StatusOK, gin.H{"message": "หยุดเซิร์ฟเวอร์เรียบร้อย"})
 }
 
@@ -337,7 +371,7 @@ func StartContainer(c *gin.Context) {
 					cleanLog = fmt.Sprintf("แอปพลิเคชันปิดการทำงานทันที (Exit Code: %d)", inspect.State.ExitCode)
 				}
 
-				config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Updates(map[string]interface{}{
+				config.DB.Model(&models.Deployment{}).Where("container_id LIKE ?", id+"%").Updates(map[string]interface{}{
 					"status":     "exited",
 					"last_error": cleanLog,
 				})
@@ -352,10 +386,19 @@ func StartContainer(c *gin.Context) {
 		}
 	}
 
-	config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Updates(map[string]interface{}{
+	dep := findDeployment(id)
+	config.DB.Model(&models.Deployment{}).Where("container_id LIKE ? OR id = ?", id+"%", dep.ID).Updates(map[string]interface{}{
 		"status":     "running",
 		"last_error": "",
 	})
+
+	wsID := dep.WorkspaceID
+	if wsID == "" {
+		wsID = utils.GetWorkspaceID(c)
+	}
+	serviceName := getDeploymentDisplayName(dep, id)
+	utils.CreateNotification(wsID, "Service Started", fmt.Sprintf("Service '%s' is now running", serviceName), "info", serviceName)
+
 	c.JSON(http.StatusOK, gin.H{"message": "เซิร์ฟเวอร์เริ่มทำงานเรียบร้อยแล้ว"})
 }
 
@@ -363,15 +406,20 @@ func DeleteContainer(c *gin.Context) {
 	id := c.Param("id")
 	ctx := context.Background()
 
-	// 1. ลองหาใน Database ก่อนว่าตรงกับ ID (Primary Key) หรือ ContainerID
-	var dep models.Deployment
-	if err := config.DB.Where("id = ? OR container_id = ?", id, id).First(&dep).Error; err == nil {
-		// ถ้ามี ContainerID อยู่จริงใน Docker ให้สั่งลบ Docker container
+	dep := findDeployment(id)
+	if dep.ID != 0 {
 		if dep.ContainerID != "" {
 			_ = services.DeleteContainer(ctx, dep.ContainerID)
 		}
-		// ปรับสถานะเป็น deleted ใน database
 		config.DB.Model(&dep).Update("status", "deleted")
+
+		wsID := dep.WorkspaceID
+		if wsID == "" {
+			wsID = utils.GetWorkspaceID(c)
+		}
+		serviceName := getDeploymentDisplayName(dep, id)
+		utils.CreateNotification(wsID, "Service Deleted", fmt.Sprintf("Service '%s' was deleted", serviceName), "warning", serviceName)
+
 		c.JSON(http.StatusOK, gin.H{"message": "ลบเซิร์ฟเวอร์เรียบร้อย"})
 		return
 	}
@@ -381,7 +429,9 @@ func DeleteContainer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ลบไม่สำเร็จ: " + err.Error()})
 		return
 	}
-	config.DB.Model(&models.Deployment{}).Where("container_id = ?", id).Update("status", "deleted")
+	config.DB.Model(&models.Deployment{}).Where("container_id LIKE ?", id+"%").Update("status", "deleted")
+	wsID := utils.GetWorkspaceID(c)
+	utils.CreateNotification(wsID, "Service Deleted", fmt.Sprintf("Container %s was deleted", id), "warning", id)
 	c.JSON(http.StatusOK, gin.H{"message": "ลบเซิร์ฟเวอร์เรียบร้อย"})
 }
 

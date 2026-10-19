@@ -64,10 +64,15 @@ const Header = ({ setIsSidebarOpen }) => {
 
   useEffect(() => {
     fetchNotifications();
+    const handleRefresh = () => fetchNotifications();
+    window.addEventListener('notification-refresh', handleRefresh);
     const interval = setInterval(() => {
       if (!document.hidden) fetchNotifications();
-    }, 8000);
-    return () => clearInterval(interval);
+    }, 5000);
+    return () => {
+      window.removeEventListener('notification-refresh', handleRefresh);
+      clearInterval(interval);
+    };
   }, [fetchNotifications]);
 
   const handleMarkAllRead = async () => {
