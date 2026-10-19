@@ -259,6 +259,7 @@ const DashboardHome = () => {
         toast.success('Custom domain saved successfully!');
         setDomainModalOpen(false);
         fetchContainers();
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         toast.error(data.error || 'Failed to update custom domain');
       }
@@ -640,6 +641,7 @@ const DashboardHome = () => {
         });
         setBindModalOpen(false);
         fetchContainers();
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         toast.error('Failed to bind database', { id: toastId, description: data.error });
       }
@@ -675,6 +677,7 @@ const DashboardHome = () => {
         id: toastId,
         description: `Created backup-${db.name}.sql file`,
       });
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
     } catch (err) {
       toast.error('Backup failed', { id: toastId, description: err.message });
     } finally {
@@ -712,6 +715,7 @@ const DashboardHome = () => {
       if (res.ok) {
         toast.success('Database restored successfully!', { id: toastId });
         setRestoreResult(data.output || 'Restore Completed Successfully.');
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         toast.error('Database restore failed', { id: toastId, description: data.error });
         setRestoreResult(`Error: ${data.error}\n${data.output || ''}`);
@@ -882,15 +886,18 @@ const DashboardHome = () => {
             // 2. Poll for updates
             const checkInterval = setInterval(() => {
               fetchContainers(); 
+              window.dispatchEvent(new CustomEvent('notification-refresh'));
             }, 3000);
 
             setTimeout(() => {
               clearInterval(checkInterval);
               fetchContainers();
+              window.dispatchEvent(new CustomEvent('notification-refresh'));
             }, 120000);
           } else {
             toast.error("Re-deployment failed");
             fetchContainers();
+            window.dispatchEvent(new CustomEvent('notification-refresh'));
           }
         } catch (error) {
           console.error("Redeploy error:", error);
@@ -936,6 +943,7 @@ const DashboardHome = () => {
       if (res.ok) {
         setEnvSuccess('Environment variables saved and server restarted!');
         fetchContainers();
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
         setTimeout(() => {
           setEnvModalOpen(false);
         }, 1500);

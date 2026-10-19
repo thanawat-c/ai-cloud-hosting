@@ -46,9 +46,15 @@ func TestDeploy(c *gin.Context) {
 			}
 			return "default"
 		}())
+		repoCleanName := filepath.Base(strings.TrimSuffix(strings.TrimSpace(req.RepoURL), ".git"))
+		if repoCleanName == "" || repoCleanName == "." {
+			repoCleanName = "Deployment"
+		}
+
 		buildDir, err := services.CloneRepository(req.RepoURL, req.Branch, req.GitToken)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
+			utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Failed to clone %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 			return
 		}
 		defer os.RemoveAll(buildDir)
@@ -126,6 +132,7 @@ func TestDeploy(c *gin.Context) {
 			aiBackendDocker, backendPort, err := services.GenerateDockerfile(ctx, req.RepoURL, backendDir, beDirName)
 			if err != nil {
 				logChan <- "Error: Failed to generate Dockerfile for backend: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Backend Dockerfile error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 			os.WriteFile(backendDockerfile, []byte(aiBackendDocker), 0644)
@@ -136,6 +143,7 @@ func TestDeploy(c *gin.Context) {
 			backendImageName, err := services.BuildImage(ctx, backendDir, logChan, baseImageName+"-backend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Backend build error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 
@@ -143,6 +151,7 @@ func TestDeploy(c *gin.Context) {
 			beContainerID, beDomainName, err := services.CreateAndStartContainer(ctx, backendImageName, req.EnvVars, backendPort, wsID)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Backend container start error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 
@@ -180,6 +189,7 @@ func TestDeploy(c *gin.Context) {
 			aiFrontendDocker, fePort, err := services.GenerateDockerfile(ctx, req.RepoURL, frontendDir, feDirName, backendPublicURL)
 			if err != nil {
 				logChan <- "Error: Failed to generate Dockerfile for frontend: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Frontend Dockerfile error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 			os.WriteFile(frontendDockerfile, []byte(aiFrontendDocker), 0644)
@@ -217,6 +227,7 @@ func TestDeploy(c *gin.Context) {
 			frontendImageName, err := services.BuildImage(ctx, frontendDir, logChan, baseImageName+"-frontend")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Frontend build error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 
@@ -261,6 +272,7 @@ func TestDeploy(c *gin.Context) {
 			feContainerID, feDomainName, err := services.CreateAndStartContainer(ctx, frontendImageName, feEnvVars, fePort, wsID)
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Frontend container start error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 
@@ -305,6 +317,7 @@ func TestDeploy(c *gin.Context) {
 			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
+				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Dockerfile generation error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 				return
 			}
 			targetPort = port
@@ -316,6 +329,7 @@ func TestDeploy(c *gin.Context) {
 		imageName, err := services.BuildImage(ctx, buildDir, logChan)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
+			utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Build image error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 			return
 		}
 
@@ -323,6 +337,7 @@ func TestDeploy(c *gin.Context) {
 		containerID, domainName, err := services.CreateAndStartContainer(ctx, imageName, req.EnvVars, targetPort, wsID)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
+			utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Failed to start container for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
 			return
 		}
 

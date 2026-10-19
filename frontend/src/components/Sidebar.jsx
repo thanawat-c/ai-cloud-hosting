@@ -59,6 +59,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         setNewTokenName('');
         fetchTokens();
         toast.success('API Token generated successfully!');
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         toast.error(data.error || 'Failed to generate token');
       }
@@ -78,6 +79,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       if (res.ok) {
         toast.success('Token revoked');
         fetchTokens();
+        window.dispatchEvent(new CustomEvent('notification-refresh'));
       } else {
         toast.error('Failed to revoke token');
       }

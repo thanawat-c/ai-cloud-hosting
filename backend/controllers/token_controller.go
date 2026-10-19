@@ -72,6 +72,8 @@ func CreateToken(c *gin.Context) {
 		return
 	}
 
+	utils.CreateNotification(wsID, "API Token Created", fmt.Sprintf("API token '%s' was generated", trimmedName), "info", trimmedName)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"id":         newToken.ID,
 		"name":       newToken.Name,
@@ -86,11 +88,20 @@ func RevokeToken(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 	tokenID := c.Param("id")
 
+	var token models.APIToken
+	config.DB.Where("id = ? AND workspace_id = ?", tokenID, wsID).First(&token)
+	tokenName := token.Name
+	if tokenName == "" {
+		tokenName = fmt.Sprintf("Token #%s", tokenID)
+	}
+
 	result := config.DB.Where("id = ? AND workspace_id = ?", tokenID, wsID).Delete(&models.APIToken{})
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Token หรือไม่มีสิทธิ์ลบ"})
 		return
 	}
+
+	utils.CreateNotification(wsID, "API Token Revoked", fmt.Sprintf("API token '%s' was revoked and invalidated", tokenName), "warning", tokenName)
 
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("ยกเลิก Token #%s สำเร็จ", tokenID)})
 }

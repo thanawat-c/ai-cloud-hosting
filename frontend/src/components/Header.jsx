@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, Check, Clock } from 'lucide-react';
+import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -260,10 +260,15 @@ const Header = ({ setIsSidebarOpen }) => {
                           >
                             <div className="flex items-start gap-2.5">
                               <div className="mt-0.5 shrink-0">
-                                {n.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                                {n.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
+                                {n.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400" />}
                                 {n.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-400" />}
-                                {n.type === 'info' && <Database className="w-4 h-4 text-cyan-400" />}
+                                {n.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                                {n.type === 'info' && (
+                                  n.title?.includes('Token') ? <Key className="w-4 h-4 text-amber-400" /> :
+                                  n.title?.includes('Domain') ? <Globe className="w-4 h-4 text-purple-400" /> :
+                                  n.title?.includes('Database') ? <Database className="w-4 h-4 text-indigo-400" /> :
+                                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1 mb-0.5">

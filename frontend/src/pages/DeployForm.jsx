@@ -307,6 +307,7 @@ const DeployForm = () => {
     } finally {
       setIsLoading(false);
       refreshWorkspaces();
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 150);

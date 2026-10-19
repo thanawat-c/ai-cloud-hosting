@@ -170,6 +170,15 @@ func BindDatabase(c *gin.Context) {
 		return
 	}
 
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, id).Error; err == nil {
+		wsID := db.WorkspaceID
+		if wsID == "" {
+			wsID = "personal"
+		}
+		utils.CreateNotification(wsID, "Database Attached", fmt.Sprintf("Database '%s' was bound to container and service restarted", db.Name), "info", db.Name)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "ผูก Database เข้ากับเซิร์ฟเวอร์และรีสตาร์ตสำเร็จเรียบร้อยแล้ว!"})
 }
 
@@ -198,6 +207,12 @@ func BackupDatabase(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ทำ Backup ล้มเหลว: " + err.Error()})
 		return
 	}
+
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Backup", fmt.Sprintf("Exported SQL backup for database '%s'", db.Name), "info", db.Name)
 
 	fileName := fmt.Sprintf("backup-%s-%s.sql", db.Name, time.Now().Format("20060102-150405"))
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
@@ -249,6 +264,12 @@ func RestoreDatabase(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Restore ล้มเหลว: " + err.Error()})
 		return
 	}
+
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Restored", fmt.Sprintf("Database '%s' restored successfully from file '%s'", db.Name, file.Filename), "warning", db.Name)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "กู้คืนข้อมูล (Restore) สำเร็จเรียบร้อยแล้ว!",

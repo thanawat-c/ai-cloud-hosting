@@ -18,6 +18,7 @@ import (
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
 	"ai-cloud-api/services"
+	"ai-cloud-api/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -160,12 +161,22 @@ func HandleDeploymentWebhook(c *gin.Context) {
 			targetDeploy.GitToken,
 		)
 
+		wsID := targetDeploy.WorkspaceID
+		if wsID == "" {
+			wsID = "personal"
+		}
+		serviceName := targetDeploy.ImageName
+		if serviceName == "" {
+			serviceName = targetDeploy.RepoURL
+		}
+
 		if err != nil {
 			fmt.Printf("❌ [Auto-Deploy Failed] %s: %v\n", targetDeploy.RepoURL, err)
 			config.DB.Model(&targetDeploy).Updates(map[string]interface{}{
 				"status":     "failed",
 				"last_error": fmt.Sprintf("Auto-Deploy (Push by %s): %v", pusher, err),
 			})
+			utils.CreateNotification(wsID, "Auto-Deploy Failed", fmt.Sprintf("Auto-deploy failed for '%s' (push by %s): %s", serviceName, pusher, err.Error()), "error", serviceName)
 		} else {
 			cleanNewID := newID
 			if len(cleanNewID) > 12 {
@@ -177,6 +188,7 @@ func HandleDeploymentWebhook(c *gin.Context) {
 				"last_error":   "",
 				"updated_at":   time.Now(),
 			})
+			utils.CreateNotification(wsID, "Auto-Deploy Succeeded", fmt.Sprintf("Commit '%s' by %s auto-deployed to '%s'", msg, pusher, serviceName), "success", serviceName)
 			fmt.Printf("✅ [Auto-Deploy Success] %s ทำงานบน Container ID ใหม่: %s เรียบร้อยแล้ว!\n", targetDeploy.RepoURL, cleanNewID)
 		}
 	}(deploy, pusherName, commitMsg, branch)
@@ -268,12 +280,22 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 				target.ForceAI,
 				target.GitToken,
 			)
+			wsID := target.WorkspaceID
+			if wsID == "" {
+				wsID = "personal"
+			}
+			serviceName := target.ImageName
+			if serviceName == "" {
+				serviceName = target.RepoURL
+			}
+
 			if err != nil {
 				fmt.Printf("❌ [Auto-Deploy Error] %s: %v\n", target.RepoURL, err)
 				config.DB.Model(&target).Updates(map[string]interface{}{
 					"status":     "failed",
 					"last_error": fmt.Sprintf("Auto-Deploy Error: %v", err),
 				})
+				utils.CreateNotification(wsID, "Auto-Deploy Failed", fmt.Sprintf("Auto-deploy failed for '%s': %v", serviceName, err), "error", serviceName)
 			} else if len(newID) > 0 {
 				cleanID := newID
 				if len(cleanID) > 12 {
@@ -285,6 +307,7 @@ func HandleGlobalGitHubWebhook(c *gin.Context) {
 					"last_error":   "",
 					"updated_at":   time.Now(),
 				})
+				utils.CreateNotification(wsID, "Auto-Deploy Succeeded", fmt.Sprintf("Service '%s' successfully rebuilt and updated via Webhook", serviceName), "success", serviceName)
 			}
 		}(dep)
 	}

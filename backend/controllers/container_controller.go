@@ -371,10 +371,13 @@ func StartContainer(c *gin.Context) {
 					cleanLog = fmt.Sprintf("แอปพลิเคชันปิดการทำงานทันที (Exit Code: %d)", inspect.State.ExitCode)
 				}
 
-				config.DB.Model(&models.Deployment{}).Where("container_id LIKE ?", id+"%").Updates(map[string]interface{}{
-					"status":     "exited",
-					"last_error": cleanLog,
-				})
+				dep := findDeployment(id)
+				wsID := dep.WorkspaceID
+				if wsID == "" {
+					wsID = utils.GetWorkspaceID(c)
+				}
+				serviceName := getDeploymentDisplayName(dep, id)
+				utils.CreateNotification(wsID, "Service Start Failed", fmt.Sprintf("Service '%s' failed to boot (Exit Code: %d)", serviceName, inspect.State.ExitCode), "error", serviceName)
 
 				c.JSON(http.StatusBadRequest, gin.H{
 					"error":   fmt.Sprintf("เริ่มเซิร์ฟเวอร์ไม่สำเร็จ! แอปพลิเคชันดับลงทันที (Exit Code: %d)", inspect.State.ExitCode),
@@ -472,8 +475,14 @@ func RedeployContainer(c *gin.Context){
 
 	config.DB.Model(&deploy).Update("status", "redeploying")
 
-	go func () {
+	go func() {
 		ctx := context.Background()
+		wsID := deploy.WorkspaceID
+		if wsID == "" {
+			wsID = "personal"
+		}
+		serviceName := getDeploymentDisplayName(deploy, id)
+
 		newID, err := services.RedeployApp(ctx, deploy.ContainerID, deploy.RepoURL, deploy.ImageName, deploy.ForceAI, deploy.GitToken)
 		if err != nil {
 			fmt.Println("Redeploy ล้มเหลว:", err)
@@ -481,14 +490,20 @@ func RedeployContainer(c *gin.Context){
 				"status":     "failed",
 				"last_error": err.Error(),
 			})
+			utils.CreateNotification(wsID, "Redeploy Failed", fmt.Sprintf("Service '%s' manual rebuild failed: %s", serviceName, err.Error()), "error", serviceName)
 		} else {
+			cleanID := newID
+			if len(cleanID) > 12 {
+				cleanID = cleanID[:12]
+			}
 			config.DB.Model(&deploy).Updates(map[string]interface{}{
-				"container_id": newID[:12],
+				"container_id": cleanID,
 				"status":       "running",
 				"last_error":   "",
 				"updated_at":   time.Now(),
 			})
-			fmt.Println("Redeploy สำเร็จ! อัปเดต ID เซิฟร์เวอร์ใหม่เป็น", newID[:12])
+			utils.CreateNotification(wsID, "Service Redeployed", fmt.Sprintf("Service '%s' was rebuilt and is live on %s", serviceName, cleanID), "success", serviceName)
+			fmt.Println("Redeploy สำเร็จ! อัปเดต ID เซิฟร์เวอร์ใหม่เป็น", cleanID)
 		}
 	}()
 	c.JSON(http.StatusOK, gin.H{"message": "กำลังดึงโค้ดและ Re-deploy"})
@@ -545,13 +560,24 @@ func UpdateContainerEnv(c *gin.Context) {
 		return
 	}
 
+	cleanID := newID
+	if len(cleanID) > 12 {
+		cleanID = cleanID[:12]
+	}
 	config.DB.Model(&deploy).Updates(map[string]interface{}{
-		"container_id": newID[:12],
+		"container_id": cleanID,
 		"status":       "running",
 		"last_error":   "",
 	})
 
-	c.JSON(http.StatusOK, gin.H{"message": "อัปเดต Environment Variables และรีสตาร์ตสำเร็จ!", "new_id": newID[:12]})
+	wsID := deploy.WorkspaceID
+	if wsID == "" {
+		wsID = utils.GetWorkspaceID(c)
+	}
+	serviceName := getDeploymentDisplayName(deploy, id)
+	utils.CreateNotification(wsID, "Environment Updated", fmt.Sprintf("Environment variables updated for service '%s'", serviceName), "info", serviceName)
+
+	c.JSON(http.StatusOK, gin.H{"message": "อัปเดต Environment Variables และรีสตาร์ตสำเร็จ!", "new_id": cleanID})
 }
 
 func UpdateContainerDomain(c *gin.Context) {
@@ -576,6 +602,18 @@ func UpdateContainerDomain(c *gin.Context) {
 	}
 
 	config.DB.Model(&deploy).Update("custom_domain", cleanDomain)
+
+	wsID := deploy.WorkspaceID
+	if wsID == "" {
+		wsID = utils.GetWorkspaceID(c)
+	}
+	serviceName := getDeploymentDisplayName(deploy, id)
+	if cleanDomain != "" {
+		utils.CreateNotification(wsID, "Custom Domain Attached", fmt.Sprintf("Domain '%s' was attached to service '%s'", cleanDomain, serviceName), "info", serviceName)
+	} else {
+		utils.CreateNotification(wsID, "Custom Domain Removed", fmt.Sprintf("Custom domain removed from service '%s'", serviceName), "info", serviceName)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Custom domain updated successfully",
 		"custom_domain": cleanDomain,
