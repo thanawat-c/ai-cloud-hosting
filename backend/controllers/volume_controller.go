@@ -113,6 +113,7 @@ func CreateVolume(c *gin.Context) {
 	}
 
 	utils.CreateNotification(wsID, "Volume Created", fmt.Sprintf("Volume '%s' created (Mount: %s)", cleanName, mountPath), "success", cleanName)
+	utils.LogActivity(c, wsID, "volume.create", "volume", fmt.Sprintf("%d", newVol.ID), cleanName, fmt.Sprintf("Mounted at %s", mountPath))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Volume created successfully",

@@ -114,6 +114,7 @@ func InviteWorkspaceMember(c *gin.Context) {
 	}
 
 	utils.CreateNotification(wsID, "Member Joined Workspace", fmt.Sprintf("%s (%s) was added as %s", name, cleanEmail, strings.ToUpper(role)), "success", cleanEmail)
+	utils.LogActivity(c, wsID, "member.invite", "member", cleanEmail, name, fmt.Sprintf("Invited as %s", strings.ToUpper(role)))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Member added to workspace successfully",

@@ -74,10 +74,11 @@ func SetupRoutes(r *gin.Engine) {
 		api.PATCH("/workspaces/members/:id/role", controllers.UpdateWorkspaceMemberRole)
 		api.DELETE("/workspaces/members/:id", controllers.RemoveWorkspaceMember)
 
-		// Notifications (System Alerts & Audit Log)
+		// Notifications & Audit Trail
 		api.GET("/notifications", controllers.GetNotifications)
 		api.POST("/notifications/read-all", controllers.MarkAllNotificationsRead)
 		api.DELETE("/notifications", controllers.ClearNotifications)
+		api.GET("/audit-logs", controllers.GetAuditLogs)
 
 		// API Tokens (User Token Management)
 		api.GET("/tokens", controllers.GetTokens)

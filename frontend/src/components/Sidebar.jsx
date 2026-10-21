@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Rocket, X, Database, Plus, Terminal, Check, ChevronsUpDown, Users, LogOut, Key, Copy, Trash2, Shield, Code, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Rocket, X, Database, Plus, Terminal, Check, ChevronsUpDown, Users, LogOut, Key, Copy, Trash2, Shield, Code, Sparkles, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
-import { TeamMembersModal } from './modals';
+import { TeamMembersModal, AuditLogModal } from './modals';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
@@ -13,9 +13,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const { workspaces, activeWorkspaceId, currentWorkspace, switchWorkspace } = useWorkspace();
 
-  // API Tokens Modal State
+  // Modals State
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
   const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [tokens, setTokens] = useState([]);
   const [newTokenName, setNewTokenName] = useState('');
   const [generatedToken, setGeneratedToken] = useState(null);
@@ -254,6 +255,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 type="button"
                 onClick={() => {
                   setWorkspaceMenuOpen(false);
+                  setAuditModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5 text-blue-400" />
+                <span>Audit Log</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspaceMenuOpen(false);
                   setTokenModalOpen(true);
                 }}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
@@ -445,6 +458,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       <TeamMembersModal
         isOpen={teamModalOpen}
         onClose={() => setTeamModalOpen(false)}
+      />
+
+      {/* Audit Log Timeline Modal */}
+      <AuditLogModal
+        isOpen={auditModalOpen}
+        onClose={() => setAuditModalOpen(false)}
       />
     </>
   );

@@ -15,4 +15,5 @@ export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { TeamMembersModal } from './TeamMembersModal';
 export { HostHealthModal } from './HostHealthModal';
 export { CreateVolumeModal } from './CreateVolumeModal';
+export { AuditLogModal } from './AuditLogModal';
 export { default as DeployProgressModal } from './DeployProgressModal';

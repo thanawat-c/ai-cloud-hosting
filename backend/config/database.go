@@ -38,6 +38,7 @@ func ConnectDatabase() {
 		&models.DeploymentRelease{},
 		&models.WorkspaceMember{},
 		&models.Volume{},
+		&models.AuditLog{},
 	)
 	if err != nil {
 		log.Fatal("❌ Auto-migration failed: ", err)
