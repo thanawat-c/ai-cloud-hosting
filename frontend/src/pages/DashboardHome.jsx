@@ -18,6 +18,7 @@ import {
   WebhookModal,
   LiveMetricsModal,
   ProjectSettingsModal,
+  CreateVolumeModal,
 } from '../components/modals';
 import {
   DashboardSubnav,
@@ -298,6 +299,57 @@ const DashboardHome = () => {
   const handleOpenProjectSettings = (container) => {
     setProjectSettingsContainer(container);
     setProjectSettingsModalOpen(true);
+  };
+
+  // Persistent Volumes State & Handlers
+  const [volumes, setVolumes] = useState([]);
+  const [createVolumeModalOpen, setCreateVolumeModalOpen] = useState(false);
+
+  const fetchVolumes = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8080/api/volumes', {
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVolumes(data || []);
+      }
+    } catch {}
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    fetchVolumes();
+  }, [fetchVolumes]);
+
+  const handleDeleteVolume = async (volId, volName) => {
+    if (!window.confirm(`Delete volume "${volName}"? All persistent files on this disk will be removed.`)) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/volumes/${volId}`, {
+        method: 'DELETE',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      if (res.ok) {
+        toast.success(`Volume "${volName}" deleted`);
+        fetchVolumes();
+      } else {
+        toast.error('Failed to delete volume');
+      }
+    } catch {
+      toast.error('Network error deleting volume');
+    }
+  };
+
+  const handleDetachVolume = async (volId) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/volumes/${volId}/detach`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      });
+      if (res.ok) {
+        toast.success('Volume detached');
+        fetchVolumes();
+      }
+    } catch {}
   };
 
   const handleSaveCustomDomain = async () => {
@@ -1385,14 +1437,18 @@ const DashboardHome = () => {
       </div>
       )}
 
-      {/* Tab 2: Storage & Databases (Managed PostgreSQL) */}
+      {/* Tab 2: Storage & Databases (Managed PostgreSQL & Persistent Volumes) */}
       {activeTab === 'storage' && (
         <StorageSection
           databases={databases}
+          volumes={volumes}
           stats={stats}
           onCreateDbClick={() => setCreateDbModalOpen(true)}
+          onCreateVolumeClick={() => setCreateVolumeModalOpen(true)}
           handleToggleDb={handleToggleDb}
           handleDeleteDb={handleDeleteDb}
+          handleDetachVolume={handleDetachVolume}
+          handleDeleteVolume={handleDeleteVolume}
           handleOpenSqlStudio={handleOpenSqlStudio}
           handleOpenBindModal={handleOpenBindModal}
           handleOpenSnapshotModal={handleOpenSnapshotModal}
@@ -1559,6 +1615,12 @@ const DashboardHome = () => {
         onClose={() => setProjectSettingsModalOpen(false)}
         container={projectSettingsContainer}
         onUpdated={fetchContainers}
+      />
+
+      <CreateVolumeModal
+        isOpen={createVolumeModalOpen}
+        onClose={() => setCreateVolumeModalOpen(false)}
+        onCreated={fetchVolumes}
       />
 
       <UniversalConfirmModal

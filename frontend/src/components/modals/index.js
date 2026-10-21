@@ -14,4 +14,5 @@ export { LiveMetricsModal } from './LiveMetricsModal';
 export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { TeamMembersModal } from './TeamMembersModal';
 export { HostHealthModal } from './HostHealthModal';
+export { CreateVolumeModal } from './CreateVolumeModal';
 export { default as DeployProgressModal } from './DeployProgressModal';

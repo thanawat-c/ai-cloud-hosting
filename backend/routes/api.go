@@ -59,6 +59,13 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/databases/:id/snapshots/:snapshot_id/download", controllers.DownloadDatabaseSnapshot)
 		api.DELETE("/databases/:id/snapshots/:snapshot_id", controllers.DeleteDatabaseSnapshot)
 
+		// Persistent Storage & Volumes
+		api.GET("/volumes", controllers.GetVolumes)
+		api.POST("/volumes", controllers.CreateVolume)
+		api.POST("/volumes/:id/attach", controllers.AttachVolume)
+		api.POST("/volumes/:id/detach", controllers.DetachVolume)
+		api.DELETE("/volumes/:id", controllers.DeleteVolume)
+
 		// Workspaces & Team Members
 		api.GET("/workspaces", controllers.GetWorkspaces)
 		api.POST("/workspaces", controllers.CreateWorkspace)
