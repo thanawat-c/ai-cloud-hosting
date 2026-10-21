@@ -34,3 +34,8 @@ frontend/build/
 # Temporary / Log files
 *.log
 scratch/
+
+# Local AI instructions (keep private, never push to git)
+AGENTS.md
+GEMINI.md
+.agents/

@@ -39,6 +39,7 @@ func ConnectDatabase() {
 		&models.WorkspaceMember{},
 		&models.Volume{},
 		&models.AuditLog{},
+		&models.WebhookAlert{},
 	)
 	if err != nil {
 		log.Fatal("❌ Auto-migration failed: ", err)

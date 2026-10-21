@@ -22,4 +22,7 @@ func CreateNotification(workspaceID, title, message, notifType, resourceName str
 		IsRead:       false,
 	}
 	config.DB.Create(&notif)
+
+	// Dispatch แจ้งเตือนไปยังภายนอก (Discord, Slack, etc.) แบบ Async
+	DispatchWebhooks(workspaceID, title, message, notifType, resourceName)
 }

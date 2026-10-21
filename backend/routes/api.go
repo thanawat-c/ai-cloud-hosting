@@ -85,6 +85,13 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/tokens", controllers.CreateToken)
 		api.DELETE("/tokens/:id", controllers.RevokeToken)
 
+		// Outgoing Webhook Notifications (Discord, Slack, Generic)
+		api.GET("/alerts/webhooks", controllers.GetWebhookAlerts)
+		api.POST("/alerts/webhooks", controllers.CreateWebhookAlert)
+		api.PATCH("/alerts/webhooks/:id/toggle", controllers.ToggleWebhookAlert)
+		api.POST("/alerts/webhooks/:id/test", controllers.TestWebhookAlert)
+		api.DELETE("/alerts/webhooks/:id", controllers.DeleteWebhookAlert)
+
 		// GitHub Webhooks (Auto-Deploy on Push)
 		api.POST("/webhooks/deploy/:id", controllers.HandleDeploymentWebhook)
 		api.POST("/webhooks/github", controllers.HandleGlobalGitHubWebhook)
