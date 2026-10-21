@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock, User, LogOut } from 'lucide-react';
+import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock, User, LogOut, Activity } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
