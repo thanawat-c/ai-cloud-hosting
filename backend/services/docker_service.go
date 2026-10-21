@@ -107,8 +107,9 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		targetPort = "80"
 	}
 
+	cleanBaseImage := strings.Split(imageName, ":")[0]
 	// 1. สร้างชื่อโดเมนเท่ๆ จากชื่อโปรเจกต์ เช่น my-app-deploy-1234.localhost
-	domainName := imageName + ".localhost"
+	domainName := cleanBaseImage + ".localhost"
 
 	var envList []string
 	if envVars != "" {
@@ -150,12 +151,12 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			"ai-cloud-network": {
-				Aliases: []string{imageName},
+				Aliases: []string{cleanBaseImage, imageName},
 			},
 		},
 	}
 
-	routerName := strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(imageName, "-"))
+	routerName := strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(cleanBaseImage, "-"))
 	rule := "Host(`" + domainName + "`)"
 	if customDomain != "" {
 		rule = fmt.Sprintf("Host(`%s`) || Host(`%s`)", domainName, customDomain)
@@ -669,4 +670,43 @@ func PruneUnusedImages(ctx context.Context) (uint64, error) {
 	}
 
 	return report.SpaceReclaimed, nil
+}
+
+// RollbackToImage สลับ Container ไปใช้ Docker Image เวอร์ชันก่อนหน้าทันที (Zero rebuild time)
+func RollbackToImage(ctx context.Context, oldContainerID string, targetImage string, wsID string, customDomain string, sslEnabled bool) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	targetPort := "80"
+	var envVars string
+	if oldContainerID != "" {
+		inspect, err := cli.ContainerInspect(ctx, oldContainerID)
+		if err == nil {
+			for k, v := range inspect.Config.Labels {
+				if strings.HasSuffix(k, "loadbalancer.server.port") {
+					targetPort = v
+					break
+				}
+			}
+			envs, _ := GetContainerEnv(ctx, oldContainerID)
+			envVars = strings.Join(envs, "\n")
+		}
+		_ = cli.ContainerStop(ctx, oldContainerID, container.StopOptions{})
+		_ = cli.ContainerRemove(ctx, oldContainerID, container.RemoveOptions{Force: true})
+	}
+
+	sslParam := "true"
+	if !sslEnabled {
+		sslParam = "false"
+	}
+
+	newID, _, err := CreateAndStartContainer(ctx, targetImage, envVars, targetPort, wsID, customDomain, sslParam)
+	if err != nil {
+		return "", fmt.Errorf("สลับไปยัง image เก่าไม่สำเร็จ: %w", err)
+	}
+
+	return newID, nil
 }

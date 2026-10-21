@@ -30,3 +30,20 @@ type Deployment struct {
 	CreatedAt     time.Time `gorm:"autoCreateTime"`      // วันเวลาที่ Deploy
 	UpdatedAt     time.Time `gorm:"autoUpdateTime"`      // วันเวลาที่แก้ไขสถานะล่าสุด
 }
+
+type DeploymentRelease struct {
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	DeploymentID  uint      `json:"deployment_id" gorm:"index;not null"`
+	ContainerID   string    `json:"container_id" gorm:"type:varchar(64)"`
+	ImageName     string    `json:"image_name" gorm:"not null"`
+	Branch        string    `json:"branch" gorm:"type:varchar(100)"`
+	CommitHash    string    `json:"commit_hash" gorm:"type:varchar(40)"`
+	CommitMessage string    `json:"commit_message" gorm:"type:text"`
+	AuthorName    string    `json:"author_name" gorm:"type:varchar(100)"`
+	AuthorAvatar  string    `json:"author_avatar" gorm:"type:varchar(255)"`
+	EnvVars       string    `json:"env_vars" gorm:"type:text"`
+	Status        string    `json:"status" gorm:"default:'success'"`
+	IsActive      bool      `json:"is_active" gorm:"default:false"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+}
+

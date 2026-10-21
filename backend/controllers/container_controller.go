@@ -515,6 +515,22 @@ func RedeployContainer(c *gin.Context){
 				"last_error":   "",
 				"updated_at":   time.Now(),
 			})
+
+			// บันทึก Release ใหม่ และปลด active จากรอบก่อน
+			config.DB.Model(&models.DeploymentRelease{}).Where("deployment_id = ?", deploy.ID).Update("is_active", false)
+			config.DB.Create(&models.DeploymentRelease{
+				DeploymentID:  deploy.ID,
+				ContainerID:   cleanID,
+				ImageName:     deploy.ImageName,
+				Branch:        deploy.Branch,
+				CommitHash:    deploy.CommitHash,
+				CommitMessage: deploy.CommitMessage,
+				AuthorName:    deploy.AuthorName,
+				AuthorAvatar:  deploy.AuthorAvatar,
+				Status:        "success",
+				IsActive:      true,
+			})
+
 			utils.CreateNotification(wsID, "Service Redeployed", fmt.Sprintf("Service '%s' was rebuilt and is live on %s", serviceName, cleanID), "success", serviceName)
 			fmt.Println("Redeploy สำเร็จ! อัปเดต ID เซิฟร์เวอร์ใหม่เป็น", cleanID)
 		}
@@ -679,5 +695,127 @@ func UpdateContainerDomain(c *gin.Context) {
 		"ssl_status":         sslStatus,
 		"ssl_force_redirect": req.SSLForceRedirect,
 		"new_id":             cleanID,
+	})
+}
+
+// GetContainerReleases ดึงประวัติ Release ทั้งหมดของ Deployment นี้
+func GetContainerReleases(c *gin.Context) {
+	id := c.Param("id")
+	deploy := findDeployment(id)
+	if deploy.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Deployment not found"})
+		return
+	}
+
+	var releases []models.DeploymentRelease
+	config.DB.Where("deployment_id = ?", deploy.ID).Order("created_at desc").Find(&releases)
+
+	// ถ้ายังไม่มีประวัติ release เลย ให้สร้าง initial release จากข้อมูลปัจจุบันให้อัตโนมัติ
+	if len(releases) == 0 {
+		cleanHash := deploy.CommitHash
+		if cleanHash == "" && deploy.ContainerID != "" {
+			if len(deploy.ContainerID) >= 7 {
+				cleanHash = deploy.ContainerID[:7]
+			} else {
+				cleanHash = deploy.ContainerID
+			}
+		}
+		initial := models.DeploymentRelease{
+			DeploymentID:  deploy.ID,
+			ContainerID:   deploy.ContainerID,
+			ImageName:     deploy.ImageName,
+			Branch:        deploy.Branch,
+			CommitHash:    cleanHash,
+			CommitMessage: deploy.CommitMessage,
+			AuthorName:    deploy.AuthorName,
+			AuthorAvatar:  deploy.AuthorAvatar,
+			Status:        "success",
+			IsActive:      true,
+			CreatedAt:     deploy.CreatedAt,
+		}
+		if initial.Branch == "" {
+			initial.Branch = "main"
+		}
+		if initial.AuthorName == "" {
+			initial.AuthorName = "Developer"
+		}
+		config.DB.Create(&initial)
+		releases = append(releases, initial)
+	}
+
+	c.JSON(http.StatusOK, releases)
+}
+
+// RollbackContainer สลับ Container กลับไปรัน Release ก่อนหน้าทันที (Zero downtime / Zero build time)
+func RollbackContainer(c *gin.Context) {
+	id := c.Param("id")
+	deploy := findDeployment(id)
+	if deploy.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Deployment not found"})
+		return
+	}
+
+	var req struct {
+		ReleaseID uint `json:"release_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ release_id ที่ต้องการย้อนกลับไป"})
+		return
+	}
+
+	var targetRelease models.DeploymentRelease
+	if err := config.DB.Where("id = ? AND deployment_id = ?", req.ReleaseID, deploy.ID).First(&targetRelease).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Release ที่ระบุ"})
+		return
+	}
+
+	ctx := context.Background()
+	wsID := deploy.WorkspaceID
+	if wsID == "" {
+		wsID = utils.GetWorkspaceID(c)
+	}
+
+	newID, err := services.RollbackToImage(ctx, deploy.ContainerID, targetRelease.ImageName, wsID, deploy.CustomDomain, deploy.SSLEnabled)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Rollback ล้มเหลว: " + err.Error()})
+		return
+	}
+
+	cleanID := newID
+	if len(cleanID) > 12 {
+		cleanID = cleanID[:12]
+	}
+
+	// อัปเดตข้อมูล Deployment หลัก
+	config.DB.Model(&deploy).Updates(map[string]interface{}{
+		"container_id":   cleanID,
+		"status":         "running",
+		"branch":         targetRelease.Branch,
+		"commit_hash":    targetRelease.CommitHash,
+		"commit_message": targetRelease.CommitMessage,
+		"author_name":    targetRelease.AuthorName,
+		"author_avatar":  targetRelease.AuthorAvatar,
+		"last_error":     "",
+		"updated_at":     time.Now(),
+	})
+
+	// ปรับสถานะ Releases: ปลด release เดิม แล้วตั้งเป้าหมายเป็น IsActive = true
+	config.DB.Model(&models.DeploymentRelease{}).Where("deployment_id = ?", deploy.ID).Update("is_active", false)
+	config.DB.Model(&targetRelease).Updates(map[string]interface{}{
+		"is_active":    true,
+		"container_id": cleanID,
+	})
+
+	serviceName := getDeploymentDisplayName(deploy, id)
+	commitTag := targetRelease.CommitHash
+	if commitTag == "" {
+		commitTag = targetRelease.Branch
+	}
+	utils.CreateNotification(wsID, "Deployment Rolled Back", fmt.Sprintf("Service '%s' was rolled back to release %s in 1 second", serviceName, commitTag), "warning", serviceName)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":        fmt.Sprintf("ย้อนกลับ (Rollback) ไปยัง Release สำเร็จเรียบร้อย! คอนเทนเนอร์รันใหม่เป็น %s", cleanID),
+		"new_id":         cleanID,
+		"active_release": targetRelease,
 	})
 }

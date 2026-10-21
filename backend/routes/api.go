@@ -23,6 +23,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/containers/:id/env", controllers.GetContainerEnv)
 		api.POST("/containers/:id/env", controllers.UpdateContainerEnv)
 		api.POST("/containers/:id/domain", controllers.UpdateContainerDomain)
+		api.GET("/containers/:id/releases", controllers.GetContainerReleases)
+		api.POST("/containers/:id/rollback", controllers.RollbackContainer)
 		api.POST("/system/prune", controllers.PruneImages)
 
 		// Managed Databases
