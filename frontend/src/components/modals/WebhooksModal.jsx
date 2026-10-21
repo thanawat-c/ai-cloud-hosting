@@ -125,7 +125,7 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`🎉 Test notification delivered to ${whPlatform.toUpperCase()}! Check your channel.`);
+        toast.success(`Test alert successfully delivered to ${whPlatform.toUpperCase()}! Check your channel.`);
       } else {
         toast.error(data.error || 'Failed to send test alert');
       }

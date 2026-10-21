@@ -143,8 +143,8 @@ func TestWebhookAlert(c *gin.Context) {
 		return
 	}
 
-	testTitle := "Webhook Test Successful"
-	testMsg := fmt.Sprintf("🔔 Congratulations! Your %s webhook integration with AI Cloud Hosting is working properly.", strings.ToUpper(wh.Platform))
+	testTitle := "Webhook Integration Verified"
+	testMsg := fmt.Sprintf("Your %s outgoing alert webhook has been successfully verified for workspace '%s'.", strings.ToUpper(wh.Platform), wh.WorkspaceID)
 
 	if err := utils.SendWebhookDirect(wh, testTitle, testMsg, "success", "system-test"); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
