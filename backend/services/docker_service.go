@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -93,6 +94,10 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	if len(workspaceID) > 0 && strings.TrimSpace(workspaceID[0]) != "" {
 		wsID = strings.TrimSpace(workspaceID[0])
 	}
+	customDomain := ""
+	if len(workspaceID) > 1 && strings.TrimSpace(workspaceID[1]) != "" {
+		customDomain = strings.TrimSpace(workspaceID[1])
+	}
 
 	if targetPort == "" {
 		targetPort = "80"
@@ -146,23 +151,34 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		},
 	}
 
+	routerName := strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(imageName, "-"))
+	rule := "Host(`" + domainName + "`)"
+	if customDomain != "" {
+		rule = fmt.Sprintf("Host(`%s`) || Host(`%s`)", domainName, customDomain)
+	}
+
+	labels := map[string]string{
+		"traefik.enable": "true",
+		"traefik.http.routers." + routerName + ".rule": rule,
+		"traefik.http.services." + routerName + ".loadbalancer.server.port": targetPort,
+		"ach.workspace": wsID,
+		"ach.type":      "service",
+	}
+	if customDomain != "" {
+		labels["ach.custom_domain"] = customDomain
+	}
+
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: imageName,
-		Env:   envList,
-		Labels: map[string]string{
-			"traefik.enable": "true", // บอก Traefik ว่าให้ช่วยจัดการตัวนี้หน่อย
-			"traefik.http.routers." + imageName + ".rule": "Host(`" + domainName + "`)", // กำหนดชื่อโดเมน
-			"traefik.http.services." + imageName + ".loadbalancer.server.port": targetPort, // พอร์ตภายในตาม Service จริง
-			"ach.workspace": wsID,
-			"ach.type":      "service",
-		},
+		Image:  imageName,
+		Env:    envList,
+		Labels: labels,
 	}, &container.HostConfig{
 		NetworkMode: "ai-cloud-network", // พระเอก! จับมันยัดเข้าเครือข่ายเดียวกับ Traefik
 		RestartPolicy: container.RestartPolicy{
 			Name: "unless-stopped", // ถ้าดับเองเพราะ Crash หรือ Reboot ให้พยายามสตาร์ตกลับขึ้นมาใหม่อัตโนมัติ
 		},
 		Resources: container.Resources{
-			Memory: 256 * 1024 * 1024,
+			Memory: 512 * 1024 * 1024, // 512 MB เพื่อความเสถียรสำหรับ SSR และ Node.js
 		},
 	}, networkConfig, nil, "")
 
@@ -306,12 +322,18 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 		}
 	}
 
+	wsID := labels["ach.workspace"]
+	if wsID == "" {
+		wsID = "personal"
+	}
+	customDomain := labels["ach.custom_domain"]
+
 	// ลบคอนเทนเนอร์เดิมทิ้ง
 	_ = cli.ContainerStop(ctx, oldID, container.StopOptions{})
 	_ = cli.ContainerRemove(ctx, oldID, container.RemoveOptions{Force: true})
 
 	// รันตัวใหม่ขึ้นมาแทนทันทีด้วย Image เดิม แต่ใส่ Env ใหม่
-	newID, _, err := CreateAndStartContainer(ctx, imageName, newEnvVars, targetPort)
+	newID, _, err := CreateAndStartContainer(ctx, imageName, newEnvVars, targetPort, wsID, customDomain)
 	if err != nil {
 		return "", fmt.Errorf("เริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
 	}
@@ -319,6 +341,48 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 	// ถ้ามีการผูก DATABASE_URL ให้ sync Prisma schema ลงฐานข้อมูลให้อัตโนมัติ (เช่น npx prisma db push)
 	if strings.Contains(newEnvVars, "DATABASE_URL=") {
 		AutoSyncPrismaSchema(newID)
+	}
+
+	return newID, nil
+}
+
+// UpdateContainerCustomDomain อัปเดตหรือผูก Custom Domain ให้กับ Container และให้ Traefik รัน Routing ทันที
+func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	inspect, err := cli.ContainerInspect(ctx, oldID)
+	if err != nil {
+		return "", fmt.Errorf("ไม่พบคอนเทนเนอร์เดิม: %w", err)
+	}
+
+	imageName := inspect.Config.Image
+	labels := inspect.Config.Labels
+	targetPort := "80"
+	for k, v := range labels {
+		if strings.HasSuffix(k, "loadbalancer.server.port") {
+			targetPort = v
+			break
+		}
+	}
+
+	wsID := labels["ach.workspace"]
+	if wsID == "" {
+		wsID = "personal"
+	}
+
+	userEnvs, _ := GetContainerEnv(ctx, oldID)
+	envVars := strings.Join(userEnvs, "\n")
+
+	_ = cli.ContainerStop(ctx, oldID, container.StopOptions{})
+	_ = cli.ContainerRemove(ctx, oldID, container.RemoveOptions{Force: true})
+
+	newID, _, err := CreateAndStartContainer(ctx, imageName, envVars, targetPort, wsID, newDomain)
+	if err != nil {
+		return "", fmt.Errorf("รีสตาร์ตคอนเทนเนอร์เพื่อผูกโดเมนใหม่ไม่สำเร็จ: %w", err)
 	}
 
 	return newID, nil
@@ -450,8 +514,16 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 
 	inspect, err := cli.ContainerInspect(ctx, id)
 	var oldEnvVars string
-	if err == nil && len(inspect.Config.Env) > 0 {
-		oldEnvVars = strings.Join(inspect.Config.Env, "\n")
+	var wsID string
+	var customDomain string
+	if err == nil {
+		if len(inspect.Config.Env) > 0 {
+			oldEnvVars = strings.Join(inspect.Config.Env, "\n")
+		}
+		if inspect.Config.Labels != nil {
+			wsID = inspect.Config.Labels["ach.workspace"]
+			customDomain = inspect.Config.Labels["ach.custom_domain"]
+		}
 	}
 
 	cleanRepoURL := rawRepoURL
@@ -557,7 +629,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 		return "", fmt.Errorf("สร้าง Image ใหม่ไม่สำเร็จ: %w", err)
 	}
 
-	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars, targetPort)
+	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars, targetPort, wsID, customDomain)
 	if err != nil {
 		return "", fmt.Errorf("เปิดเซิร์ฟเวอร์ใหม่ไม่สำเร็จ: %w", err)
 	}

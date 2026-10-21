@@ -603,6 +603,20 @@ func UpdateContainerDomain(c *gin.Context) {
 
 	config.DB.Model(&deploy).Update("custom_domain", cleanDomain)
 
+	newID := deploy.ContainerID
+	if deploy.ContainerID != "" {
+		updatedID, err := services.UpdateContainerCustomDomain(context.Background(), deploy.ContainerID, cleanDomain)
+		if err == nil && updatedID != "" {
+			newID = updatedID
+			config.DB.Model(&deploy).Update("container_id", updatedID)
+		}
+	}
+
+	cleanID := newID
+	if len(cleanID) > 12 {
+		cleanID = cleanID[:12]
+	}
+
 	wsID := deploy.WorkspaceID
 	if wsID == "" {
 		wsID = utils.GetWorkspaceID(c)
@@ -617,5 +631,6 @@ func UpdateContainerDomain(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Custom domain updated successfully",
 		"custom_domain": cleanDomain,
+		"new_id":        cleanID,
 	})
 }
