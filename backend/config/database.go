@@ -33,6 +33,7 @@ func ConnectDatabase() {
 		&models.ManagedDatabase{},
 		&models.Notification{},
 		&models.APIToken{},
+		&models.DatabaseSnapshot{},
 	)
 	if err != nil {
 		log.Fatal("❌ สร้างตารางอัตโนมัติล้มเหลว: ", err)

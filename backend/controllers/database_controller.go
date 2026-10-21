@@ -277,4 +277,128 @@ func RestoreDatabase(c *gin.Context) {
 	})
 }
 
+// CreateDatabaseSnapshot บันทึก Snapshot ลง Host Disk และสร้าง Record
+func CreateDatabaseSnapshot(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		return
+	}
+
+	var req struct {
+		Notes string `json:"notes"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	wsID := utils.GetWorkspaceID(c)
+	snapshot, err := services.CreateDatabaseSnapshot(context.Background(), uint(id), req.Notes, wsID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "สร้าง Snapshot สำเร็จเรียบร้อยแล้ว!",
+		"snapshot": snapshot,
+	})
+}
+
+// GetDatabaseSnapshots ดึงประวัติ Snapshot ทั้งหมดของ Database
+func GetDatabaseSnapshots(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		return
+	}
+
+	snapshots, err := services.ListDatabaseSnapshots(context.Background(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, snapshots)
+}
+
+// RestoreDatabaseSnapshot กู้คืนข้อมูลจาก Snapshot ID ที่ระบุ
+func RestoreDatabaseSnapshot(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		return
+	}
+
+	snapParam := c.Param("snapshot_id")
+	snapID, err := strconv.ParseUint(snapParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		return
+	}
+
+	output, err := services.RestoreDatabaseSnapshot(context.Background(), uint(id), uint(snapID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "กู้คืนข้อมูลจาก Snapshot สำเร็จเรียบร้อยแล้ว!",
+		"output":  output,
+	})
+}
+
+// DownloadDatabaseSnapshot ดาวน์โหลดไฟล์ .sql จาก Snapshot
+func DownloadDatabaseSnapshot(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		return
+	}
+
+	snapParam := c.Param("snapshot_id")
+	snapID, err := strconv.ParseUint(snapParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		return
+	}
+
+	filePath, fileName, err := services.GetSnapshotFilePath(uint(id), uint(snapID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	c.Header("Content-Type", "application/sql")
+	c.File(filePath)
+}
+
+// DeleteDatabaseSnapshot ลบ Snapshot
+func DeleteDatabaseSnapshot(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		return
+	}
+
+	snapParam := c.Param("snapshot_id")
+	snapID, err := strconv.ParseUint(snapParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		return
+	}
+
+	if err := services.DeleteDatabaseSnapshot(context.Background(), uint(id), uint(snapID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "ลบ Snapshot สำเร็จเรียบร้อยแล้ว"})
+}
+
 

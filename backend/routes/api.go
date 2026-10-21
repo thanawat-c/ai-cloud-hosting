@@ -36,6 +36,11 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/databases/:id/bind", controllers.BindDatabase)
 		api.GET("/databases/:id/backup", controllers.BackupDatabase)
 		api.POST("/databases/:id/restore", controllers.RestoreDatabase)
+		api.GET("/databases/:id/snapshots", controllers.GetDatabaseSnapshots)
+		api.POST("/databases/:id/snapshots", controllers.CreateDatabaseSnapshot)
+		api.POST("/databases/:id/snapshots/:snapshot_id/restore", controllers.RestoreDatabaseSnapshot)
+		api.GET("/databases/:id/snapshots/:snapshot_id/download", controllers.DownloadDatabaseSnapshot)
+		api.DELETE("/databases/:id/snapshots/:snapshot_id", controllers.DeleteDatabaseSnapshot)
 
 		// Workspaces (Multi-Tenancy)
 		api.GET("/workspaces", controllers.GetWorkspaces)

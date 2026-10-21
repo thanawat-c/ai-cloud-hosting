@@ -753,6 +753,158 @@ func RestoreDatabaseSQL(ctx context.Context, db models.ManagedDatabase, sqlConte
 	return strings.TrimSpace(out), nil
 }
 
+// CreateDatabaseSnapshot ทำ Snapshot ข้อมูลของ PostgreSQL และบันทึกไฟล์ลงเซิร์ฟเวอร์
+func CreateDatabaseSnapshot(ctx context.Context, dbID uint, notes string, wsID string) (*models.DatabaseSnapshot, error) {
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, dbID).Error; err != nil {
+		return nil, fmt.Errorf("ไม่พบฐานข้อมูล ID: %d", dbID)
+	}
 
+	if db.Status != "running" {
+		return nil, fmt.Errorf("ฐานข้อมูลต้องอยู่ในสถานะ running ก่อนทำ Snapshot")
+	}
 
+	sqlDump, err := BackupDatabaseSQL(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("dump ฐานข้อมูลไม่สำเร็จ: %w", err)
+	}
 
+	// โฟลเดอร์เก็บข้อมูล snapshot ใน data/backups/db_{id}
+	baseDir := filepath.Join("data", "backups", fmt.Sprintf("db_%d", dbID))
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return nil, fmt.Errorf("สร้างโฟลเดอร์เก็บ snapshot ไม่สำเร็จ: %w", err)
+	}
+
+	timeTag := time.Now().Format("20060102-150405")
+	cleanName := regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(db.Name, "-")
+	fileName := fmt.Sprintf("snapshot-%s-%s.sql", cleanName, timeTag)
+	fullPath := filepath.Join(baseDir, fileName)
+
+	if err := os.WriteFile(fullPath, []byte(sqlDump), 0644); err != nil {
+		return nil, fmt.Errorf("บันทึกไฟล์ snapshot ไม่สำเร็จ: %w", err)
+	}
+
+	sizeBytes := int64(len(sqlDump))
+	formattedSize := formatSize(sizeBytes)
+
+	if wsID == "" {
+		wsID = db.WorkspaceID
+		if wsID == "" {
+			wsID = "personal"
+		}
+	}
+
+	snapshot := models.DatabaseSnapshot{
+		DatabaseID:    dbID,
+		WorkspaceID:   wsID,
+		FileName:      fileName,
+		FilePath:      fullPath,
+		SizeBytes:     sizeBytes,
+		FormattedSize: formattedSize,
+		Type:          "manual",
+		Notes:         strings.TrimSpace(notes),
+		CreatedAt:     time.Now(),
+	}
+
+	if err := config.DB.Create(&snapshot).Error; err != nil {
+		return nil, fmt.Errorf("บันทึกประวัติ snapshot ลงฐานข้อมูลไม่สำเร็จ: %w", err)
+	}
+
+	utils.CreateNotification(wsID, "Database Snapshot Created", fmt.Sprintf("Created snapshot '%s' (%s) for database '%s'", fileName, formattedSize, db.Name), "success", db.Name)
+
+	return &snapshot, nil
+}
+
+// ListDatabaseSnapshots ดึงรายการ Snapshots ทั้งหมดของฐานข้อมูล
+func ListDatabaseSnapshots(ctx context.Context, dbID uint) ([]models.DatabaseSnapshot, error) {
+	var snapshots []models.DatabaseSnapshot
+	if err := config.DB.Where("database_id = ?", dbID).Order("created_at desc").Find(&snapshots).Error; err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+// RestoreDatabaseSnapshot คืนค่าฐานข้อมูลจาก Snapshot ID ที่ระบุ
+func RestoreDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) (string, error) {
+	var db models.ManagedDatabase
+	if err := config.DB.First(&db, dbID).Error; err != nil {
+		return "", fmt.Errorf("ไม่พบฐานข้อมูล")
+	}
+
+	if db.Status != "running" {
+		return "", fmt.Errorf("ฐานข้อมูลต้องอยู่ในสถานะ running ก่อนทำ Restore")
+	}
+
+	var snapshot models.DatabaseSnapshot
+	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
+		return "", fmt.Errorf("ไม่พบประวัติ snapshot นี้")
+	}
+
+	// Security: ตรวจสอบความปลอดภัย Path Traversal
+	cleanPath := filepath.Clean(snapshot.FilePath)
+	if !strings.HasPrefix(cleanPath, filepath.Join("data", "backups")) {
+		return "", fmt.Errorf("security error: invalid snapshot file path")
+	}
+
+	contentBytes, err := os.ReadFile(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("อ่านไฟล์ snapshot ไม่สำเร็จ: %w", err)
+	}
+
+	output, err := RestoreDatabaseSQL(ctx, db, string(contentBytes))
+	if err != nil {
+		return "", fmt.Errorf("restore ฐานข้อมูลไม่สำเร็จ: %w", err)
+	}
+
+	wsID := db.WorkspaceID
+	if wsID == "" {
+		wsID = "personal"
+	}
+	utils.CreateNotification(wsID, "Database Restored", fmt.Sprintf("Database '%s' restored from snapshot '%s'", db.Name, snapshot.FileName), "warning", db.Name)
+
+	return output, nil
+}
+
+// DeleteDatabaseSnapshot ลบไฟล์ Snapshot และลบ Record
+func DeleteDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) error {
+	var snapshot models.DatabaseSnapshot
+	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
+		return fmt.Errorf("ไม่พบ snapshot")
+	}
+
+	// Security check
+	cleanPath := filepath.Clean(snapshot.FilePath)
+	if strings.HasPrefix(cleanPath, filepath.Join("data", "backups")) {
+		_ = os.Remove(cleanPath)
+	}
+
+	return config.DB.Delete(&snapshot).Error
+}
+
+// GetSnapshotFilePath ส่งออก Path และชื่อไฟล์สำหรับการดาวน์โหลด
+func GetSnapshotFilePath(dbID uint, snapshotID uint) (string, string, error) {
+	var snapshot models.DatabaseSnapshot
+	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
+		return "", "", fmt.Errorf("ไม่พบ snapshot")
+	}
+
+	cleanPath := filepath.Clean(snapshot.FilePath)
+	if !strings.HasPrefix(cleanPath, filepath.Join("data", "backups")) {
+		return "", "", fmt.Errorf("security error: invalid path")
+	}
+
+	return cleanPath, snapshot.FileName, nil
+}
+
+func formatSize(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}

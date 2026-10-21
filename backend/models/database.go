@@ -32,3 +32,16 @@ type CreateDatabaseRequest struct {
 	Type        string `json:"type"` // postgres, mysql, redis
 	WorkspaceID string `json:"workspace_id"`
 }
+
+type DatabaseSnapshot struct {
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	DatabaseID    uint      `json:"database_id" gorm:"index;not null"`
+	WorkspaceID   string    `json:"workspace_id" gorm:"type:varchar(50);index"`
+	FileName      string    `json:"file_name" gorm:"not null"`
+	FilePath      string    `json:"file_path" gorm:"not null"`
+	SizeBytes     int64     `json:"size_bytes"`
+	FormattedSize string    `json:"formatted_size"`
+	Type          string    `json:"type" gorm:"default:'manual'"` // manual, auto
+	Notes         string    `json:"notes"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+}

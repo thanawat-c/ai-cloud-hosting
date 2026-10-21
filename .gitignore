@@ -17,6 +17,7 @@ frontend/.env
 *.db
 *.sqlite
 *.sqlite3
+backend/data/
 
 # Dependencies
 node_modules/

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send, MoreHorizontal, ArrowUpRight, GitCommit } from 'lucide-react';
+import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send, MoreHorizontal, ArrowUpRight, GitCommit, Archive, History, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 
@@ -177,6 +177,18 @@ const DashboardHome = () => {
   const [restoreFile, setRestoreFile] = useState(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState('');
+
+  // Snapshots & Server Backups State
+  const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
+  const [activeSnapshotDb, setActiveSnapshotDb] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
+  const [takingSnapshot, setTakingSnapshot] = useState(false);
+  const [snapshotNote, setSnapshotNote] = useState('');
+  const [confirmRestoreSnapshot, setConfirmRestoreSnapshot] = useState(null);
+  const [restoringSnapshotId, setRestoringSnapshotId] = useState(null);
+  const [deletingSnapshotId, setDeletingSnapshotId] = useState(null);
+  const [activeSnapshotTab, setActiveSnapshotTab] = useState('list'); // 'list' | 'upload'
 
   // Webhook State
   const [webhookModalOpen, setWebhookModalOpen] = useState(false);
@@ -726,6 +738,113 @@ const DashboardHome = () => {
     } finally {
       setRestoring(false);
     }
+  };
+
+  const handleOpenSnapshotModal = async (db) => {
+    setActiveSnapshotDb(db);
+    setSnapshotModalOpen(true);
+    setSnapshotNote('');
+    setConfirmRestoreSnapshot(null);
+    setActiveSnapshotTab('list');
+    await fetchSnapshots(db.id);
+  };
+
+  const fetchSnapshots = async (dbId) => {
+    setLoadingSnapshots(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${dbId}/snapshots`);
+      if (res.ok) {
+        const data = await res.json();
+        setSnapshots(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Failed to load snapshots:', e);
+    } finally {
+      setLoadingSnapshots(false);
+    }
+  };
+
+  const handleTakeSnapshot = async () => {
+    if (!activeSnapshotDb) return;
+    setTakingSnapshot(true);
+    const toastId = toast.loading(`Taking snapshot for "${activeSnapshotDb.name}"...`);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: snapshotNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create snapshot');
+      }
+      toast.success('Snapshot created successfully!', {
+        id: toastId,
+        description: `${data.snapshot.file_name} (${data.snapshot.formatted_size})`,
+      });
+      setSnapshotNote('');
+      await fetchSnapshots(activeSnapshotDb.id);
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
+    } catch (err) {
+      toast.error('Snapshot failed', { id: toastId, description: err.message });
+    } finally {
+      setTakingSnapshot(false);
+    }
+  };
+
+  const handleRestoreFromSnapshot = async (snapshot) => {
+    if (!activeSnapshotDb) return;
+    setRestoringSnapshotId(snapshot.id);
+    const toastId = toast.loading(`Restoring database from snapshot "${snapshot.file_name}"...`);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots/${snapshot.id}/restore`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to restore snapshot');
+      }
+      toast.success('Database restored successfully from snapshot!', {
+        id: toastId,
+        description: 'All tables and data have been restored.',
+      });
+      setConfirmRestoreSnapshot(null);
+      window.dispatchEvent(new CustomEvent('notification-refresh'));
+    } catch (err) {
+      toast.error('Restore failed', { id: toastId, description: err.message });
+    } finally {
+      setRestoringSnapshotId(null);
+    }
+  };
+
+  const handleDeleteSnapshot = async (snapshotId) => {
+    if (!activeSnapshotDb) return;
+    setDeletingSnapshotId(snapshotId);
+    try {
+      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots/${snapshotId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        toast.success('Snapshot deleted');
+        setSnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
+      } else {
+        const data = await res.json();
+        toast.error('Failed to delete snapshot', { description: data.error });
+      }
+    } catch (err) {
+      toast.error('Failed to delete snapshot', { description: err.message });
+    } finally {
+      setDeletingSnapshotId(null);
+    }
+  };
+
+  const handleDownloadSnapshot = (dbId, snapshot) => {
+    const a = document.createElement('a');
+    a.href = `http://localhost:8080/api/databases/${dbId}/snapshots/${snapshot.id}/download`;
+    a.download = snapshot.file_name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const handleOpenWebhookModal = (container) => {
@@ -1783,23 +1902,23 @@ const DashboardHome = () => {
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         <button
                           type="button"
-                          onClick={() => handleBackupDb(db)}
-                          disabled={!isRunning || backingUpId === db.id}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-300 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
-                          title="Download .sql backup"
+                          onClick={() => handleOpenSnapshotModal(db)}
+                          disabled={!isRunning}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-950/40 hover:bg-emerald-900/60 disabled:opacity-30 text-emerald-400 hover:text-emerald-300 rounded-md text-xs font-mono border border-emerald-800/60 transition-colors cursor-pointer"
+                          title="Manage Database Snapshots & Instant Restore"
                         >
-                          <Download className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>{backingUpId === db.id ? 'Exporting...' : 'Backup (.sql)'}</span>
+                          <Archive className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Snapshots</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleOpenRestoreModal(db)}
-                          disabled={!isRunning}
+                          onClick={() => handleBackupDb(db)}
+                          disabled={!isRunning || backingUpId === db.id}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-30 text-neutral-300 hover:text-white rounded-md text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
-                          title="Restore data from .sql"
+                          title="Export immediate .sql dump"
                         >
-                          <Upload className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>Restore</span>
+                          <Download className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>{backingUpId === db.id ? 'Exporting...' : 'Export .sql'}</span>
                         </button>
                       </div>
 
@@ -2427,6 +2546,343 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
+      {/* Snapshots & Backups Management Modal */}
+      {snapshotModalOpen && activeSnapshotDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+                  <Archive className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-white tracking-tight">Database Snapshots & Backups</h3>
+                    <span className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-300 font-mono text-xs">
+                      {activeSnapshotDb.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Safe point-in-time snapshots stored securely on server disk
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSnapshotModalOpen(false)} 
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-header / Tabs & Quick Action */}
+            <div className="p-4 bg-neutral-900/40 border-b border-neutral-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveSnapshotTab('list')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer ${
+                    activeSnapshotTab === 'list'
+                      ? 'bg-neutral-800 text-white border border-neutral-700'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                >
+                  Snapshots History ({snapshots.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSnapshotTab('upload')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer ${
+                    activeSnapshotTab === 'upload'
+                      ? 'bg-neutral-800 text-white border border-neutral-700'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                >
+                  Upload & Restore .sql
+                </button>
+              </div>
+
+              {activeSnapshotTab === 'list' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={snapshotNote}
+                    onChange={(e) => setSnapshotNote(e.target.value)}
+                    placeholder="Note (e.g. before schema update)..."
+                    className="px-2.5 py-1.5 bg-black border border-neutral-800 rounded-md text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-600 font-mono w-56"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTakeSnapshot}
+                    disabled={takingSnapshot}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-semibold rounded-md text-xs font-mono transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {takingSnapshot ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Snapshot Now</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {activeSnapshotTab === 'list' ? (
+                <div>
+                  {/* Inline Restore Confirmation Dialog */}
+                  {confirmRestoreSnapshot && (
+                    <div className="mb-4 p-4 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 space-y-3 animate-in fade-in">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-xs font-semibold text-amber-300">Confirm Database Restore</h4>
+                          <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                            Restoring will overwrite current tables in <span className="font-mono text-white">"{activeSnapshotDb.name}"</span> with data from snapshot <span className="font-mono text-white font-semibold">"{confirmRestoreSnapshot.file_name}"</span>. This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRestoreSnapshot(null)}
+                          className="px-3 py-1 text-xs text-neutral-400 hover:text-white bg-neutral-900 border border-neutral-800 rounded-md cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreFromSnapshot(confirmRestoreSnapshot)}
+                          disabled={restoringSnapshotId === confirmRestoreSnapshot.id}
+                          className="px-3.5 py-1 text-xs font-medium text-black bg-amber-400 hover:bg-amber-300 rounded-md cursor-pointer font-mono inline-flex items-center gap-1.5"
+                        >
+                          {restoringSnapshotId === confirmRestoreSnapshot.id ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <span>Restoring...</span>
+                            </>
+                          ) : (
+                            <span>Confirm & Restore Now</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingSnapshots ? (
+                    <div className="py-12 flex flex-col items-center justify-center gap-2 text-neutral-500">
+                      <RefreshCw className="w-6 h-6 animate-spin text-neutral-400" />
+                      <span className="text-xs font-mono">Loading snapshots...</span>
+                    </div>
+                  ) : snapshots.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center justify-center border border-dashed border-neutral-800 rounded-xl bg-neutral-950/50 p-6 text-center">
+                      <div className="p-3 rounded-full bg-neutral-900 text-neutral-500 mb-3 border border-neutral-800">
+                        <Archive className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-medium text-white mb-1">No Snapshots Yet</h4>
+                      <p className="text-xs text-neutral-400 max-w-sm mb-4">
+                        Snapshots allow instant rollbacks before making schema changes or running batch scripts.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTakeSnapshot}
+                        disabled={takingSnapshot}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-md text-xs font-mono font-medium transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Create First Snapshot</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-neutral-800 rounded-xl overflow-hidden bg-neutral-950">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-800 bg-neutral-900/60 text-neutral-400 font-mono text-[11px]">
+                            <th className="py-2.5 px-4 font-medium">Snapshot</th>
+                            <th className="py-2.5 px-3 font-medium">Date & Time</th>
+                            <th className="py-2.5 px-3 font-medium">Size</th>
+                            <th className="py-2.5 px-3 font-medium">Type</th>
+                            <th className="py-2.5 px-4 font-medium text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-900 font-mono">
+                          {snapshots.map((snap) => (
+                            <tr key={snap.id} className="hover:bg-neutral-900/30 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                                  <div>
+                                    <div className="text-neutral-200 font-semibold truncate max-w-xs" title={snap.file_name}>
+                                      {snap.file_name}
+                                    </div>
+                                    {snap.notes && (
+                                      <div className="text-[11px] text-neutral-400 font-sans mt-0.5">
+                                        {snap.notes}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-neutral-400 text-[11px] whitespace-nowrap">
+                                {new Date(snap.created_at).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 border border-neutral-800 text-[11px]">
+                                  {snap.formatted_size || `${(snap.size_bytes / 1024).toFixed(1)} KB`}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase font-bold">
+                                  {snap.type || 'manual'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmRestoreSnapshot(snap)}
+                                    title="Restore database from this snapshot"
+                                    className="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 rounded text-[11px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>Restore</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadSnapshot(activeSnapshotDb.id, snap)}
+                                    title="Download snapshot file (.sql)"
+                                    className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSnapshot(snap.id)}
+                                    disabled={deletingSnapshotId === snap.id}
+                                    title="Delete snapshot"
+                                    className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 leading-relaxed">
+                    SQL statements in the uploaded file will be executed directly against <span className="font-mono font-bold text-white">"{activeSnapshotDb.name}"</span>. Please verify your backup file before restoring.
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-300 mb-2">
+                      Select backup file (.sql):
+                    </label>
+                    <input
+                      type="file"
+                      accept=".sql,.dump"
+                      onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+                      className="block w-full text-xs text-neutral-400 font-mono file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-mono file:bg-neutral-800 file:text-white hover:file:bg-neutral-700 border border-neutral-800 rounded-md p-1.5 bg-black cursor-pointer"
+                    />
+                    {restoreFile && (
+                      <p className="text-[11px] text-emerald-400 mt-1.5 font-medium">
+                        Selected file: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                      </p>
+                    )}
+                  </div>
+
+                  {restoreResult && (
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold text-neutral-400 font-mono">Execution output:</span>
+                      <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                        {restoreResult}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!restoreFile || !activeSnapshotDb) {
+                          toast.warning('Please select a .sql file to restore');
+                          return;
+                        }
+                        setRestoring(true);
+                        setRestoreResult('');
+                        const toastId = toast.loading(`Restoring database into "${activeSnapshotDb.name}"...`);
+                        const formData = new FormData();
+                        formData.append('file', restoreFile);
+                        try {
+                          const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/restore`, {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            toast.success('Database restored successfully!', { id: toastId });
+                            setRestoreResult(data.output || 'Restore Completed Successfully.');
+                            window.dispatchEvent(new CustomEvent('notification-refresh'));
+                          } else {
+                            toast.error('Database restore failed', { id: toastId, description: data.error });
+                            setRestoreResult(`Error: ${data.error}\n${data.output || ''}`);
+                          }
+                        } catch (err) {
+                          toast.error('Connection failed', { id: toastId, description: err.message });
+                        } finally {
+                          setRestoring(false);
+                        }
+                      }}
+                      disabled={restoring || !restoreFile}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black rounded-md text-xs font-semibold font-mono border border-white transition-colors cursor-pointer"
+                    >
+                      {restoring ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Restoring...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Restore Uploaded .sql</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between">
+              <span className="text-[11px] text-neutral-500 font-mono">
+                Storage: Host sandboxed /data/backups/
+              </span>
+              <button
+                type="button"
+                onClick={() => setSnapshotModalOpen(false)}
+                className="px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 rounded-md transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Restore Database Modal */}
       {restoreModalOpen && activeRestoreDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
