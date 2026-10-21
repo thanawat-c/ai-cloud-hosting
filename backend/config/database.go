@@ -10,23 +10,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// ตัวแปร DB เอาไว้ให้ไฟล์อื่น (เช่น Controller) ดึงไปใช้งาน
+// DB instance for controllers and services
 var DB *gorm.DB
 
 func ConnectDatabase() {
 	dsn := os.Getenv("DB_URL")
 	if dsn == "" {
-		log.Fatal("❌ หาตัวแปร DB_URL ใน .env ไม่เจอครับ!")
+		log.Fatal("❌ DB_URL environment variable is missing in .env or environment!")
 	}
 
-	// เชื่อมต่อ PostgreSQL
+	// Connect to PostgreSQL
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("❌ เชื่อมต่อ Database ไม่สำเร็จ: ", err)
+		log.Fatal("❌ Failed to connect to Database: ", err)
 	}
 
-	// ฟีเจอร์เด็ดของ GORM: Auto Migrate
-	// สร้างตาราง workspaces, deployments, managed_databases, notifications และ api_tokens ให้อัตโนมัติ
+	// GORM Auto Migrate tables
 	err = database.AutoMigrate(
 		&models.Workspace{}, 
 		&models.Deployment{}, 
@@ -37,17 +36,17 @@ func ConnectDatabase() {
 		&models.DeploymentRelease{},
 	)
 	if err != nil {
-		log.Fatal("❌ สร้างตารางอัตโนมัติล้มเหลว: ", err)
+		log.Fatal("❌ Auto-migration failed: ", err)
 	}
 
-	// Seed Workspaces เริ่มต้น (Personal และ Engineering Team)
+	// Seed default workspaces
 	seedWorkspaces(database)
 
-	// Backfill ข้อมูลเดิมที่ยังไม่มี workspace_id ให้เข้า 'personal' ทันที ป้องกันข้อมูลหาย
+	// Backfill existing records with empty workspace_id to 'personal'
 	database.Model(&models.Deployment{}).Where("workspace_id = '' OR workspace_id IS NULL").Update("workspace_id", "personal")
 	database.Model(&models.ManagedDatabase{}).Where("workspace_id = '' OR workspace_id IS NULL").Update("workspace_id", "personal")
 
-	fmt.Println("✅ เชื่อมต่อ Database และสร้างตารางสำเร็จ!")
+	fmt.Println("✅ Database connected and migrated successfully!")
 	DB = database
 }
 

@@ -16,13 +16,13 @@ import (
 func main() {
 	err := godotenv.Overload()
 	if err != nil {
-		log.Println("ไม่พบไฟล์ .env (จะลองอ่านจาก System OS แทน)")
+		log.Println(".env file not found (loading from OS environment instead)")
 	}
 
-	// เชื่อมต่อ Database
+	// Connect Database
 	config.ConnectDatabase()
 
-	// รัน sync_traefik.sh เป็น background process
+	// Run sync_traefik.sh as a background process
 	go func() {
 		_ = exec.Command("pkill", "-f", "sync_traefik.sh").Run()
 		for {
@@ -41,7 +41,7 @@ func main() {
 		corsOrigin = envOrigin
 	}
 
-	// เปิดใช้งาน CORS ให้ React (Port 5173) สามารถยิง API เข้ามาได้
+	// Enable CORS for frontend clients
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		if corsOrigin == "*" {
@@ -60,9 +60,9 @@ func main() {
 		c.Next()
 	})
 
-	// เรียกใช้งาน Routes
+	// Setup Routes
 	routes.SetupRoutes(r)
 
-	fmt.Println("🚀 Backend เริ่มทำงานที่พอร์ต :8080")
+	fmt.Println("🚀 Backend server running on port :8080")
 	r.Run(":8080")
 }
