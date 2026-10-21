@@ -2655,41 +2655,41 @@ const DashboardHome = () => {
       )}
       {/* Snapshots & Backups Management Modal */}
       {snapshotModalOpen && activeSnapshotDb && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0a0a0a] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-[940px] rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col text-white max-h-[90vh]">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950 gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-xl bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 shrink-0">
                   <Archive className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-white tracking-tight">Database Snapshots & Backups</h3>
-                    <span className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-300 font-mono text-xs">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <h3 className="text-base font-semibold text-white tracking-tight shrink-0">Database Snapshots & Backups</h3>
+                    <span className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-300 font-mono text-xs truncate max-w-[180px] sm:max-w-xs md:max-w-sm" title={activeSnapshotDb.name}>
                       {activeSnapshotDb.name}
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-400 mt-0.5">
+                  <p className="text-xs text-neutral-400 mt-0.5 truncate">
                     Safe point-in-time snapshots stored securely on server disk
                   </p>
                 </div>
               </div>
               <button 
                 onClick={() => setSnapshotModalOpen(false)} 
-                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-900 transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Sub-header / Tabs & Quick Action */}
-            <div className="p-4 bg-neutral-900/40 border-b border-neutral-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="p-3 sm:p-4 bg-neutral-900/40 border-b border-neutral-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 shrink-0">
                 <button
                   type="button"
                   onClick={() => setActiveSnapshotTab('list')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer whitespace-nowrap ${
                     activeSnapshotTab === 'list'
                       ? 'bg-neutral-800 text-white border border-neutral-700'
                       : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
@@ -2700,7 +2700,7 @@ const DashboardHome = () => {
                 <button
                   type="button"
                   onClick={() => setActiveSnapshotTab('upload')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-colors cursor-pointer whitespace-nowrap ${
                     activeSnapshotTab === 'upload'
                       ? 'bg-neutral-800 text-white border border-neutral-700'
                       : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
@@ -2711,19 +2711,19 @@ const DashboardHome = () => {
               </div>
 
               {activeSnapshotTab === 'list' && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full md:w-auto">
                   <input
                     type="text"
                     value={snapshotNote}
                     onChange={(e) => setSnapshotNote(e.target.value)}
                     placeholder="Note (e.g. before schema update)..."
-                    className="px-2.5 py-1.5 bg-black border border-neutral-800 rounded-md text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-600 font-mono w-56"
+                    className="flex-1 md:w-64 px-2.5 py-1.5 bg-black border border-neutral-800 rounded-md text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-600 font-mono min-w-0"
                   />
                   <button
                     type="button"
                     onClick={handleTakeSnapshot}
                     disabled={takingSnapshot}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-semibold rounded-md text-xs font-mono transition-colors cursor-pointer whitespace-nowrap"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-semibold rounded-md text-xs font-mono transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   >
                     {takingSnapshot ? (
                       <>
@@ -2742,7 +2742,7 @@ const DashboardHome = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
               {activeSnapshotTab === 'list' ? (
                 <div>
                   {/* Inline Restore Confirmation Dialog */}
@@ -2809,29 +2809,29 @@ const DashboardHome = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="border border-neutral-800 rounded-xl overflow-hidden bg-neutral-950">
+                    <div className="border border-neutral-800 rounded-xl overflow-x-auto bg-neutral-950">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="border-b border-neutral-800 bg-neutral-900/60 text-neutral-400 font-mono text-[11px]">
                             <th className="py-2.5 px-4 font-medium">Snapshot</th>
-                            <th className="py-2.5 px-3 font-medium">Date & Time</th>
-                            <th className="py-2.5 px-3 font-medium">Size</th>
-                            <th className="py-2.5 px-3 font-medium">Type</th>
-                            <th className="py-2.5 px-4 font-medium text-right">Actions</th>
+                            <th className="py-2.5 px-3 font-medium whitespace-nowrap w-[150px]">Date & Time</th>
+                            <th className="py-2.5 px-3 font-medium whitespace-nowrap w-[90px]">Size</th>
+                            <th className="py-2.5 px-3 font-medium whitespace-nowrap w-[80px]">Type</th>
+                            <th className="py-2.5 px-4 font-medium text-right whitespace-nowrap w-[170px]">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-900 font-mono">
                           {snapshots.map((snap) => (
                             <tr key={snap.id} className="hover:bg-neutral-900/30 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
+                              <td className="py-3 px-4 max-w-[220px] sm:max-w-[300px]">
+                                <div className="flex items-center gap-2 min-w-0">
                                   <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
-                                  <div>
-                                    <div className="text-neutral-200 font-semibold truncate max-w-xs" title={snap.file_name}>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-neutral-200 font-semibold truncate" title={snap.file_name}>
                                       {snap.file_name}
                                     </div>
                                     {snap.notes && (
-                                      <div className="text-[11px] text-neutral-400 font-sans mt-0.5">
+                                      <div className="text-[11px] text-neutral-400 font-sans mt-0.5 truncate" title={snap.notes}>
                                         {snap.notes}
                                       </div>
                                     )}
@@ -2841,23 +2841,23 @@ const DashboardHome = () => {
                               <td className="py-3 px-3 text-neutral-400 text-[11px] whitespace-nowrap">
                                 {new Date(snap.created_at).toLocaleString()}
                               </td>
-                              <td className="py-3 px-3">
-                                <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 border border-neutral-800 text-[11px]">
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span className="inline-block px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 border border-neutral-800 text-[11px] font-mono whitespace-nowrap">
                                   {snap.formatted_size || `${(snap.size_bytes / 1024).toFixed(1)} KB`}
                                 </span>
                               </td>
-                              <td className="py-3 px-3">
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase font-bold">
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase font-bold whitespace-nowrap">
                                   {snap.type || 'manual'}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5">
+                                <div className="inline-flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => setConfirmRestoreSnapshot(snap)}
                                     title="Restore database from this snapshot"
-                                    className="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 rounded text-[11px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                                    className="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 rounded text-[11px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
                                   >
                                     <RefreshCw className="w-3 h-3" />
                                     <span>Restore</span>
@@ -2866,7 +2866,7 @@ const DashboardHome = () => {
                                     type="button"
                                     onClick={() => handleDownloadSnapshot(activeSnapshotDb.id, snap)}
                                     title="Download snapshot file (.sql)"
-                                    className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+                                    className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer shrink-0"
                                   >
                                     <Download className="w-3.5 h-3.5" />
                                   </button>
@@ -2875,7 +2875,7 @@ const DashboardHome = () => {
                                     onClick={() => handleDeleteSnapshot(snap.id)}
                                     disabled={deletingSnapshotId === snap.id}
                                     title="Delete snapshot"
-                                    className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+                                    className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors cursor-pointer shrink-0"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -2992,22 +2992,22 @@ const DashboardHome = () => {
 
       {/* Deployment Releases & Instant Rollback Modal */}
       {releasesModalOpen && activeReleasesContainer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0a0a0a] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col max-h-[85vh] text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0a] w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border border-neutral-800 flex flex-col max-h-[85vh] text-white">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950 gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
                   <RotateCcw className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-white">Deployment Releases</h3>
-                    <span className="px-2 py-0.5 text-[10px] font-mono rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <h3 className="text-base font-semibold text-white shrink-0">Deployment Releases</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-mono rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400 shrink-0">
                       Instant Rollback
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-400 mt-0.5">
+                  <p className="text-xs text-neutral-400 mt-0.5 truncate" title={`${activeReleasesContainer.clean_name || activeReleasesContainer.name} • ${activeReleasesContainer.branch || 'main'}`}>
                     {activeReleasesContainer.clean_name || activeReleasesContainer.name} • {activeReleasesContainer.branch || 'main'}
                   </p>
                 </div>
@@ -3015,14 +3015,14 @@ const DashboardHome = () => {
               <button
                 type="button"
                 onClick={() => setReleasesModalOpen(false)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
               {/* Info Box */}
               <div className="p-3.5 rounded-lg bg-neutral-900/60 border border-neutral-800/80 flex items-start gap-3">
                 <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
