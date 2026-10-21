@@ -9,6 +9,8 @@ import {
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { DeployProgressModal } from '../components/modals';
+import { PreFlightCard, BuildSettingsSection, AdvancedSettingsSection, DeploySuccessModal } from '../components/deploy';
+
 import { BulkEnvEditor } from '../components/common/BulkEnvEditor';
 import { apiFetch } from '../api/client';
 
@@ -463,357 +465,54 @@ const DeployForm = () => {
           )}
 
           {/* Project Configuration & Insights Card (Auto-populated) */}
-          {inspectResult && (
-            <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 text-xs space-y-3.5 animate-in fade-in duration-200">
-              
-              {/* Row 1: Framework & Architecture */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-900 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-neutral-400 font-mono">Detected Architecture:</span>
-                  <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-white font-mono font-medium text-xs">
-                    {inspectResult.detected_framework || 'Standard Project'}
-                  </span>
-                  {inspectResult.is_monorepo && (
-                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono text-[11px]">
-                      Fullstack Monorepo
-                    </span>
-                  )}
-                </div>
-
-                {inspectResult.detected_envs?.length > 0 && (
-                  <span className="text-[11px] text-neutral-500 font-mono">
-                    {inspectResult.detected_envs.length} env variables loaded
-                  </span>
-                )}
-              </div>
-
-              {/* Row 2: Database Attachment & Auto-Provisioning */}
-              {(inspectResult.has_database || databases.length > 0) && (
-                <div className={`p-3.5 rounded-md bg-black border space-y-3 transition-all ${
-                  inspectResult.has_database ? 'border-purple-500/40 ring-1 ring-purple-500/10' : 'border-neutral-800'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-200 font-mono">
-                      <Database className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Database Attachment:</span>
-                    </label>
-                    {inspectResult.has_database && (
-                      <span className="text-[10px] text-purple-300 font-mono font-medium px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30">
-                        ⚡ Required ({inspectResult.db_var_names?.join(', ') || 'DATABASE_URL'})
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 1-Click Auto-Provision Card */}
-                  <div 
-                    onClick={() => {
-                      const next = !autoCreateDb;
-                      setAutoCreateDb(next);
-                      if (next) setSelectedDbId('');
-                    }}
-                    className={`p-3 rounded-md border flex items-start gap-2.5 cursor-pointer transition-all ${
-                      autoCreateDb 
-                        ? 'bg-purple-950/20 border-purple-500/60 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
-                        : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
-                    }`}
-                  >
-                    <input 
-                      type="checkbox"
-                      checked={autoCreateDb}
-                      onChange={(e) => {
-                        setAutoCreateDb(e.target.checked);
-                        if (e.target.checked) setSelectedDbId('');
-                      }}
-                      className="mt-0.5 rounded border-neutral-700 text-purple-600 focus:ring-0 cursor-pointer"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-purple-200 font-mono">
-                          Auto-create dedicated PostgreSQL Database
-                        </span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono uppercase font-semibold">
-                          Recommended
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-neutral-400 font-mono mt-1 leading-relaxed">
-                        Automatically provisions a dedicated database container, injects DATABASE_URL, and syncs schema/seed in one click.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Manual / Existing DB Dropdown (Show when user unchecks auto-create or wants existing DB) */}
-                  {!autoCreateDb && (
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] text-neutral-400 font-mono block">Or select an existing database in the cluster:</span>
-                      <select
-                        value={selectedDbId}
-                        onChange={(e) => handleSelectDatabase(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-neutral-950 text-xs font-mono text-white focus:outline-none focus:border-neutral-600 cursor-pointer"
-                      >
-                        <option value="" className="bg-neutral-900 text-neutral-400">-- Do not attach database (Configure manually via .env) --</option>
-                        {databases.map(db => (
-                          <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
-                            {db.name} ({db.db_type || 'PostgreSQL'} :5432)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Row 3: Build Mode (AI Dockerfile Switch) */}
-              <div className="p-3 rounded-md bg-black border border-neutral-800 flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-white font-mono">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>AI Auto-Dockerize</span>
-                    {forceAi && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-                    {forceAi 
-                      ? 'AI will generate a fresh, cloud-optimized Dockerfile for this build' 
-                      : 'Use repository Dockerfile (or AI will generate one if none exists)'}
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                  <input 
-                    type="checkbox" 
-                    checked={forceAi} 
-                    onChange={(e) => setForceAi(e.target.checked)} 
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-black"></div>
-                </label>
-              </div>
-
-            </div>
-          )}
+          <PreFlightCard
+            inspectResult={inspectResult}
+            databases={databases}
+            autoCreateDb={autoCreateDb}
+            setAutoCreateDb={setAutoCreateDb}
+            selectedDbId={selectedDbId}
+            setSelectedDbId={setSelectedDbId}
+            handleSelectDatabase={handleSelectDatabase}
+            forceAi={forceAi}
+            setForceAi={setForceAi}
+          />
 
           {/* Collapsible Build & Output Settings (Vercel Style) */}
-          <div className="border border-neutral-800 rounded-md overflow-hidden bg-neutral-950">
-            <button
-              type="button"
-              onClick={() => setShowBuildSettings(!showBuildSettings)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-neutral-900/80 transition-colors select-none cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Folder className="w-3.5 h-3.5 text-neutral-400 font-mono" />
-                <span className="text-xs font-semibold text-neutral-300 font-mono">Build and Output Settings</span>
-                {activeBuildCount > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {activeBuildCount} customized
-                  </span>
-                )}
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-neutral-500 font-mono transition-transform duration-200 ${showBuildSettings ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showBuildSettings && (
-              <div className="p-4 pt-3 border-t border-neutral-800 space-y-3.5 bg-neutral-950 text-xs font-mono">
-                {/* Root Directory */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Folder className="w-3 h-3 text-neutral-400" />
-                      <span>Root Directory</span>
-                    </label>
-                    <span className="text-[10px] text-neutral-500">e.g. apps/web or frontend</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={rootDir}
-                    onChange={(e) => setRootDir(e.target.value)}
-                    placeholder="./ (defaults to project root)"
-                    className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 text-xs font-mono"
-                  />
-                  <p className="text-[10px] text-neutral-500">
-                    Target subfolder for Monorepos or nested microservices.
-                  </p>
-                </div>
-
-                {/* Build Command */}
-                <div className="space-y-1">
-                  <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                    <Terminal className="w-3 h-3 text-neutral-400" />
-                    <span>Build Command</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={buildCmd}
-                    onChange={(e) => setBuildCmd(e.target.value)}
-                    placeholder="e.g. npm run build, pnpm build, yarn build"
-                    className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 text-xs font-mono"
-                  />
-                </div>
-
-                {/* Grid: Output Dir & Install Cmd */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Package className="w-3 h-3 text-neutral-400" />
-                      <span>Output Directory</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={outputDir}
-                      onChange={(e) => setOutputDir(e.target.value)}
-                      placeholder="e.g. dist, build, out"
-                      className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 text-xs font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Terminal className="w-3 h-3 text-neutral-400" />
-                      <span>Install Command</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={installCmd}
-                      onChange={(e) => setInstallCmd(e.target.value)}
-                      placeholder="e.g. npm install, pnpm i"
-                      className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Grid: Start Cmd & Node Version */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Play className="w-3 h-3 text-neutral-400" />
-                      <span>Start Command</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={startCmd}
-                      onChange={(e) => setStartCmd(e.target.value)}
-                      placeholder="e.g. npm start, node server.js"
-                      className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 text-xs font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Cpu className="w-3 h-3 text-neutral-400" />
-                      <span>Node.js Version</span>
-                    </label>
-                    <select
-                      value={nodeVersion}
-                      onChange={(e) => setNodeVersion(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md bg-black border border-neutral-800 text-white focus:outline-none focus:border-neutral-600 text-xs font-mono cursor-pointer"
-                    >
-                      <option value="20">20.x (Recommended)</option>
-                      <option value="22">22.x (Current)</option>
-                      <option value="18">18.x (Legacy LTS)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <BuildSettingsSection
+            showBuildSettings={showBuildSettings}
+            setShowBuildSettings={setShowBuildSettings}
+            activeBuildCount={activeBuildCount}
+            rootDir={rootDir}
+            setRootDir={setRootDir}
+            buildCmd={buildCmd}
+            setBuildCmd={setBuildCmd}
+            outputDir={outputDir}
+            setOutputDir={setOutputDir}
+            installCmd={installCmd}
+            setInstallCmd={setInstallCmd}
+            startCmd={startCmd}
+            setStartCmd={setStartCmd}
+            nodeVersion={nodeVersion}
+            setNodeVersion={setNodeVersion}
+          />
 
           {/* Collapsible Advanced Configuration */}
-          <div className="border border-neutral-800 rounded-md overflow-hidden bg-neutral-950">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-neutral-900/80 transition-colors select-none cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-500 font-mono" />
-                <span className="text-xs font-semibold text-neutral-300 font-mono">Advanced Settings</span>
-                {activeAdvancedCount > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300">
-                    {activeAdvancedCount}
-                  </span>
-                )}
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-neutral-500 font-mono transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showAdvanced && (
-              <div className="p-4 pt-2 border-t border-neutral-800 space-y-3 bg-neutral-950">
-                {/* 1. Managed Database Attachment */}
-                {databases.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
-                      Connect Database:
-                    </label>
-                    <select
-                      value={selectedDbId}
-                      onChange={(e) => handleSelectDatabase(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-black focus:outline-none focus:border-neutral-600 text-xs font-mono text-white transition-colors"
-                    >
-                      <option value="" className="bg-neutral-900 text-neutral-400">-- No Database Attached --</option>
-                      {databases.map(db => (
-                        <option key={db.id} value={db.id} className="bg-neutral-900 text-white">
-                          {db.name} (Port :{db.host_port}) [{db.status}]
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* 2. Environment Variables (.env Bulk Editor) */}
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1.5">
-                    Environment Variables (.env):
-                  </label>
-                  <BulkEnvEditor
-                    value={envVars}
-                    onChange={setEnvVars}
-                    databases={databases}
-                    minRows={4}
-                    placeholder={"PORT=3000\nDATABASE_URL=postgres://...\nJWT_SECRET=production_secret_key"}
-                  />
-                </div>
-
-                {/* 3. GitHub Token */}
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
-                    Personal Access Token (for Private Repositories):
-                  </label>
-                  <div className="relative">
-                    <input 
-                      type={showToken ? "text" : "password"} 
-                      value={gitToken}
-                      onChange={(e) => setGitToken(e.target.value)}
-                      placeholder="ghp_xxxxxxxxxxxx" 
-                      className="w-full bg-black border border-neutral-800 text-white pl-3 pr-9 py-2 rounded-md focus:outline-none focus:border-neutral-600 text-xs font-mono placeholder:text-neutral-600 transition-colors" 
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowToken(!showToken)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 font-mono hover:text-neutral-400 font-mono transition-colors p-1"
-                      title={showToken ? "Hide token" : "Show token"}
-                    >
-                      {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 4. Force Override */}
-                <div className="flex items-center gap-2 pt-0.5">
-                  <input 
-                    type="checkbox" 
-                    id="forceAi"
-                    checked={forceAi}
-                    onChange={(e) => setForceAi(e.target.checked)}
-                    className="w-3.5 h-3.5 text-white bg-black rounded border-neutral-800 focus:ring-0 cursor-pointer"
-                  />
-                  <label htmlFor="forceAi" className="text-xs text-neutral-400 font-mono cursor-pointer select-none">
-                    Always generate new Dockerfile (override repository Dockerfile)
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
+          <AdvancedSettingsSection
+            showAdvanced={showAdvanced}
+            setShowAdvanced={setShowAdvanced}
+            activeAdvancedCount={activeAdvancedCount}
+            databases={databases}
+            selectedDbId={selectedDbId}
+            handleSelectDatabase={handleSelectDatabase}
+            envVars={envVars}
+            setEnvVars={setEnvVars}
+            gitToken={gitToken}
+            setGitToken={setGitToken}
+            showToken={showToken}
+            setShowToken={setShowToken}
+            forceAi={forceAi}
+            setForceAi={setForceAi}
+          />
 
           {/* Primary Action Button */}
           <button 
