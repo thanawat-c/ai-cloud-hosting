@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings, X, AlertCircle, CheckCircle2, Database } from 'lucide-react';
+import { BulkEnvEditor } from '../common/BulkEnvEditor';
 
 export const EnvVariablesModal = ({
   isOpen,
@@ -51,41 +52,14 @@ export const EnvVariablesModal = ({
             </div>
           )}
 
-          <p className="text-xs text-neutral-400 font-mono">
-            Add or edit environment variables (one per line, e.g. <code className="bg-neutral-800 border border-neutral-700 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">DATABASE_URL=postgres://...</code>). The server will restart automatically:
-          </p>
-
-          {databases.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] text-neutral-400 font-mono">Quick Insert DB:</span>
-              {databases.map(db => (
-                <button
-                  key={db.id}
-                  type="button"
-                  onClick={() => {
-                    const snippet = `DATABASE_URL=${db.internal_url}`;
-                    if (!currentEnvText.includes(snippet)) {
-                      setCurrentEnvText(prev => prev ? `${prev.trim()}\n${snippet}` : snippet);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-purple-300 font-mono text-[11px] transition-colors cursor-pointer"
-                  title={db.internal_url}
-                >
-                  <Database className="w-3 h-3 text-purple-400" />
-                  <span>{db.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <textarea 
+          <BulkEnvEditor
             value={currentEnvText}
-            onChange={(e) => setCurrentEnvText(e.target.value)}
-            rows="7"
+            onChange={setCurrentEnvText}
+            databases={databases}
             disabled={envSaving}
-            placeholder={"DATABASE_URL=postgres://postgres:...@cloud-db-...:5432/app\nPORT=8080\nAPI_KEY=secret123"}
-            className="w-full px-4 py-3 rounded-md border border-neutral-800 bg-black text-white font-mono text-xs focus:border-neutral-600 focus:outline-none placeholder:text-neutral-600"
-          ></textarea>
+            minRows={8}
+            placeholder={"DATABASE_URL=postgres://...\nPORT=8080\nSECRET_KEY=my_secret_token"}
+          />
         </div>
 
         <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 flex items-center justify-end gap-3">

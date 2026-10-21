@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { DeployProgressModal } from '../components/modals';
+import { BulkEnvEditor } from '../components/common/BulkEnvEditor';
 
 const DeployForm = () => {
   const navigate = useNavigate();
@@ -759,18 +760,18 @@ const DeployForm = () => {
                   </div>
                 )}
 
-                {/* 2. Environment Variables */}
+                {/* 2. Environment Variables (.env Bulk Editor) */}
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1">
+                  <label className="block text-xs font-semibold text-neutral-300 font-mono mb-1.5">
                     Environment Variables (.env):
                   </label>
-                  <textarea
+                  <BulkEnvEditor
                     value={envVars}
-                    onChange={(e) => setEnvVars(e.target.value)}
-                    placeholder={"PORT=3000\nDATABASE_URL=postgres://..."}
-                    className="w-full px-3 py-2 rounded-md border border-neutral-800 bg-black focus:outline-none focus:border-neutral-600 font-mono text-xs text-white placeholder:text-neutral-600 transition-colors"
-                    rows="3"
-                  ></textarea>
+                    onChange={setEnvVars}
+                    databases={databases}
+                    minRows={4}
+                    placeholder={"PORT=3000\nDATABASE_URL=postgres://...\nJWT_SECRET=production_secret_key"}
+                  />
                 </div>
 
                 {/* 3. GitHub Token */}
