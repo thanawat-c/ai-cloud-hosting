@@ -10,6 +10,7 @@ import {
   Upload 
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiFetch } from '../../api/client';
 
 export const DatabaseSnapshotModal = ({
   isOpen,
@@ -319,7 +320,7 @@ export const DatabaseSnapshotModal = ({
                     const formData = new FormData();
                     formData.append('file', restoreFile);
                     try {
-                      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/restore`, {
+                      const res = await apiFetch(`/databases/${activeSnapshotDb.id}/restore`, {
                         method: 'POST',
                         body: formData,
                       });

@@ -1,4 +1,23 @@
-export const API_BASE_URL = 'http://localhost:8080/api';
+export const API_BASE_URL = (() => {
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+  if (import.meta.env?.VITE_SERVER_URL) {
+    return `${import.meta.env.VITE_SERVER_URL.replace(/\/+$/, '')}/api`;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `${window.location.origin}/api`;
+  }
+  return 'http://localhost:8080/api';
+})();
+
+export const getApiUrl = (endpoint = '') => {
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    return endpoint;
+  }
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE_URL}${cleanEndpoint}`;
+};
 
 export const getActiveWorkspaceId = () => {
   return localStorage.getItem('ach_active_workspace_id') || 'personal';

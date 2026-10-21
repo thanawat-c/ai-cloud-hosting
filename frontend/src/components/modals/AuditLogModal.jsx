@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { History, X, Rocket, Database, HardDrive, Users, Shield, RefreshCw, Clock, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { apiFetch } from '../../api/client';
 
 export const AuditLogModal = ({ isOpen, onClose }) => {
   const { activeWorkspaceId, currentWorkspace } = useWorkspace();
@@ -13,12 +14,10 @@ export const AuditLogModal = ({ isOpen, onClose }) => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const url = type && type !== 'all' 
-        ? `http://localhost:8080/api/audit-logs?type=${type}`
-        : 'http://localhost:8080/api/audit-logs';
-      const res = await fetch(url, {
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      const endpoint = type && type !== 'all' 
+        ? `/audit-logs?type=${type}`
+        : '/audit-logs';
+      const res = await apiFetch(endpoint);
       if (res.ok) {
         const data = await res.json();
         setLogs(Array.isArray(data) ? data : []);

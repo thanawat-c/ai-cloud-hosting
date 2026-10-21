@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { apiFetch } from '../api/client';
 
 const WorkspaceContext = createContext(null);
 
@@ -12,7 +13,7 @@ export const WorkspaceProvider = ({ children }) => {
 
   const fetchWorkspaces = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/workspaces');
+      const res = await apiFetch('/workspaces');
       if (res.ok) {
         const data = await res.json();
         setWorkspaces(data || []);

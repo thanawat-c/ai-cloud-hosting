@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, X, Folder, Terminal, Play, Package, Cpu, RefreshCw, Save, GitBranch, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiFetch } from '../../api/client';
 
 export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) => {
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) 
     if (!container?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${container.id}/settings`);
+      const res = await apiFetch(`/containers/${container.id}/settings`);
       if (res.ok) {
         const data = await res.json();
         setRootDir(data.root_dir || '');
@@ -59,7 +60,7 @@ export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) 
     else setSaving(true);
 
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${container.id}/settings`, {
+      const res = await apiFetch(`/containers/${container.id}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,7 +81,7 @@ export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) 
 
       if (triggerRedeploy) {
         toast.info('Triggering redeploy with new build settings...');
-        await fetch(`http://localhost:8080/api/containers/${container.id}/redeploy`, { method: 'POST' });
+        await apiFetch(`/containers/${container.id}/redeploy`, { method: 'POST' });
         toast.success('Redeploy started in background');
       }
 

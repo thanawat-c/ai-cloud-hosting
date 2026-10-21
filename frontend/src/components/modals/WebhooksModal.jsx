@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Webhook, X, Plus, Trash2, Send, Power, HelpCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { apiFetch } from '../../api/client';
 
 export const WebhooksModal = ({ isOpen, onClose }) => {
   const { activeWorkspaceId, currentWorkspace } = useWorkspace();
@@ -22,9 +23,7 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/alerts/webhooks?workspace_id=${activeWorkspaceId}`, {
-        headers: { 'X-Workspace-Id': activeWorkspaceId }
-      });
+      const res = await apiFetch(`/alerts/webhooks?workspace_id=${activeWorkspaceId}`);
       if (res.ok) {
         const data = await res.json();
         setWebhooks(Array.isArray(data) ? data : []);
@@ -57,11 +56,10 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/alerts/webhooks?workspace_id=${activeWorkspaceId}`, {
+      const res = await apiFetch(`/alerts/webhooks?workspace_id=${activeWorkspaceId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -90,9 +88,8 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
 
   const handleToggle = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/alerts/webhooks/${id}/toggle`, {
+      const res = await apiFetch(`/alerts/webhooks/${id}/toggle`, {
         method: 'PATCH',
-        headers: { 'X-Workspace-Id': activeWorkspaceId }
       });
       if (res.ok) {
         toast.success('Webhook status updated');
@@ -106,9 +103,8 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
   const handleDelete = async (id, whName) => {
     if (!confirm(`Are you sure you want to delete "${whName}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/alerts/webhooks/${id}`, {
+      const res = await apiFetch(`/alerts/webhooks/${id}`, {
         method: 'DELETE',
-        headers: { 'X-Workspace-Id': activeWorkspaceId }
       });
       if (res.ok) {
         toast.success('Webhook removed');
@@ -122,9 +118,8 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
   const handleTest = async (id, whPlatform) => {
     setTestingId(id);
     try {
-      const res = await fetch(`http://localhost:8080/api/alerts/webhooks/${id}/test`, {
+      const res = await apiFetch(`/alerts/webhooks/${id}/test`, {
         method: 'POST',
-        headers: { 'X-Workspace-Id': activeWorkspaceId }
       });
       const data = await res.json();
       if (res.ok) {

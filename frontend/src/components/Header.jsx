@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
 import { HostHealthModal } from './modals';
+import { apiFetch } from '../api/client';
 
 const Header = ({ setIsSidebarOpen }) => {
   const location = useLocation();
@@ -44,9 +45,7 @@ const Header = ({ setIsSidebarOpen }) => {
   // Fetch containers when palette opens (scoped to active workspace)
   useEffect(() => {
     if (paletteOpen) {
-      fetch('http://localhost:8080/api/containers', {
-        headers: { 'X-Workspace-Id': activeWorkspaceId }
-      })
+      apiFetch('/containers')
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setContainers(data);
@@ -58,9 +57,7 @@ const Header = ({ setIsSidebarOpen }) => {
   // Fetch real notification events from backend
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/notifications', {
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      const res = await apiFetch('/notifications');
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications || []);
@@ -69,7 +66,7 @@ const Header = ({ setIsSidebarOpen }) => {
     } catch (err) {
       void err;
     }
-  }, [activeWorkspaceId]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(fetchNotifications, 0);
@@ -87,10 +84,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
   const handleMarkAllRead = async () => {
     try {
-      await fetch('http://localhost:8080/api/notifications/read-all', {
-        method: 'POST',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      await apiFetch('/notifications/read-all', { method: 'POST' });
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (err) {
@@ -100,10 +94,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
   const handleClearNotifications = async () => {
     try {
-      await fetch('http://localhost:8080/api/notifications', {
-        method: 'DELETE',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      await apiFetch('/notifications', { method: 'DELETE' });
       setNotifications([]);
       setUnreadCount(0);
       toast.success('All notifications cleared');
@@ -133,7 +124,7 @@ const Header = ({ setIsSidebarOpen }) => {
     setPaletteOpen(false);
     toast.info('Cleaning up unused Docker images...');
     try {
-      const res = await fetch('http://localhost:8080/api/system/prune', { method: 'POST' });
+      const res = await apiFetch('/system/prune', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         toast.success(`Cleanup complete: Reclaimed ${data.space_reclaimed_mb} MB`);

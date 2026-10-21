@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
 import { TeamMembersModal, AuditLogModal, WebhooksModal } from './modals';
+import { apiFetch, API_BASE_URL } from '../api/client';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
@@ -26,9 +27,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
   const fetchTokens = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/tokens', {
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      const res = await apiFetch('/tokens');
       if (res.ok) {
         const data = await res.json();
         setTokens(data || []);
@@ -36,7 +35,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     } catch (err) {
       void err;
     }
-  }, [activeWorkspaceId]);
+  }, []);
 
   useEffect(() => {
     if (tokenModalOpen) {
@@ -57,11 +56,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     }
     setTokenLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/tokens', {
+      const res = await apiFetch('/tokens', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId,
         },
         body: JSON.stringify({ name: newTokenName.trim() }),
       });
@@ -84,9 +82,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
   const handleRevokeToken = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/tokens/${id}`, {
+      const res = await apiFetch(`/tokens/${id}`, {
         method: 'DELETE',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
       if (res.ok) {
         toast.success('Token revoked');
@@ -467,7 +464,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 <span>Usage in cURL or CI/CD:</span>
               </div>
               <code className="text-neutral-400 block bg-black p-2 rounded border border-neutral-900 overflow-x-auto text-[10px]">
-                curl -H "Authorization: Bearer &lt;TOKEN&gt;" -H "X-Workspace-Id: {activeWorkspaceId}" http://localhost:8080/api/containers
+                curl -H "Authorization: Bearer &lt;TOKEN&gt;" -H "X-Workspace-Id: {activeWorkspaceId}" {API_BASE_URL}/containers
               </code>
             </div>
           </div>

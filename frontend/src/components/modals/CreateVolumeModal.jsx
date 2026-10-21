@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { HardDrive, X, Plus, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { useWorkspace } from '../../context/WorkspaceContext';
+import { apiFetch } from '../../api/client';
 
 export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
-  const { activeWorkspaceId } = useWorkspace();
   const [name, setName] = useState('');
   const [mountPath, setMountPath] = useState('/app/uploads');
   const [containerId, setContainerId] = useState('');
@@ -13,9 +12,7 @@ export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/containers', {
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      const res = await apiFetch('/containers');
       if (res.ok) {
         const data = await res.json();
         setContainers(Array.isArray(data) ? data : []);
@@ -23,7 +20,7 @@ export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
     } catch {
       // ignore
     }
-  }, [activeWorkspaceId]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,11 +43,10 @@ export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/volumes', {
+      const res = await apiFetch('/volumes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId,
         },
         body: JSON.stringify({
           name: name.trim(),

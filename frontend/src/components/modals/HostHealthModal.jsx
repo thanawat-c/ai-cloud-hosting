@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Activity, X, Cpu, HardDrive, Server, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiFetch } from '../../api/client';
 
 export const HostHealthModal = ({ isOpen, onClose }) => {
   const [health, setHealth] = useState(null);
@@ -10,7 +11,7 @@ export const HostHealthModal = ({ isOpen, onClose }) => {
   const fetchHealth = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/system/health');
+      const res = await apiFetch('/system/health');
       if (res.ok) {
         const data = await res.json();
         setHealth(data);
@@ -37,7 +38,7 @@ export const HostHealthModal = ({ isOpen, onClose }) => {
     if (!window.confirm('Prune unused Docker images, build cache, and stopped containers to free disk space?')) return;
     setPruning(true);
     try {
-      const res = await fetch('http://localhost:8080/api/system/prune', { method: 'POST' });
+      const res = await apiFetch('/system/prune', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to prune system');
 

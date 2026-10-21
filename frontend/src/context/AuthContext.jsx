@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { apiFetch } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const res = await fetch('http://localhost:8080/api/auth/me', {
+      const res = await apiFetch('/auth/me', {
         headers: {
           Authorization: `Bearer ${savedToken}`,
         },
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   // Login handler
   const login = async (email, password) => {
     try {
-      const res = await fetch('http://localhost:8080/api/auth/login', {
+      const res = await apiFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }) => {
   // Register handler
   const register = async (name, email, password) => {
     try {
-      const res = await fetch('http://localhost:8080/api/auth/register', {
+      const res = await apiFetch('/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
@@ -114,7 +115,7 @@ export const AuthProvider = ({ children }) => {
   // Logout handler
   const logout = () => {
     try {
-      fetch('http://localhost:8080/api/auth/logout', { method: 'POST' }).catch(() => {});
+      apiFetch('/auth/logout', { method: 'POST' }).catch(() => {});
     } catch (err) {
       void err;
     }

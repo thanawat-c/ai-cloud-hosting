@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Server, Play, Box, X, Bell, BellRing, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { apiFetch, API_BASE_URL } from '../api/client';
 import {
   UniversalConfirmModal,
   DatabaseSnapshotModal,
@@ -223,7 +224,7 @@ const DashboardHome = () => {
 
   const fetchMetrics = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${id}/stats`);
+      const res = await apiFetch(`/containers/${id}/stats`);
       if (res.ok) {
         const data = await res.json();
         setMetricsData(data);
@@ -281,7 +282,7 @@ const DashboardHome = () => {
 
   const fetchVolumes = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/volumes', {
+      const res = await apiFetch('/volumes', {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
       if (res.ok) {
@@ -301,7 +302,7 @@ const DashboardHome = () => {
   const handleDeleteVolume = async (volId, volName) => {
     if (!window.confirm(`Delete volume "${volName}"? All persistent files on this disk will be removed.`)) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/volumes/${volId}`, {
+      const res = await apiFetch(`/volumes/${volId}`, {
         method: 'DELETE',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
@@ -318,7 +319,7 @@ const DashboardHome = () => {
 
   const handleDetachVolume = async (volId) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/volumes/${volId}/detach`, {
+      const res = await apiFetch(`/volumes/${volId}/detach`, {
         method: 'POST',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
@@ -335,7 +336,7 @@ const DashboardHome = () => {
     if (!domainContainer) return;
     setSavingDomain(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${domainContainer.id}/domain`, {
+      const res = await apiFetch(`/containers/${domainContainer.id}/domain`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -418,7 +419,7 @@ const DashboardHome = () => {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/containers', {
+      const response = await apiFetch('/containers', {
         headers: { 'X-Workspace-Id': activeWorkspaceId }
       });
       const data = await response.json();
@@ -496,7 +497,7 @@ const DashboardHome = () => {
 
   const fetchDatabases = useCallback(async (shouldFetchStats = false) => {
     try {
-      const res = await fetch('http://localhost:8080/api/databases', {
+      const res = await apiFetch('/databases', {
         headers: { 'X-Workspace-Id': activeWorkspaceId }
       });
       if (res.ok) {
@@ -509,7 +510,7 @@ const DashboardHome = () => {
           dbList.forEach(async (db) => {
             if (db.status === 'running' && db.container_id) {
               try {
-                const statRes = await fetch(`http://localhost:8080/api/containers/${db.container_id}/stats`);
+                const statRes = await apiFetch(`/containers/${db.container_id}/stats`);
                 if (statRes.ok) {
                   const statData = await statRes.json();
                   setStats(prev => ({ ...prev, [db.container_id]: statData }));
@@ -555,7 +556,7 @@ const DashboardHome = () => {
     setCreatingDb(true);
     const toastId = toast.loading('Creating database and mounting persistent volume...');
     try {
-      const res = await fetch('http://localhost:8080/api/databases', {
+      const res = await apiFetch('/databases', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -597,7 +598,7 @@ const DashboardHome = () => {
     const action = currentStatus === 'running' ? 'stop' : 'start';
     const toastId = toast.loading(action === 'stop' ? 'Stopping database...' : 'Starting database...');
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${id}/${action}`, { method: 'POST' });
+      const res = await apiFetch(`/databases/${id}/${action}`, { method: 'POST' });
       if (res.ok) {
         toast.success(action === 'stop' ? 'Database stopped successfully' : 'Database started successfully', { id: toastId });
         fetchDatabases();
@@ -621,7 +622,7 @@ const DashboardHome = () => {
       onConfirm: async () => {
         const toastId = toast.loading('Deleting database and clearing volume...');
         try {
-          const res = await fetch(`http://localhost:8080/api/databases/${id}`, { method: 'DELETE' });
+          const res = await apiFetch(`/databases/${id}`, { method: 'DELETE' });
           if (res.ok) {
             toast.success('Database deleted successfully', { id: toastId });
             fetchDatabases();
@@ -651,7 +652,7 @@ const DashboardHome = () => {
     if (!q || !q.trim() || !targetDb) return;
     setRunningSql(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${targetDb.id}/query`, {
+      const res = await apiFetch(`/databases/${targetDb.id}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q.trim() }),
@@ -660,7 +661,7 @@ const DashboardHome = () => {
       if (res.ok) {
         setSqlResult(data.result || 'Query executed successfully (no rows returned)');
         // Reload tables list
-        const tblRes = await fetch(`http://localhost:8080/api/databases/${targetDb.id}/tables`);
+        const tblRes = await apiFetch(`/databases/${targetDb.id}/tables`);
         if (tblRes.ok) {
           const tblData = await tblRes.json();
           setSqlTables(tblData.tables || []);
@@ -681,7 +682,7 @@ const DashboardHome = () => {
     setSqlResult('');
     setSqlTables([]);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${db.id}/tables`);
+      const res = await apiFetch(`/databases/${db.id}/tables`);
       if (res.ok) {
         const data = await res.json();
         const tables = data.tables || [];
@@ -716,7 +717,7 @@ const DashboardHome = () => {
     setBindingServer(true);
     const toastId = toast.loading('Binding database to server and restarting...');
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeBindDb.id}/bind`, {
+      const res = await apiFetch(`/databases/${activeBindDb.id}/bind`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ container_id: selectedTargetContainer }),
@@ -744,7 +745,7 @@ const DashboardHome = () => {
     setBackingUpId(db.id);
     const toastId = toast.loading(`Generating backup (.sql) for "${db.name}"...`);
     try {
-      const response = await fetch(`http://localhost:8080/api/databases/${db.id}/backup`);
+      const response = await apiFetch(`/databases/${db.id}/backup`);
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || 'Unable to download backup');
@@ -794,7 +795,7 @@ const DashboardHome = () => {
     formData.append('file', restoreFile);
 
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeRestoreDb.id}/restore`, {
+      const res = await apiFetch(`/databases/${activeRestoreDb.id}/restore`, {
         method: 'POST',
         body: formData,
       });
@@ -828,7 +829,7 @@ const DashboardHome = () => {
   const fetchSnapshots = async (dbId) => {
     setLoadingSnapshots(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${dbId}/snapshots`);
+      const res = await apiFetch(`/databases/${dbId}/snapshots`);
       if (res.ok) {
         const data = await res.json();
         setSnapshots(Array.isArray(data) ? data : []);
@@ -845,7 +846,7 @@ const DashboardHome = () => {
     setTakingSnapshot(true);
     const toastId = toast.loading(`Taking snapshot for "${activeSnapshotDb.name}"...`);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots`, {
+      const res = await apiFetch(`/databases/${activeSnapshotDb.id}/snapshots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: snapshotNote }),
@@ -873,7 +874,7 @@ const DashboardHome = () => {
     setRestoringSnapshotId(snapshot.id);
     const toastId = toast.loading(`Restoring database from snapshot "${snapshot.file_name}"...`);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots/${snapshot.id}/restore`, {
+      const res = await apiFetch(`/databases/${activeSnapshotDb.id}/snapshots/${snapshot.id}/restore`, {
         method: 'POST',
       });
       const data = await res.json();
@@ -897,7 +898,7 @@ const DashboardHome = () => {
     if (!activeSnapshotDb) return;
     setDeletingSnapshotId(snapshotId);
     try {
-      const res = await fetch(`http://localhost:8080/api/databases/${activeSnapshotDb.id}/snapshots/${snapshotId}`, {
+      const res = await apiFetch(`/databases/${activeSnapshotDb.id}/snapshots/${snapshotId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -916,7 +917,7 @@ const DashboardHome = () => {
 
   const handleDownloadSnapshot = (dbId, snapshot) => {
     const a = document.createElement('a');
-    a.href = `http://localhost:8080/api/databases/${dbId}/snapshots/${snapshot.id}/download`;
+    a.href = `${API_BASE_URL}/databases/${dbId}/snapshots/${snapshot.id}/download`;
     a.download = snapshot.file_name;
     document.body.appendChild(a);
     a.click();
@@ -934,7 +935,7 @@ const DashboardHome = () => {
   const fetchReleases = async (containerId) => {
     setLoadingReleases(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${containerId}/releases`);
+      const res = await apiFetch(`/containers/${containerId}/releases`);
       if (res.ok) {
         const data = await res.json();
         setReleases(Array.isArray(data) ? data : []);
@@ -952,7 +953,7 @@ const DashboardHome = () => {
     setRollingBackId(release.id);
     const toastId = toast.loading(`Rolling back to release #${release.release_num || release.id.slice(0, 7)}...`);
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${activeReleasesContainer.id}/rollback`, {
+      const res = await apiFetch(`/containers/${activeReleasesContainer.id}/rollback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ release_id: release.id }),
@@ -986,7 +987,7 @@ const DashboardHome = () => {
     setPingingWebhook(true);
     const toastId = toast.loading('Sending test ping to webhook...');
     try {
-      const res = await fetch(`http://localhost:8080/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`, {
+      const res = await apiFetch(`/webhooks/deploy/${activeWebhookContainer.deployment_id}`, {
         method: 'POST',
         headers: {
           'X-GitHub-Event': 'ping',
@@ -1018,7 +1019,7 @@ const DashboardHome = () => {
     const toastId = toast.loading(actionLabel);
     try {
       setLoading(true); // Prevent spamming actions
-      const res = await fetch(`http://localhost:8080/api/containers/${id}/${action}`, {
+      const res = await apiFetch(`/containers/${id}/${action}`, {
         method: 'POST',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
@@ -1068,7 +1069,7 @@ const DashboardHome = () => {
         const toastId = toast.loading("Deleting server...");
 
         try {
-          const res = await fetch(`http://localhost:8080/api/containers/${identifier}`, {
+          const res = await apiFetch(`/containers/${identifier}`, {
             method: 'DELETE',
             headers: { 'X-Workspace-Id': activeWorkspaceId },
           });
@@ -1096,7 +1097,7 @@ const DashboardHome = () => {
     setActiveContainerName(name);
     setCurrentLogs('');
     try {
-      const response = await fetch(`http://localhost:8080/api/containers/${id}/logs`);
+      const response = await apiFetch(`/containers/${id}/logs`);
       const text = await response.text();
       setCurrentLogs(text || 'No logs available for this container.');
     } catch (error) {
@@ -1125,7 +1126,7 @@ const DashboardHome = () => {
         ));
 
         try {
-          const response = await fetch(`http://localhost:8080/api/containers/${id}/redeploy`, {
+          const response = await apiFetch(`/containers/${id}/redeploy`, {
             method: 'POST',
           });
           
@@ -1164,7 +1165,7 @@ const DashboardHome = () => {
     setEnvModalOpen(true);
 
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${id}/env`);
+      const res = await apiFetch(`/containers/${id}/env`);
       const data = await res.json();
       if (res.ok && data.env) {
         // Display environment variables
@@ -1181,7 +1182,7 @@ const DashboardHome = () => {
     setEnvSuccess('');
 
     try {
-      const res = await fetch(`http://localhost:8080/api/containers/${activeEnvContainerId}/env`, {
+      const res = await apiFetch(`/containers/${activeEnvContainerId}/env`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ env_vars: currentEnvText }),

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Users, X, UserPlus, Trash2, RefreshCw, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { apiFetch } from '../../api/client';
 
 export const TeamMembersModal = ({ isOpen, onClose }) => {
   const { activeWorkspaceId, currentWorkspace } = useWorkspace();
@@ -18,9 +19,7 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/workspaces/members', {
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      });
+      const res = await apiFetch('/workspaces/members');
       if (res.ok) {
         const data = await res.json();
         setMembers(data || []);
@@ -53,11 +52,10 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
 
     setInviting(true);
     try {
-      const res = await fetch('http://localhost:8080/api/workspaces/members/invite', {
+      const res = await apiFetch('/workspaces/members/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId,
         },
         body: JSON.stringify({
           email: email.trim(),
@@ -84,11 +82,10 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
 
   const handleUpdateRole = async (memberId, newRole) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/workspaces/members/${memberId}/role`, {
+      const res = await apiFetch(`/workspaces/members/${memberId}/role`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId,
         },
         body: JSON.stringify({ role: newRole }),
       });
@@ -108,9 +105,8 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
     if (!window.confirm(`Are you sure you want to remove ${memberName} from this workspace?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/workspaces/members/${memberId}`, {
+      const res = await apiFetch(`/workspaces/members/${memberId}`, {
         method: 'DELETE',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
       });
 
       const data = await res.json();

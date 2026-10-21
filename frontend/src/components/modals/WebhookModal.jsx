@@ -1,4 +1,5 @@
 import { Webhook, X, Check, Copy, ExternalLink } from 'lucide-react';
+import { API_BASE_URL } from '../../api/client';
 
 export const WebhookModal = ({
   isOpen,
@@ -13,6 +14,15 @@ export const WebhookModal = ({
   pingingWebhook,
 }) => {
   if (!isOpen || !activeWebhookContainer) return null;
+
+  const apiPort = (() => {
+    try {
+      const url = new URL(API_BASE_URL);
+      return url.port || (url.protocol === 'https:' ? '443' : '80');
+    } catch {
+      return '8080';
+    }
+  })();
 
   const urlToCopy = customPublicUrl.trim() 
     ? `${customPublicUrl.trim().replace(/\/$/, '')}/api/webhooks/deploy/${activeWebhookContainer.deployment_id}`
@@ -68,7 +78,7 @@ export const WebhookModal = ({
                 <span className="text-neutral-400 font-medium">Public Tunnel Command (for Localhost):</span>
                 <button
                   type="button"
-                  onClick={() => handleCopyUrl('npx localtunnel --port 8080', 'cmd-localtunnel')}
+                  onClick={() => handleCopyUrl(`npx localtunnel --port ${apiPort}`, 'cmd-localtunnel')}
                   className="text-purple-400 hover:text-purple-300 font-medium inline-flex items-center gap-1 cursor-pointer"
                 >
                   {copiedKey === 'cmd-localtunnel' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -76,7 +86,7 @@ export const WebhookModal = ({
                 </button>
               </div>
               <div className="p-2 bg-black rounded-md border border-neutral-800 font-mono text-[11px] text-neutral-300">
-                <code>npx localtunnel --port 8080</code>
+                <code>npx localtunnel --port {apiPort}</code>
               </div>
               <input
                 type="text"

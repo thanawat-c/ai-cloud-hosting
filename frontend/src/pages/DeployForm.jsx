@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { DeployProgressModal } from '../components/modals';
 import { BulkEnvEditor } from '../components/common/BulkEnvEditor';
+import { apiFetch } from '../api/client';
 
 const DeployForm = () => {
   const navigate = useNavigate();
@@ -113,9 +114,7 @@ const DeployForm = () => {
   }, [isLoading, deployStartTime]);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/databases', {
-      headers: { 'X-Workspace-Id': activeWorkspaceId }
-    })
+    apiFetch('/databases')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setDatabases(data);
@@ -129,7 +128,7 @@ const DeployForm = () => {
     setInspecting(true);
     setInspectError('');
     try {
-      const res = await fetch('http://localhost:8080/api/inspect-repo', {
+      const res = await apiFetch('/inspect-repo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repo_url: url, git_token: gitToken.trim() }),
@@ -251,11 +250,10 @@ const DeployForm = () => {
     });
 
     try {
-      const response = await fetch('http://localhost:8080/api/test-deploy', {
+      const response = await apiFetch('/test-deploy', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Workspace-Id': activeWorkspaceId,
         },
         body: JSON.stringify({ 
           repo_url: repoUrl.trim(), 
