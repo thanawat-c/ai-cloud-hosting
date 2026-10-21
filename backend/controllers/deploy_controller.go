@@ -59,7 +59,7 @@ func TestDeploy(c *gin.Context) {
 		}
 		defer os.RemoveAll(buildDir)
 
-		// ดึงข้อมูล Git จริง (Branch, Commit Hash, Commit Message, Deployer/Author)
+		// Extract Git metadata (branch, commit hash, author, commit message)
 		gitMeta := services.GetGitMetadata(buildDir, req.RepoURL)
 
 		// Auto-provision dedicated database if requested
@@ -217,14 +217,13 @@ func TestDeploy(c *gin.Context) {
 			}
 			os.WriteFile(frontendDockerfile, []byte(aiFrontendDocker), 0644)
 
-			// สร้างไฟล์ nginx.conf สำหรับ Reverse Proxy ให้ชัวร์ 100%
-			// ใช้ resolver 127.0.0.11 (Docker DNS) และ set ตัวแปร เพื่อไม่ให้ Nginx แครชตอนสตาร์ตถ้า backend ดับอยู่
-			// location /api รองรับทั้ง /api, /api/ และ /api/v1/...
+			// Generate nginx.conf for reverse proxying frontend requests to backend
+			// Uses Docker DNS resolver 127.0.0.11 to prevent Nginx startup failure if backend container is booting
 			nginxConf := fmt.Sprintf(`server {
     listen 80;
     server_name localhost;
 
-    # ใช้ Docker Internal DNS ในการ Resolve ชื่อเครื่อง
+    # Use Docker internal DNS resolver
     resolver 127.0.0.11 valid=30s;
     set $backend_upstream "http://%s";
 
@@ -254,8 +253,7 @@ func TestDeploy(c *gin.Context) {
 				return
 			}
 
-			// ส่ง URL ของ Backend เข้าไปให้ Frontend ทั้งรูปแบบ Vite, Nuxt และ Next
-			// กรองไม่ส่งข้อมูลการเชื่อมต่อ Database หรือ Secrets หลังบ้านไปให้ Frontend
+			// Pass backend connection URL to frontend while filtering out sensitive database credentials
 			var feCleanEnvLines []string
 			for _, line := range strings.Split(req.EnvVars, "\n") {
 				line = strings.TrimSpace(line)
@@ -264,7 +262,7 @@ func TestDeploy(c *gin.Context) {
 				}
 				parts := strings.SplitN(line, "=", 2)
 				keyUpper := strings.ToUpper(strings.TrimSpace(parts[0]))
-				// ตัดตัวแปรที่เกี่ยวกับฐานข้อมูล หรือ credentials หลังบ้านออก
+				// Exclude database credentials and internal secrets from frontend bundle
 				if strings.Contains(keyUpper, "DATABASE") ||
 					strings.Contains(keyUpper, "POSTGRES") ||
 					strings.Contains(keyUpper, "MYSQL") ||
@@ -284,7 +282,7 @@ func TestDeploy(c *gin.Context) {
 			backendInternalURL := fmt.Sprintf("http://%s", backendInternalEndpoint)
 			backendPublicURL = fmt.Sprintf("http://%s", beDomainName)
 
-			// สแกนหาตัวแปร API ทั้งหมดที่ Frontend เรียกใช้จริงแบบไดนามิก 100%
+			// Dynamically detect API environment variable names required by the frontend
 			feApiKeys := services.DetectFrontendAPIEnvKeys(frontendDir)
 			for _, k := range feApiKeys {
 				feEnvVars += fmt.Sprintf("\n%s=%s", k, backendPublicURL)
@@ -354,7 +352,7 @@ func TestDeploy(c *gin.Context) {
 			logChan <- "Dockerfile generated successfully.\n"
 		}
 
-		// โยนท่อส่งเข้าไปให้ BuildImage นำไปใช้
+		// Build the container image using log channel for live streaming
 		imageName, err := services.BuildImage(ctx, targetBuildDir, logChan)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
@@ -407,10 +405,8 @@ func TestDeploy(c *gin.Context) {
 		logChan <- fmt.Sprintf("\n SUCCESS: DOMAIN=%s ID=%s\n", domainName, containerID[:12])
 	}()
 
-	// 4. Controller มานั่งเฝ้าปลายท่อ
-	// for วนลูปอ่านข้อความจากท่อไปเรื่อยๆ จนกว่าท่อจะถูกปิด (close)
+	// Stream build output to HTTP response until channel is closed
 	for msg := range logChan {
-		// พ่นข้อความไปให้ Frontend ทันที
 		c.Writer.Write([]byte(msg))
 		c.Writer.Flush()
 	}

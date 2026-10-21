@@ -52,7 +52,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 	}
 	defer aiClient.Close()
 
-	// 2. ให้ Go สแกนหาโครงสร้างโฟลเดอร์ และ "อ่านเนื้อหาไฟล์ Config สำคัญ" ส่งให้ AI
+	// Scan repository directory structure and extract key configuration files for AI
 	var fileList []string
 	var configContents []string
 
@@ -87,7 +87,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 		}
 	}
 
-	// สแกน Root และโฟลเดอร์ย่อย (รองรับทั้ง mono-repo ปกติ และ monorepo แบบ apps/...)
+	// Scan root and nested directories (supports standard and monorepo structures)
 	entries, _ := os.ReadDir(buildDir)
 	for _, e := range entries {
 		name := e.Name()
@@ -105,7 +105,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 				relSubPath := filepath.Join(name, subName)
 				if sub.IsDir() {
 					fileList = append(fileList, relSubPath+"/")
-					// สแกนชั้นที่ 2 สำหรับ apps/web, apps/api
+					// Scan second-level subdirectories (e.g. apps/web, apps/api)
 					if name == "apps" || name == "packages" || name == "services" {
 						subSubEntries, _ := os.ReadDir(filepath.Join(buildDir, name, subName))
 						for _, ss := range subSubEntries {
@@ -185,7 +185,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
 			backendURL = "http://" + backendURL
 		}
 
-		// สแกนหาชื่อตัวแปรที่ Frontend นี้เรียกใช้เชื่อมต่อกับ Backend จริงจากโค้ดและไฟล์ .env แบบไดนามิก 100%
+		// Dynamically detect API environment variable names required by the frontend
 		apiKeys := DetectFrontendAPIEnvKeys(buildDir)
 		var envListStr strings.Builder
 		for _, k := range apiKeys {
@@ -284,26 +284,26 @@ GitHub Repository: %s
 	}
 	finalDockerfile = strings.TrimSpace(finalDockerfile)
 
-	// แปลงให้ใช้ pnpm@9 เสมอ เพื่อป้องกันปัญหา ERR_PNPM_IGNORED_BUILDS ของ pnpm v10
+	// Enforce pnpm@9 to prevent ERR_PNPM_IGNORED_BUILDS in pnpm v10
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm install -g pnpm\n", "npm install -g pnpm@9\n")
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm install -g pnpm &&", "npm install -g pnpm@9 &&")
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm\n", "npm i -g pnpm@9\n")
 	finalDockerfile = strings.ReplaceAll(finalDockerfile, "npm i -g pnpm &&", "npm i -g pnpm@9 &&")
 
-	// Auto-fix: หาก AI ไปเดาคำสั่ง npx nx build <name> ให้สลับมาใช้คำสั่งมาตรฐาน npm run build
+	// Auto-fix: replace hypothetical nx build commands with standard npm run build
 	if strings.Contains(finalDockerfile, "nx build") {
 		reNx := regexp.MustCompile(`(?m)^RUN\s+(npx\s+)?nx\s+build.*$`)
 		finalDockerfile = reNx.ReplaceAllString(finalDockerfile, "RUN npm run build")
 	}
 
-	// Auto-fix: ป้องกันข้อผิดพลาดกรณีใช้ Prisma แต่ AI ลืม npx prisma generate
+	// Auto-fix: ensure prisma generate is executed prior to build when prisma is used
 	if strings.Contains(configsStr, "prisma") && !strings.Contains(finalDockerfile, "prisma generate") {
 		finalDockerfile = strings.Replace(finalDockerfile, "RUN npm run build", "RUN npx prisma generate || true\nRUN npm run build", 1)
 		finalDockerfile = strings.Replace(finalDockerfile, "RUN pnpm run build", "RUN npx prisma generate || true\nRUN pnpm run build", 1)
 		finalDockerfile = strings.Replace(finalDockerfile, "RUN yarn build", "RUN npx prisma generate || true\nRUN yarn build", 1)
 	}
 
-	// Auto-fix: ป้องกัน Prisma บน Alpine ขาด OpenSSL ในทุก Stage (ทั้ง builder และ runtime runner)
+	// Auto-fix: ensure openssl and libc6-compat are installed on Alpine for Prisma
 	if strings.Contains(configsStr, "prisma") && strings.Contains(finalDockerfile, "alpine") {
 		lines := strings.Split(finalDockerfile, "\n")
 		var newLines []string
@@ -317,7 +317,7 @@ GitHub Repository: %s
 		finalDockerfile = strings.Join(newLines, "\n")
 	}
 
-	// Auto-fix: ป้องกัน Go SQLite ขาด CGO (go-sqlite3 requires cgo to work)
+	// Auto-fix: enable CGO and build-base for SQLite on Alpine if sqlite driver is used
 	if (strings.Contains(configsStr, "sqlite") || strings.Contains(configsStr, "go-sqlite3")) && strings.Contains(finalDockerfile, "golang") {
 		finalDockerfile = strings.ReplaceAll(finalDockerfile, "CGO_ENABLED=0", "CGO_ENABLED=1")
 		if !strings.Contains(finalDockerfile, "gcc") && !strings.Contains(finalDockerfile, "build-base") {
@@ -334,7 +334,7 @@ GitHub Repository: %s
 		}
 	}
 
-	// Auto-fix: ป้องกันข้อผิดพลาดกรณี AI เรียกใช้ pnpm แต่ลืมติดตั้งลงใน base image
+	// Auto-fix: install pnpm globally if generated Dockerfile uses pnpm without installing it
 	if strings.Contains(finalDockerfile, "pnpm") && !strings.Contains(finalDockerfile, "install -g pnpm") && !strings.Contains(finalDockerfile, "corepack") {
 		lines := strings.Split(finalDockerfile, "\n")
 		var newLines []string
@@ -352,7 +352,7 @@ GitHub Repository: %s
 		}
 	}
 
-	// Auto-fix: ป้องกันกรณีใช้ yarn แต่ยังไม่ได้ enable corepack
+	// Auto-fix: enable corepack when yarn is used without global install
 	if strings.Contains(finalDockerfile, "yarn") && !strings.Contains(finalDockerfile, "install -g yarn") && !strings.Contains(finalDockerfile, "corepack") {
 		lines := strings.Split(finalDockerfile, "\n")
 		var newLines []string
@@ -370,7 +370,7 @@ GitHub Repository: %s
 		}
 	}
 
-	// Auto-fix: ป้องกัน Frontend Bundlers (Vite, Next.js, Create React App, Nuxt) ขาดตัวแปร Backend API ก่อนคำสั่ง RUN ... build
+	// Auto-fix: ensure required backend API environment variables precede the frontend build step
 	if isFrontend && endpoint != "" {
 		feBackendURL := endpoint
 		if !strings.HasPrefix(feBackendURL, "http://") && !strings.HasPrefix(feBackendURL, "https://") {
@@ -387,7 +387,7 @@ GitHub Repository: %s
 
 		if len(missingEnvs) > 0 {
 			envBlock := strings.Join(missingEnvs, "\n")
-			// ค้นหาตำแหน่ง build command เพื่อแทรกไว้ข้างหน้า
+			// Locate build command position to inject environment variables
 			reBuildCmd := regexp.MustCompile(`(?m)^RUN\s+.*(build|generate).*$`)
 			loc := reBuildCmd.FindStringIndex(finalDockerfile)
 			if loc != nil {
@@ -404,7 +404,7 @@ GitHub Repository: %s
 		}
 	}
 
-	// แกะหา EXPOSE port จาก Dockerfile
+	// Parse exposed port from Dockerfile
 	exposedPort := "80"
 	for _, line := range strings.Split(finalDockerfile, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -420,15 +420,14 @@ GitHub Repository: %s
 	return finalDockerfile, exposedPort, nil
 }
 
-// MonorepoDetectionResult เก็บชื่อโฟลเดอร์ที่ AI วิเคราะห์เจอ
-// MonorepoDetectionResult เก็บชื่อโฟลเดอร์ที่ AI วิเคราะห์เจอ
+// MonorepoDetectionResult holds monorepo workspace detection analysis.
 type MonorepoDetectionResult struct {
 	IsMonorepo  bool   `json:"is_monorepo"`
 	FrontendDir string `json:"frontend_dir"`
 	BackendDir  string `json:"backend_dir"`
 }
 
-// checkHeuristicMonorepo ตรวจจับโครงสร้าง Monorepo มาตรฐาน (เช่น frontend/backend, client/server) ได้ทันทีโดยไม่ต้องพึ่ง AI
+// checkHeuristicMonorepo identifies standard monorepo folder layouts without invoking AI.
 func checkHeuristicMonorepo(buildDir string) (bool, string, string) {
 	feCandidates := []string{"frontend", "client", "web", "ui", "app"}
 	beCandidates := []string{"backend", "server", "api"}
@@ -470,7 +469,7 @@ func checkHeuristicMonorepo(buildDir string) (bool, string, string) {
 		return true, foundFE, foundBE
 	}
 
-	// สแกนโฟลเดอร์ชั้นที่ 2 (เช่น apps/web, apps/api หรือ packages/web, packages/api)
+	// Scan second-level subdirectories (e.g. apps/web, apps/api, packages/client)
 	parents := []string{"apps", "packages", "services"}
 	for _, p := range parents {
 		pDir := filepath.Join(buildDir, p)
@@ -505,11 +504,11 @@ func checkHeuristicMonorepo(buildDir string) (bool, string, string) {
 	return false, "", ""
 }
 
-// DetectMonorepoServices ให้ AI ช่วยดูโครงสร้างโฟลเดอร์จริงว่าโฟลเดอร์ไหนคือ Frontend และโฟลเดอร์ไหนคือ Backend
+// DetectMonorepoServices inspects repository folders to identify frontend and backend workspaces.
 func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string, string) {
-	// 1. ตรวจสอบด้วย Heuristic ก่อนเสมอ (ทำงาน 0ms, ไม่กิน Quota AI, แม่นยำ 100%)
+	// 1. Evaluate with heuristic layout matching first
 	if isMono, fe, be := checkHeuristicMonorepo(buildDir); isMono {
-		fmt.Printf("⚡ [Heuristic Detection] ตรวจพบ Monorepo อัตโนมัติ: Frontend='%s', Backend='%s'\n", fe, be)
+		fmt.Printf("⚡ [Heuristic Detection] Auto-detected monorepo: Frontend='%s', Backend='%s'\n", fe, be)
 		return true, fe, be
 	}
 
@@ -535,9 +534,9 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 		for _, s := range subEntries {
 			subNames = append(subNames, s.Name())
 		}
-		summary = append(summary, fmt.Sprintf("โฟลเดอร์ '%s': มีไฟล์/โฟลเดอร์ย่อยคือ [%s]", e.Name(), strings.Join(subNames, ", ")))
+		summary = append(summary, fmt.Sprintf("Folder '%s': contents [%s]", e.Name(), strings.Join(subNames, ", ")))
 
-		// สแกนโฟลเดอร์ชั้นที่ 2 เพิ่มเติมสำหรับ Monorepo ยอดนิยม (เช่น apps/web, apps/api, packages/client, packages/server)
+		// Scan second-level subdirectories for monorepo layouts
 		if e.Name() == "apps" || e.Name() == "packages" || e.Name() == "services" {
 			for _, sub := range subEntries {
 				if sub.IsDir() && !strings.HasPrefix(sub.Name(), ".") {
@@ -589,7 +588,7 @@ func DetectMonorepoServices(ctx context.Context, buildDir string) (bool, string,
 	return res.IsMonorepo && res.FrontendDir != "" && res.BackendDir != "", res.FrontendDir, res.BackendDir
 }
 
-// generateFallbackDockerfile สร้าง Dockerfile มาตรฐานโดยอัตโนมัติเมื่อ AI Rate Limit หรือ Quota หมด
+// generateFallbackDockerfile generates standard Dockerfiles when AI is unavailable or rate-limited.
 func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFrontend bool, backendEndpoint string) (string, string, error) {
 	fullTarget := filepath.Join(buildDir, targetDir)
 
@@ -608,10 +607,7 @@ func generateFallbackDockerfile(buildDir, targetDir string, isBackend, isFronten
 		workdir = "/app/" + targetDir
 	}
 
-	// หมายเหตุ: เมื่อเข้ามาถึงฟังก์ชันนี้ แสดงว่าระบบต้องการสร้าง Dockerfile ใหม่
-	// (ไม่ใช้ Dockerfile เดิมที่อาจมีปัญหาหรือเขียนผิดพลาดใน repo)
-
-	// 1. ตรวจสอบกรณี Frontend (Nuxt, Vite, React, Vue, Static Web)
+	// 1. Frontend applications (Nuxt, Vite, React, Vue, Static Web)
 	if isFrontend || targetDir == "frontend" {
 		pnpmLockPath := filepath.Join(fullTarget, "pnpm-lock.yaml")
 		yarnLockPath := filepath.Join(fullTarget, "yarn.lock")
@@ -668,7 +664,7 @@ CMD ["nginx", "-g", "daemon off;"]
 		return dockerfile, "80", nil
 	}
 
-	// 2. ตรวจสอบกรณี Go (มี go.mod หรือ main.go)
+	// 2. Go applications (go.mod or main.go)
 	goModPath := filepath.Join(fullTarget, "go.mod")
 	mainGoPath := filepath.Join(fullTarget, "main.go")
 	if _, err := os.Stat(goModPath); err == nil || (func() bool { _, e := os.Stat(mainGoPath); return e == nil })() {
@@ -698,7 +694,7 @@ CMD ["/app/server"]
 		return dockerfile, "8080", nil
 	}
 
-	// 3. กรณี Python
+	// 3. Python applications (requirements.txt or main.py)
 	reqPath := filepath.Join(fullTarget, "requirements.txt")
 	pyMainPath := filepath.Join(fullTarget, "main.py")
 	if _, err := os.Stat(reqPath); err == nil || (func() bool { _, e := os.Stat(pyMainPath); return e == nil })() {
@@ -717,7 +713,7 @@ CMD ["python", "main.py"]
 		return dockerfile, "8000", nil
 	}
 
-	// 4. Node.js (ตรวจสอบว่ามี package.json อยู่จริง)
+	// 4. Node.js applications (package.json)
 	packageJsonPath := filepath.Join(fullTarget, "package.json")
 	if _, err := os.Stat(packageJsonPath); err == nil {
 		buildStep := ""
@@ -738,7 +734,7 @@ CMD ["npm", "start"]
 		return dockerfile, "3000", nil
 	}
 
-	// 5. Static HTML (กรณีมี index.html แต่ไม่มี package.json)
+	// 5. Static HTML (index.html without package.json)
 	indexPath := filepath.Join(fullTarget, "index.html")
 	if _, err := os.Stat(indexPath); err == nil {
 		dockerfile := fmt.Sprintf(`FROM nginx:alpine

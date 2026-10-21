@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GitHubWebhookPayload โครงสร้างข้อมูลที่ GitHub Push Event ส่งมา
+// GitHubWebhookPayload represents the GitHub push event webhook payload.
 type GitHubWebhookPayload struct {
 	Ref        string `json:"ref"`
 	Before     string `json:"before"`
@@ -48,10 +48,10 @@ type GitHubWebhookPayload struct {
 			Email string `json:"email"`
 		} `json:"author"`
 	} `json:"head_commit"`
-	HookID int64 `json:"hook_id"` // ใช้ตรวจสอบกรณี Ping Event
+	HookID int64 `json:"hook_id"` // Ping event identifier
 }
 
-// GenerateRandomSecret สร้าง Secret สุ่มสำหรับ Webhook
+// GenerateRandomSecret generates a secure random secret token for webhook verification.
 func GenerateRandomSecret() string {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
@@ -60,7 +60,7 @@ func GenerateRandomSecret() string {
 	return "whsec_" + hex.EncodeToString(bytes)
 }
 
-// extractWebhookJSON แปลง payload ไม่ว่าจะส่งมาแบบ application/json หรือ form-urlencoded ให้เป็น JSON เสมอ
+// extractWebhookJSON extracts payload JSON whether content-type is json or url-encoded form.
 func extractWebhookJSON(c *gin.Context, bodyBytes []byte) []byte {
 	rawStr := string(bodyBytes)
 	if strings.HasPrefix(rawStr, "payload=") || strings.Contains(c.ContentType(), "application/x-www-form-urlencoded") {
@@ -72,10 +72,10 @@ func extractWebhookJSON(c *gin.Context, bodyBytes []byte) []byte {
 	return bodyBytes
 }
 
-// VerifySignature ตรวจสอบ HMAC-SHA256 Signature ที่ส่งมาจาก GitHub Header
+// VerifySignature validates HMAC-SHA256 signature against the request payload.
 func VerifySignature(secret string, payload []byte, signatureHeader string) bool {
 	if secret == "" {
-		return true // ถ้าไม่ได้ตั้ง secret ให้ผ่าน
+		return true // Skip verification if secret is not configured
 	}
 	if signatureHeader == "" || !strings.HasPrefix(signatureHeader, "sha256=") {
 		return false
@@ -87,7 +87,7 @@ func VerifySignature(secret string, payload []byte, signatureHeader string) bool
 	return hmac.Equal([]byte(computedHash), []byte(expectedHash))
 }
 
-// HandleDeploymentWebhook รับ Webhook สำหรับ Deployment เฉพาะ ID
+// HandleDeploymentWebhook handles webhook events for a specific deployment ID.
 // Route: POST /api/webhooks/deploy/:id
 func HandleDeploymentWebhook(c *gin.Context) {
 	idParam := c.Param("id")
@@ -109,7 +109,7 @@ func HandleDeploymentWebhook(c *gin.Context) {
 		return
 	}
 
-	// 1. ตรวจสอบความปลอดภัยผ่าน Secret (ถ้ามี)
+	// 1. Verify webhook signature if configured
 	sigHeader := c.GetHeader("X-Hub-Signature-256")
 	if deploy.WebhookSecret != "" && sigHeader != "" {
 		if !VerifySignature(deploy.WebhookSecret, bodyBytes, sigHeader) {
@@ -118,7 +118,7 @@ func HandleDeploymentWebhook(c *gin.Context) {
 		}
 	}
 
-	// 2. ตรวจสอบประเภท Event (กรณี GitHub ยิงทดสอบ Ping)
+	// 2. Handle GitHub ping event
 	eventType := c.GetHeader("X-GitHub-Event")
 	if eventType == "ping" {
 		c.JSON(http.StatusOK, gin.H{
@@ -144,13 +144,13 @@ func HandleDeploymentWebhook(c *gin.Context) {
 	fmt.Printf("🚀 [Webhook Triggered] Service: %s (ID: %d) | Branch: %s | Pusher: %s | Commit: %s\n",
 		deploy.RepoURL, deploy.ID, branch, pusherName, commitMsg)
 
-	// 3. ปรับสถานะเป็น redeploying ทันทีเพื่อให้หน้า Dashboard โชว์ Updating
+	// 3. Mark status as redeploying to reflect on UI immediately
 	config.DB.Model(&deploy).Update("status", "redeploying")
 
-	// สั่ง Re-deploy ใน Goroutine แบบ Asynchronous
+	// Trigger asynchronous redeployment in background
 	go func(targetDeploy models.Deployment, pusher, msg, br string) {
 		ctx := context.Background()
-		fmt.Printf("🔄 [Auto-Deploy] เริ่มดึงโค้ดล่าสุดจาก Git และสร้าง Image ใหม่สำหรับ %s...\n", targetDeploy.RepoURL)
+		fmt.Printf("🔄 [Auto-Deploy] Fetching latest commit and rebuilding container for %s...\n", targetDeploy.RepoURL)
 
 		newID, err := services.RedeployApp(
 			ctx,
@@ -189,7 +189,7 @@ func HandleDeploymentWebhook(c *gin.Context) {
 				"updated_at":   time.Now(),
 			})
 			utils.CreateNotification(wsID, "Auto-Deploy Succeeded", fmt.Sprintf("Commit '%s' by %s auto-deployed to '%s'", msg, pusher, serviceName), "success", serviceName)
-			fmt.Printf("✅ [Auto-Deploy Success] %s ทำงานบน Container ID ใหม่: %s เรียบร้อยแล้ว!\n", targetDeploy.RepoURL, cleanNewID)
+			fmt.Printf("✅ [Auto-Deploy Success] %s running on container ID: %s\n", targetDeploy.RepoURL, cleanNewID)
 		}
 	}(deploy, pusherName, commitMsg, branch)
 
@@ -202,7 +202,8 @@ func HandleDeploymentWebhook(c *gin.Context) {
 	})
 }
 
-// HandleGlobalGitHubWebhook รับ Webhook กลาง แล้วค้นหา Service ที่จับคู่กับ Repo URL
+// HandleGlobalGitHubWebhook handles incoming GitHub push events and routes to matched services.
+// Route: POST /api/webhooks/github
 // Route: POST /api/webhooks/github
 func HandleGlobalGitHubWebhook(c *gin.Context) {
 	bodyBytes, err := io.ReadAll(c.Request.Body)

@@ -21,14 +21,14 @@ type InspectResult struct {
 	DefaultBranch     string   `json:"default_branch"`
 }
 
-// InspectRepository โคลน repo แบบตื้น (--depth 1) มาสแกนหาตัวแปรและโครงสร้างโค้ด
+// InspectRepository shallow-clones (--depth 1) a repository to scan framework and environment variables.
 func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, error) {
 	cleanRepoURL := strings.TrimSpace(repoURL)
 	if err := ValidateGitRepository(cleanRepoURL, gitToken...); err != nil {
 		return nil, err
 	}
 
-	// ดึง Branches แบบรวดเร็ว
+	// Fetch remote branches quickly
 	branches, defBranch, _ := GetRepoBranches(cleanRepoURL, gitToken...)
 
 	tempDir, err := os.MkdirTemp("", "inspect-*")
@@ -39,7 +39,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 
 	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
-	// ใช้ --depth 1 เพื่อความรวดเร็วระดับวินาที
+	// Shallow clone with --depth 1 for rapid analysis
 	cmd := exec.Command("git", "clone", "--depth", "1", authURL, tempDir)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -55,7 +55,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 
 	envMap := make(map[string]string)
 
-	// 1. ตรวจหาไฟล์ .env.example หรือไฟล์ template ทั้งหมดในโปรเจกต์ (รวมถึงโฟลเดอร์ client/ และ server/ ใน Monorepo)
+	// 1. Scan for .env.example and environment template files across the project
 	sampleFiles := []string{
 		".env.example", ".env.sample", ".env.template", ".env.local.example",
 		"example.env", "sample.env", "env.example",
@@ -108,7 +108,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 		return nil
 	})
 
-	// 2. Regex สแกนหาการเรียกใช้ env ในไฟล์โค้ด (.go, .js, .ts, .jsx, .tsx, .vue, .py, .prisma)
+	// 2. Scan source code (.go, .js, .ts, .jsx, .tsx, .vue, .py, .prisma) for env references
 	reGo := regexp.MustCompile(`(?:os\.Getenv|os\.LookupEnv)\(["']([A-Za-z0-9_]+)["']\)`)
 	reNode := regexp.MustCompile(`process\.env\.([A-Za-z0-9_]+)`)
 	reVite := regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`)
@@ -133,7 +133,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 			return nil
 		}
 
-		// อ่านเฉพาะไฟล์ขนาดไม่เกิน 500 KB เพื่อประสิทธิภาพ
+		// Only parse files smaller than 500 KB for efficiency
 		if info.Size() > 500*1024 {
 			return nil
 		}
@@ -190,10 +190,10 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 		return nil
 	})
 
-	// 3. ตรวจจับ Framework
+	// 3. Detect application framework
 	result.DetectedFramework = detectFramework(tempDir)
 
-	// 4. สรุปตัวแปร และตรวจจับตัวแปร Database
+	// 4. Summarize detected environment variables and check for database references
 	var templateLines []string
 	for k, v := range envMap {
 		result.DetectedEnvs = append(result.DetectedEnvs, k)
@@ -217,7 +217,7 @@ func isValidEnvKey(key string) bool {
 	if len(key) < 2 || len(key) > 50 {
 		return false
 	}
-	// ไม่เอาตัวแปรระบบของ Linux / Node / Git
+	// Exclude standard Linux / Node system environment variables
 	systemBlacklist := map[string]bool{
 		"PATH": true, "PWD": true, "HOME": true, "USER": true, "HOSTNAME": true,
 		"SHELL": true, "LANG": true, "LC_ALL": true, "TERM": true, "SHLVL": true,
@@ -226,7 +226,7 @@ func isValidEnvKey(key string) bool {
 	if systemBlacklist[key] {
 		return false
 	}
-	// ต้องขึ้นต้นด้วยตัวอักษรและมีเฉพาะตัวอักษร ตัวเลข หรือขีดล่าง
+	// Must begin with a letter and contain only alphanumeric and underscore characters
 	match, _ := regexp.MatchString(`^[A-Za-z][A-Za-z0-9_]*$`, key)
 	return match
 }
@@ -286,11 +286,11 @@ func detectFramework(dir string) string {
 	return "Web Application"
 }
 
-// DetectFrontendAPIEnvKeys สแกนโค้ดและไฟล์ .env ใน Frontend เพื่อหาชื่อตัวแปรที่ใช้เชื่อมต่อกับ Backend โดยอัตโนมัติ (เช่น VITE_SERVER_URL, REACT_APP_BACKEND, NEXT_PUBLIC_API_URL ฯลฯ)
+// DetectFrontendAPIEnvKeys scans frontend files and .env templates for backend connection variables.
 func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 	detectedMap := make(map[string]bool)
 
-	// 1. Regex สแกนหาตัวแปร Frontend ยอดนิยมจากทุก Framework
+	// 1. Regular expression patterns for common frontend environment variable conventions
 	rePatterns := []*regexp.Regexp{
 		regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`),                   // Vite (React/Vue/Svelte)
 		regexp.MustCompile(`import\.meta\.env\[['"]([A-Za-z0-9_]+)['"]\]`),         // Vite bracket syntax
@@ -317,7 +317,7 @@ func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 			strings.Contains(upper, "PROXY")
 	}
 
-	// 2. สแกนไฟล์ .env, .env.example, .env.sample ภายใน frontend directory
+	// 2. Scan .env, .env.example, .env.sample in frontend directory
 	_ = filepath.Walk(frontendDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -349,7 +349,7 @@ func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 			}
 		}
 
-		// 3. สแกนไฟล์ Source code (.js, .jsx, .ts, .tsx, .vue, .svelte, .html)
+		// 3. Scan frontend source code (.js, .jsx, .ts, .tsx, .vue, .svelte, .html)
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".js" || ext == ".jsx" || ext == ".ts" || ext == ".tsx" || ext == ".vue" || ext == ".svelte" || ext == ".html" {
 			if info.Size() < 500*1024 {
@@ -371,7 +371,7 @@ func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 		return nil
 	})
 
-	// Default fallback keys ที่จำเป็นเสมอ
+	// Standard default fallback keys
 	defaultKeys := []string{"VITE_API_URL", "VITE_SERVER_URL", "BACKEND_URL", "API_URL", "REACT_APP_API_URL", "NEXT_PUBLIC_API_URL", "NUXT_PUBLIC_API_URL"}
 	for _, k := range defaultKeys {
 		detectedMap[k] = true

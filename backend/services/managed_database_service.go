@@ -34,18 +34,18 @@ const (
 	DBCPULimit   = 1000000000        // 1 Core
 )
 
-// GenerateRandomSecret สุ่มรหัสผ่านปลอดภัย
+// GenerateRandomSecret generates a secure random alphanumeric secret string.
 func GenerateRandomSecret(length int) string {
 	b := make([]byte, length)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)[:length]
 }
 
-// FindAvailablePort หาพอร์ต Host ที่ว่างอยู่ โดยตรวจสอบทั้งใน Database, Docker daemon และ OS
+// FindAvailablePort finds an unused host port checking database records, Docker containers, and host sockets.
 func FindAvailablePort(startPort int) (int, error) {
 	usedPorts := make(map[int]bool)
 
-	// 1. ดึงพอร์ตที่ ManagedDatabase ในระบบใช้งานอยู่ทั้งหมด
+	// 1. Fetch ports assigned to managed databases in database
 	if config.DB != nil {
 		var activeDBs []models.ManagedDatabase
 		config.DB.Where("status != ?", "deleted").Find(&activeDBs)
@@ -56,7 +56,7 @@ func FindAvailablePort(startPort int) (int, error) {
 		}
 	}
 
-	// 2. ดึงพอร์ตที่ Docker Container ใดๆ ในเครื่องกำลังใช้งานอยู่ทั้งหมด
+	// 2. Query ports occupied by any running Docker container
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err == nil {
 		defer cli.Close()
@@ -72,7 +72,7 @@ func FindAvailablePort(startPort int) (int, error) {
 		}
 	}
 
-	// 3. วนหาพอร์ตที่ว่างจริงทั้งใน Docker และบน Host OS (0.0.0.0)
+	// 3. Find the first open host port bound to 0.0.0.0
 	for port := startPort; port < startPort+500; port++ {
 		if usedPorts[port] {
 			continue
@@ -276,7 +276,7 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 	return &dbRecord, nil
 }
 
-// GetDatabaseStorageUsage คำนวณขนาด Disk จริงของ Database Container
+// GetDatabaseStorageUsage calculates disk storage consumed by the database container data directory.
 func GetDatabaseStorageUsage(ctx context.Context, cli *client.Client, containerID string) string {
 	if containerID == "" || cli == nil {
 		return "~28 MB"
@@ -310,7 +310,7 @@ func GetDatabaseStorageUsage(ctx context.Context, cli *client.Client, containerI
 	return "~32 MB"
 }
 
-// ListManagedDatabases ดึงรายการ Database พร้อมสถานะปัจจุบัน (รองรับการกรองตาม Workspace)
+// ListManagedDatabases retrieves all databases with live status, optionally filtered by workspace.
 func ListManagedDatabases(ctx context.Context, workspaceID ...string) ([]models.ManagedDatabase, error) {
 	var databases []models.ManagedDatabase
 	query := config.DB.Where("status != ?", "deleted")
@@ -337,7 +337,7 @@ func ListManagedDatabases(ctx context.Context, workspaceID ...string) ([]models.
 				databases[i].Status = state
 				config.DB.Model(&databases[i]).Update("status", state)
 			}
-			// คำนวณขนาด Storage จริงเมื่อ Container รันอยู่
+			// Compute live storage utilization when container is running
 			if state == "running" {
 				realUsage := GetDatabaseStorageUsage(ctx, cli, databases[i].ContainerID)
 				if realUsage != "" && realUsage != databases[i].StorageUsage {
@@ -491,7 +491,7 @@ func ListDatabaseTables(ctx context.Context, id uint) ([]string, error) {
 	}
 	defer cli.Close()
 
-	// ใช้ -t -A เพื่อให้คืนค่าเฉพาะชื่อตารางบรรทัดละ 1 ชื่อ ไม่มีขอบตารางและไม่มี header
+	// Use -t -A flags to return clean table names line-by-line without table borders or headers
 	execConfig := types.ExecConfig{
 		AttachStdout: true,
 		AttachStderr: true,
@@ -589,7 +589,7 @@ func BindDatabaseToContainer(ctx context.Context, dbID uint, targetContainerID s
 	return nil
 }
 
-// AutoExecuteRepoSQL ตรวจหาไฟล์ .sql ใน Repo แล้วรันเข้า Managed Database อัตโนมัติถ้ามีการผูกไว้
+// AutoExecuteRepoSQL detects .sql files in the repo and executes them against the linked database.
 func AutoExecuteRepoSQL(ctx context.Context, buildDir string, envVars string, logChan chan string) {
 	if strings.TrimSpace(envVars) == "" {
 		return
@@ -650,7 +650,7 @@ func AutoExecuteRepoSQL(ctx context.Context, buildDir string, envVars string, lo
 	}
 }
 
-// BackupDatabaseSQL ดึง dump ข้อมูลทั้งหมดออกมาเป็นไฟล์ SQL
+// BackupDatabaseSQL dumps database contents to an SQL string.
 func BackupDatabaseSQL(ctx context.Context, db models.ManagedDatabase) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -658,7 +658,7 @@ func BackupDatabaseSQL(ctx context.Context, db models.ManagedDatabase) (string, 
 	}
 	defer cli.Close()
 
-	// ใช้ pg_dump พร้อมคำสั่งล้างตารางเดิมถ้ามี (--clean --if-exists)
+	// Execute pg_dump with --clean --if-exists flags
 	cmd := []string{
 		"pg_dump",
 		"-U", db.Username,
@@ -699,7 +699,7 @@ func BackupDatabaseSQL(ctx context.Context, db models.ManagedDatabase) (string, 
 	return stdoutBuf.String(), nil
 }
 
-// RestoreDatabaseSQL นำเข้าไฟล์ SQL เข้าไปยัง PostgreSQL Container ผ่าน psql
+// RestoreDatabaseSQL restores a database backup from an SQL string into PostgreSQL via psql.
 func RestoreDatabaseSQL(ctx context.Context, db models.ManagedDatabase, sqlContent string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -731,7 +731,7 @@ func RestoreDatabaseSQL(ctx context.Context, db models.ManagedDatabase, sqlConte
 	}
 	defer resp.Close()
 
-	// เขียนเนื้อหา SQL เข้าไปใน Stdin ของ psql
+	// Stream SQL content into psql stdin
 	go func() {
 		defer resp.CloseWrite()
 		io.WriteString(resp.Conn, sqlContent)

@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Workspace โมเดลสำหรับแบ่งสิทธิ์และแยกพื้นที่ทำงาน (Multi-Tenancy)
+// Workspace represents an isolated workspace environment for multi-tenancy.
 type Workspace struct {
 	ID          string    `gorm:"primaryKey;type:varchar(50)" json:"id"`  // e.g. "personal", "engineering"
 	Name        string    `gorm:"type:varchar(100);not null" json:"name"` // e.g. "Personal (Pro)", "Engineering Team"
@@ -15,7 +15,7 @@ type Workspace struct {
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
-// WorkspaceSummary ข้อมูลสรุปของ Workspace พร้อมตัวเลขนับ Service และ DB
+// WorkspaceSummary aggregates workspace metadata with live resource counts.
 type WorkspaceSummary struct {
 	Workspace
 	DeploymentsCount int64 `json:"deployments_count"`

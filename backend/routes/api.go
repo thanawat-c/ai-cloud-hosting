@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes กำหนด Routing ทั้งหมดของ API
+// SetupRoutes configures all HTTP API routes and middleware groups.
 func SetupRoutes(r *gin.Engine) {
 	api := r.Group("/api")
 	api.Use(middleware.ExtractUserContext())

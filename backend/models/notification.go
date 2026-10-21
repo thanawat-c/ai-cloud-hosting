@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Notification โมเดลสำหรับเก็บประวัติแจ้งเตือนเหตุการณ์สำคัญในระบบ
+// Notification represents an in-app system notification record.
 type Notification struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	WorkspaceID  string    `gorm:"type:varchar(50);default:'personal';index" json:"workspace_id"`

@@ -17,12 +17,12 @@ import (
 )
 
 func GetContainers(c *gin.Context) {
-	// ล้างประวัติ Deployment ผีที่ไม่มี Container จริงๆ (เช่น พิมพ์ URL มั่วแล้ว Clone ไม่ผ่าน)
+	// Clean up phantom deployments with missing container IDs
 	config.DB.Where("container_id = '' OR container_id IS NULL").Delete(&models.Deployment{})
 
 	wsID := utils.GetWorkspaceID(c)
 
-	// 1. ดึงประวัติทั้งหมดจาก Database (เฉพาะที่มี ContainerID จริง และไม่รวมที่ลบทิ้งไปแล้ว ตาม Workspace)
+	// 1. Fetch active deployments for the workspace
 	var deployments []models.Deployment
 	query := config.DB.Where("status != ? AND container_id != ''", "deleted")
 	if wsID != "" {
@@ -30,10 +30,10 @@ func GetContainers(c *gin.Context) {
 	}
 	query.Order("created_at desc").Find(&deployments)
 
-	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
+	// 2. Query live container states from Docker daemon
 	dockerContainers, _ := services.ListContainers(context.Background())
 
-	// ดึงรายการ Managed Database ทั้งหมดของ Workspace นี้ (รวมถึงที่ถูกลบไปแล้ว เพื่อเช็คว่า Service เดิมเคยผูกกับ DB ที่ถูกลบหรือไม่)
+	// Fetch managed databases to verify database health and relationships
 	var allDBs []models.ManagedDatabase
 	dbQuery := config.DB.Model(&models.ManagedDatabase{})
 	if wsID != "" {
@@ -41,10 +41,10 @@ func GetContainers(c *gin.Context) {
 	}
 	dbQuery.Find(&allDBs)
 
-	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร (รองรับทั้ง short 12-char และ full 64-char ID)
+	// Map container IDs (both full and 12-char short ID) to runtime state
 	dockerStateMap := make(map[string]string)
 	for _, dc := range dockerContainers {
-		dockerStateMap[dc.ID] = dc.State // "running" หรือ "exited"
+		dockerStateMap[dc.ID] = dc.State // "running" or "exited"
 		if len(dc.ID) >= 12 {
 			dockerStateMap[dc.ID[:12]] = dc.State
 		}
@@ -72,7 +72,7 @@ func GetContainers(c *gin.Context) {
 				if d.Status != actualState {
 					config.DB.Model(&d).Update("status", actualState)
 				}
-				// ถ้า Container ดับ (exited หรือ restarting) ให้ดึง log ล่าสุดมาใส่ทันที
+				// If container crashed (exited or restarting), extract recent logs
 				if actualState == "exited" || actualState == "restarting" {
 					crashLog, err := services.GetContainerLogs(context.Background(), d.ContainerID)
 					if err == nil && strings.TrimSpace(crashLog) != "" {
@@ -87,12 +87,12 @@ func GetContainers(c *gin.Context) {
 			}
 		}
 
-		// ข้ามไม่เอาเซิร์ฟเวอร์ที่ถูกลบทิ้งไปแล้วมาโชว์ในหน้าเว็บ
+		// Skip deleted services from response list
 		if actualState == "deleted" {
 			continue
 		}
 
-		// สังเกตประเภท Service จากชื่อ RepoURL ก่อนเป็นอันดับแรก
+		// Determine service type from RepoURL naming suffix
 		serviceType := "standalone"
 		cleanName := d.RepoURL
 		if strings.HasSuffix(d.RepoURL, " (Backend)") {
@@ -103,7 +103,7 @@ func GetContainers(c *gin.Context) {
 			cleanName = strings.TrimSuffix(d.RepoURL, " (Frontend)")
 		}
 
-		// ตรวจสอบว่า Container นี้ผูกกับ Managed Database ตัวไหน และ DB นั้นหยุดทำงาน/ถูกลบ หรือไม่
+		// Check database association and runtime health
 		var linkedDBName string
 		var linkedDBID uint
 		var isDBStopped bool
@@ -241,7 +241,7 @@ func GetContainers(c *gin.Context) {
 			deployedAt = d.CreatedAt
 		}
 
-		// กำหนด Branch, Commit Hash, Author Name และ Author Avatar ให้สมบูรณ์
+		// Populate Git branch, commit hash, and author metadata defaults
 		branch := d.Branch
 		if branch == "" {
 			branch = "main"
@@ -470,7 +470,7 @@ func RedeployContainer(c *gin.Context) {
 				"updated_at":   time.Now(),
 			})
 
-			// บันทึก Release ใหม่ และปลด active จากรอบก่อน
+			// Record new active release and deactivate previous releases
 			config.DB.Model(&models.DeploymentRelease{}).Where("deployment_id = ?", deploy.ID).Update("is_active", false)
 			config.DB.Create(&models.DeploymentRelease{
 				DeploymentID:  deploy.ID,

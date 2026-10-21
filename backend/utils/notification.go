@@ -5,7 +5,7 @@ import (
 	"ai-cloud-api/models"
 )
 
-// CreateNotification บันทึกการแจ้งเตือนเหตุการณ์ระบบลงฐานข้อมูล
+// CreateNotification records a system notification and dispatches external webhooks.
 func CreateNotification(workspaceID, title, message, notifType, resourceName string) {
 	if config.DB == nil {
 		return
@@ -23,6 +23,6 @@ func CreateNotification(workspaceID, title, message, notifType, resourceName str
 	}
 	config.DB.Create(&notif)
 
-	// Dispatch แจ้งเตือนไปยังภายนอก (Discord, Slack, etc.) แบบ Async
+	// Asynchronously dispatch external webhooks (Discord, Slack, etc.)
 	DispatchWebhooks(workspaceID, title, message, notifType, resourceName)
 }

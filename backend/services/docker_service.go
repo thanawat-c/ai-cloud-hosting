@@ -108,7 +108,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	}
 
 	cleanBaseImage := strings.Split(imageName, ":")[0]
-	// 1. สร้างชื่อโดเมนเท่ๆ จากชื่อโปรเจกต์ เช่น my-app-deploy-1234.localhost
+	// Generate local domain name from base image name (e.g. app-deploy.localhost)
 	domainName := cleanBaseImage + ".localhost"
 
 	var envList []string
@@ -121,7 +121,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		}
 	}
 
-	// มั่นใจได้เสมอว่าจะมี PORT เข้าไปใน Container ป้องกันกรณีโค้ดเรียก process.env.PORT แล้วเป็นค่าว่างหรือ undefined
+	// Ensure PORT is present to prevent runtime crashes when applications read process.env.PORT
 	hasValidPort := false
 	for i, env := range envList {
 		if strings.HasPrefix(env, "PORT=") {
@@ -137,7 +137,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		envList = append(envList, "PORT="+targetPort)
 	}
 
-	// รองรับกรณี SERVER_PORT มีค่าว่างด้วย (เช่น docker-compose ใช้ SERVER_PORT)
+	// Also support SERVER_PORT if present
 	for i, env := range envList {
 		if strings.HasPrefix(env, "SERVER_PORT=") {
 			val := strings.TrimSpace(strings.TrimPrefix(env, "SERVER_PORT="))
@@ -147,7 +147,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		}
 	}
 
-	// 2. แปะป้ายชื่อ (Labels) สั่งงาน Traefik และป้ายกำกับ Workspace
+	// Configure network settings and Traefik router labels
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			"ai-cloud-network": {
@@ -274,7 +274,7 @@ func DeleteContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetContainerEnv ดึง Environment Variables ที่คอนเทนเนอร์นี้ใช้อยู่ (กรองค่า System พื้นฐานของ OS ออก)
+// GetContainerEnv retrieves active container environment variables, filtering out base OS vars.
 func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -287,7 +287,7 @@ func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
 		return nil, err
 	}
 
-	// กรองตัวแปรระบบของ Docker / Linux Base Image ออก เช่น PATH, HOSTNAME เพื่อไม่ให้ไปกวนผู้ใช้
+	// Filter out base OS and runtime environment variables (PATH, HOSTNAME, etc.)
 	var userEnvs []string
 	systemPrefixes := []string{"PATH=", "HOSTNAME=", "NODE_VERSION=", "YARN_VERSION=", "GOLANG_VERSION=", "GOPATH=", "HOME="}
 	for _, env := range inspect.Config.Env {
@@ -306,7 +306,7 @@ func GetContainerEnv(ctx context.Context, id string) ([]string, error) {
 	return userEnvs, nil
 }
 
-// UpdateContainerEnv สร้างคอนเทนเนอร์ใหม่พร้อมใส่ Env ใหม่ โดยไม่ต้อง Build โค้ดใหม่
+// UpdateContainerEnv replaces a container with new environment variables without rebuilding the image.
 func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -400,7 +400,7 @@ func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain st
 	return newID, nil
 }
 
-// AutoSyncPrismaSchema ตรวจสอบและ sync database schema อัตโนมัติในเบื้องหลัง
+// AutoSyncPrismaSchema pushes Prisma database schema and executes seed scripts in the background.
 func AutoSyncPrismaSchema(containerID string) {
 	go func() {
 		time.Sleep(2 * time.Second)
@@ -491,13 +491,13 @@ func GetContainerStats(ctx context.Context, containerID string) (map[string]inte
 
 	defer stats.Body.Close()
 
-	// ถอดรหัสข้อมูลที่ได้มา ใส่ลงใน Struct
+	// Decode Docker container statistics JSON payload
 	var data ContainerStatsData
 	if err := json.NewDecoder(stats.Body).Decode(&data); err != nil {
 		return nil, err
 	}
 
-	//สูตรคำนวณ Memory (แปลงเป็น Megabyte)
+	// Calculate memory usage and limit in Megabytes
 	memUsageMB := data.MemoryStats.Usage / 1024 / 1024
 	memLimitMB := data.MemoryStats.Limit / 1024 / 1024
 
@@ -508,7 +508,6 @@ func GetContainerStats(ctx context.Context, containerID string) (map[string]inte
 		cpuPercent = (cpuDelta / systemDelta) * 100.0
 	}
 
-	// แพ็กข้อมูลส่งกลับไป
 	return map[string]interface{}{
 		"cpu_percent":  cpuPercent,
 		"memory_mb":    memUsageMB,

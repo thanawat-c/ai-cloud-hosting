@@ -4,40 +4,40 @@ import (
 	"time"
 )
 
-// Deployment คือโครงสร้างตารางที่จะจำประวัติว่ามีโปรเจกต์ไหนถูก Deploy ไปบ้าง
+// Deployment represents a deployed application service instance.
 type Deployment struct {
-	ID               uint   `gorm:"primaryKey"`                                                    // รหัสลำดับ
-	WorkspaceID      string `gorm:"type:varchar(50);default:'personal';index" json:"workspace_id"` // Workspace ที่สังกัด
-	RepoURL          string `gorm:"not null"`                                                      // ลิงก์ GitHub ของลูกค้า
-	GitToken         string `gorm:"type:text"`                                                     // Token สำหรับดึง Private Repo
-	ImageName        string // ชื่อ Image ที่ Build ได้
-	ContainerID      string // รหัส Container
-	DomainName       string // ชื่อโดเมนสำหรับเข้าเว็บ
-	Status           string `gorm:"default:'running'"`                                     // สถานะ (running, stopped, failed)
-	ForceAI          bool   `gorm:"default:false"`                                         // บังคับให้ AI เขียน Dockerfile ทับ
-	WebhookSecret    string `json:"webhook_secret"`                                        // Secret สำหรับยืนยันตัวตนกับ GitHub Webhook
-	AutoDeploy       bool   `gorm:"default:true" json:"auto_deploy"`                       // เปิด/ปิด Auto-Deploy เมื่อมี push
-	Branch           string `gorm:"type:varchar(100);default:'main'" json:"branch"`        // ชื่อ Git Branch
-	CommitHash       string `gorm:"type:varchar(40)" json:"commit_hash"`                   // รหัส Commit ย่อ 7 หลัก
-	CommitMessage    string `gorm:"type:text" json:"commit_message"`                       // ข้อความ Commit ล่าสุด
-	AuthorName       string `gorm:"type:varchar(100)" json:"author_name"`                  // ชื่อผู้ Commit หรือ Deployer
-	AuthorAvatar     string `gorm:"type:varchar(255)" json:"author_avatar"`                // URL รูป Avatar ของ Deployer
-	CustomDomain     string `gorm:"type:varchar(255)" json:"custom_domain"`                // โดเมนเนมที่ผู้ใช้กำหนดเอง
-	SSLEnabled       bool   `gorm:"default:false" json:"ssl_enabled"`                      // สถานะการเปิดใช้งาน SSL / HTTPS
+	ID               uint   `gorm:"primaryKey"`                                                    // Primary key
+	WorkspaceID      string `gorm:"type:varchar(50);default:'personal';index" json:"workspace_id"` // Scoped workspace ID
+	RepoURL          string `gorm:"not null"`                                                      // Git repository URL
+	GitToken         string `gorm:"type:text"`                                                     // Git access token for private repositories
+	ImageName        string // Docker image tag
+	ContainerID      string // Docker container ID
+	DomainName       string // Generated domain name
+	Status           string `gorm:"default:'running'"`                                     // Status: running, stopped, failed
+	ForceAI          bool   `gorm:"default:false"`                                         // Force AI Dockerfile generation
+	WebhookSecret    string `json:"webhook_secret"`                                        // GitHub webhook secret
+	AutoDeploy       bool   `gorm:"default:true" json:"auto_deploy"`                       // Trigger deploy on push
+	Branch           string `gorm:"type:varchar(100);default:'main'" json:"branch"`        // Active branch
+	CommitHash       string `gorm:"type:varchar(40)" json:"commit_hash"`                   // Short commit hash
+	CommitMessage    string `gorm:"type:text" json:"commit_message"`                       // Latest commit message
+	AuthorName       string `gorm:"type:varchar(100)" json:"author_name"`                  // Commit author or deployer name
+	AuthorAvatar     string `gorm:"type:varchar(255)" json:"author_avatar"`                // Deployer avatar URL
+	CustomDomain     string `gorm:"type:varchar(255)" json:"custom_domain"`                // Custom domain name
+	SSLEnabled       bool   `gorm:"default:false" json:"ssl_enabled"`                      // SSL/HTTPS status
 	SSLStatus        string `gorm:"type:varchar(50);default:'inactive'" json:"ssl_status"` // inactive, local, active
-	SSLForceRedirect bool   `gorm:"default:true" json:"ssl_force_redirect"`                // บังคับเปลี่ยนเส้นทาง HTTP ไปยัง HTTPS
-	LastError        string `gorm:"type:text"`                                             // บันทึก Error ล่าสุดถ้าระบบพัง
+	SSLForceRedirect bool   `gorm:"default:true" json:"ssl_force_redirect"`                // Redirect HTTP to HTTPS
+	LastError        string `gorm:"type:text"`                                             // Error message if deployment fails
 
 	// Build & Project Configuration (Monorepo, Custom Scripts)
-	RootDir     string `gorm:"type:varchar(255);default:''" json:"root_dir"`      // โฟลเดอร์ราก (Monorepo support)
-	BuildCmd    string `gorm:"type:text;default:''" json:"build_cmd"`             // คำสั่ง Custom Build เช่น npm run build
-	InstallCmd  string `gorm:"type:text;default:''" json:"install_cmd"`           // คำสั่ง Custom Install เช่น pnpm install
-	StartCmd    string `gorm:"type:text;default:''" json:"start_cmd"`             // คำสั่ง Custom Start เช่น node server.js
-	OutputDir   string `gorm:"type:varchar(255);default:''" json:"output_dir"`    // โฟลเดอร์ Output เช่น dist, build
-	NodeVersion string `gorm:"type:varchar(20);default:'20'" json:"node_version"` // Runtime version เช่น 18, 20, 22
+	RootDir     string `gorm:"type:varchar(255);default:''" json:"root_dir"`      // Monorepo root directory
+	BuildCmd    string `gorm:"type:text;default:''" json:"build_cmd"`             // Custom build command
+	InstallCmd  string `gorm:"type:text;default:''" json:"install_cmd"`           // Custom install command
+	StartCmd    string `gorm:"type:text;default:''" json:"start_cmd"`             // Custom start command
+	OutputDir   string `gorm:"type:varchar(255);default:''" json:"output_dir"`    // Build output directory
+	NodeVersion string `gorm:"type:varchar(20);default:'20'" json:"node_version"` // Node runtime version
 
-	CreatedAt time.Time `gorm:"autoCreateTime"` // วันเวลาที่ Deploy
-	UpdatedAt time.Time `gorm:"autoUpdateTime"` // วันเวลาที่แก้ไขสถานะล่าสุด
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
 
 type DeploymentRelease struct {

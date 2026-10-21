@@ -13,14 +13,14 @@ import (
 	"ai-cloud-api/models"
 )
 
-// AlertStyle กำหนดสีและไอคอนมาตรฐานสากลตามระดับความสำคัญ
+// AlertStyle defines standard presentation styles (color, label, icon) for alerts.
 type AlertStyle struct {
 	Color       int
 	StatusLabel string
 	IconURL     string
 }
 
-// แผนผังไอคอนความละเอียดสูงแบบ CDN ไม่ hardcode อีโมจิ
+// Global alert styling map with CDN-hosted high-resolution icons
 var alertStyles = map[string]AlertStyle{
 	"success": {
 		Color:       0x10b981, // Emerald Green
@@ -44,7 +44,7 @@ var alertStyles = map[string]AlertStyle{
 	},
 }
 
-// getBrandConfig ดึงการตั้งค่าแบรนด์จาก Environment หรือใช้ค่าเริ่มต้นมาตรฐาน
+// getBrandConfig retrieves branding options from environment variables or returns defaults.
 func getBrandConfig() (string, string) {
 	brandName := os.Getenv("ACH_BRAND_NAME")
 	if brandName == "" {
@@ -57,7 +57,7 @@ func getBrandConfig() (string, string) {
 	return brandName, brandIcon
 }
 
-// DispatchWebhooks ยิงแจ้งเตือนไปยัง Webhooks ทั้งหมดที่ Active ใน Workspace แบบ Asynchronous
+// DispatchWebhooks dispatches notifications to all active webhooks in the workspace asynchronously.
 func DispatchWebhooks(workspaceID, title, message, notifType, resourceName string) {
 	if config.DB == nil {
 		return
@@ -66,7 +66,7 @@ func DispatchWebhooks(workspaceID, title, message, notifType, resourceName strin
 		workspaceID = "personal"
 	}
 
-	// รันแบบ Non-blocking ใน Goroutine แยก เพื่อไม่ให้กระทบเวลาตอบกลับของ API
+	// Run non-blocking in a background goroutine to avoid delaying API responses
 	go func(wsID, t, msg, nType, res string) {
 		var webhooks []models.WebhookAlert
 		err := config.DB.Where("workspace_id = ? AND is_active = true", wsID).Find(&webhooks).Error
@@ -80,7 +80,7 @@ func DispatchWebhooks(workspaceID, title, message, notifType, resourceName strin
 	}(workspaceID, title, message, notifType, resourceName)
 }
 
-// SendWebhookDirect ยิงตรงสำหรับปุ่ม Test Webhook
+// SendWebhookDirect delivers a test notification to a specific webhook endpoint synchronously.
 func SendWebhookDirect(wh models.WebhookAlert, title, message, notifType, resourceName string) error {
 	return sendWebhookNotification(wh, title, message, notifType, resourceName, wh.WorkspaceID)
 }
@@ -92,7 +92,7 @@ func sendWebhookNotification(wh models.WebhookAlert, title, message, notifType, 
 
 	brandName, brandIcon := getBrandConfig()
 
-	// เลือกลักษณะของ Alert ตามประเภทเหตุการณ์
+	// Resolve alert style based on event severity
 	style, exists := alertStyles[strings.ToLower(notifType)]
 	if !exists {
 		style = alertStyles["info"]

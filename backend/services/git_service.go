@@ -94,7 +94,7 @@ func ValidateGitRepository(repoURL string, gitToken ...string) error {
 	return nil
 }
 
-// GetRepoBranches ดึงรายชื่อ Branch ทั้งหมดจาก Remote Git โดยไม่ต้อง Clone เต็มรูปแบบ
+// GetRepoBranches fetches all remote branches using git ls-remote without cloning.
 func GetRepoBranches(repoURL string, gitToken ...string) ([]string, string, error) {
 	cleanRepoURL := strings.TrimSpace(repoURL)
 	if cleanRepoURL == "" {
@@ -194,7 +194,7 @@ func CloneRepository(repoURL string, branch string, gitToken ...string) (string,
 	return buildDir, nil
 }
 
-// GitMetadata เก็บข้อมูล Branch, Commit Hash, Commit Message และ Author จาก Git จริง
+// GitMetadata represents Git branch, commit hash, commit message, and author details.
 type GitMetadata struct {
 	Branch        string
 	CommitHash    string
@@ -203,14 +203,14 @@ type GitMetadata struct {
 	AuthorAvatar  string
 }
 
-// GetGitMetadata ดึงข้อมูล branch, commit, message และ author จากโฟลเดอร์ Git
+// GetGitMetadata retrieves branch, commit, message, and author from the local Git repository directory.
 func GetGitMetadata(repoDir string, originalRepoURL string) GitMetadata {
 	meta := GitMetadata{
 		Branch:     "main",
 		CommitHash: "head",
 	}
 
-	// 1. ดึงชื่อ Branch ปัจจุบัน (เช่น main, master, dev)
+	// 1. Resolve current branch name (e.g. main, master, dev)
 	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	branchCmd.Dir = repoDir
 	if out, err := branchCmd.Output(); err == nil {
@@ -220,7 +220,7 @@ func GetGitMetadata(repoDir string, originalRepoURL string) GitMetadata {
 		}
 	}
 
-	// 2. ดึง Commit Hash ย่อ (7 ตัว), ชื่อผู้เขียน (Author), และข้อความ Commit
+	// 2. Fetch short commit hash, author name, and commit subject
 	logCmd := exec.Command("git", "log", "-1", "--pretty=format:%h|%an|%s")
 	logCmd.Dir = repoDir
 	if out, err := logCmd.Output(); err == nil {
@@ -236,7 +236,7 @@ func GetGitMetadata(repoDir string, originalRepoURL string) GitMetadata {
 		}
 	}
 
-	// 3. กำหนด Avatar จากเจ้าของ GitHub Repository (เช่น https://github.com/owner.png)
+	// 3. Resolve avatar from GitHub repository owner if applicable
 	cleanURL := strings.TrimSpace(originalRepoURL)
 	if strings.Contains(cleanURL, "github.com/") {
 		trimmed := strings.Split(cleanURL, "github.com/")[1]

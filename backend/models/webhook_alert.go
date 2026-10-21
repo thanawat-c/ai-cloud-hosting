@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// WebhookAlert เก็บข้อมูล Webhook สำหรับยิงแจ้งเตือนภายนอก (Discord, Slack, Custom)
+// WebhookAlert stores configuration for external notifications (Discord, Slack, Custom Webhooks).
 type WebhookAlert struct {
 	ID          string    `gorm:"primaryKey" json:"id"`
 	WorkspaceID string    `gorm:"index" json:"workspace_id"`

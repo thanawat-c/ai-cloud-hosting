@@ -1,4 +1,5 @@
 # Binaries & Executables
+/ai-cloud-api
 backend/ai-cloud-api
 backend/server
 backend/*.exe

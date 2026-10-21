@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetNotifications ดึงรายการแจ้งเตือนทั้งหมดของ Workspace
+// GetNotifications retrieves all notifications for the active workspace.
 func GetNotifications(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 
@@ -26,7 +26,7 @@ func GetNotifications(c *gin.Context) {
 	})
 }
 
-// MarkAllNotificationsRead สั่งทำเครื่องหมายว่าอ่านแจ้งเตือนทั้งหมดแล้ว
+// MarkAllNotificationsRead marks all unread notifications in the workspace as read.
 func MarkAllNotificationsRead(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 
@@ -37,7 +37,7 @@ func MarkAllNotificationsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Marked all notifications as read"})
 }
 
-// ClearNotifications ลบประวัติแจ้งเตือนทั้งหมดของ Workspace
+// ClearNotifications removes all notifications for the active workspace.
 func ClearNotifications(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 

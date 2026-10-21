@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetWebhookAlerts ดึงรายการ Webhook ทั้งหมดของ Workspace
+// GetWebhookAlerts retrieves all webhook configurations for a workspace.
 func GetWebhookAlerts(c *gin.Context) {
 	wsID := c.Query("workspace_id")
 	if wsID == "" {
@@ -30,7 +30,7 @@ func GetWebhookAlerts(c *gin.Context) {
 	c.JSON(http.StatusOK, webhooks)
 }
 
-// CreateWebhookAlert สร้าง Webhook แจ้งเตือนใหม่
+// CreateWebhookAlert registers a new webhook alert endpoint.
 func CreateWebhookAlert(c *gin.Context) {
 	wsID := c.Query("workspace_id")
 	if wsID == "" {
@@ -94,7 +94,7 @@ func CreateWebhookAlert(c *gin.Context) {
 	c.JSON(http.StatusCreated, wh)
 }
 
-// ToggleWebhookAlert เปิด/ปิด การทำงานของ Webhook
+// ToggleWebhookAlert toggles the active state of a webhook.
 func ToggleWebhookAlert(c *gin.Context) {
 	id := c.Param("id")
 	var wh models.WebhookAlert
@@ -116,7 +116,7 @@ func ToggleWebhookAlert(c *gin.Context) {
 	})
 }
 
-// DeleteWebhookAlert ลบ Webhook
+// DeleteWebhookAlert removes a webhook configuration.
 func DeleteWebhookAlert(c *gin.Context) {
 	id := c.Param("id")
 	var wh models.WebhookAlert
@@ -133,7 +133,7 @@ func DeleteWebhookAlert(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Webhook deleted successfully"})
 }
 
-// TestWebhookAlert ทดสอบยิงข้อความจริงไปยัง Discord/Slack
+// TestWebhookAlert sends a test message to verify the webhook destination.
 func TestWebhookAlert(c *gin.Context) {
 	id := c.Param("id")
 	var wh models.WebhookAlert
