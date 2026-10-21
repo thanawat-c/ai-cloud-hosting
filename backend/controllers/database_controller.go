@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetDatabases ดึงรายการ Database ทั้งหมด ตาม Workspace
+// GetDatabases retrieves all databases for the current workspace
 func GetDatabases(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 	dbs, err := services.ListManagedDatabases(context.Background(), wsID)
@@ -28,11 +28,11 @@ func GetDatabases(c *gin.Context) {
 	c.JSON(http.StatusOK, dbs)
 }
 
-// CreateDatabase สั่งสร้าง Database ใหม่
+// CreateDatabase creates a new managed database
 func CreateDatabase(c *gin.Context) {
 	var req models.CreateDatabaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง กรุณาระบุชื่อ Database"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Please provide a database name."})
 		return
 	}
 
@@ -48,17 +48,17 @@ func CreateDatabase(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":  "สร้างฐานข้อมูลเรียบร้อยแล้ว!",
+		"message":  "Database created successfully!",
 		"database": dbRecord,
 	})
 }
 
-// StartDatabase สั่งเปิด Database
+// StartDatabase starts a managed database
 func StartDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -67,15 +67,15 @@ func StartDatabase(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "เริ่มการทำงานของ Database สำเร็จ"})
+	c.JSON(http.StatusOK, gin.H{"message": "Database started successfully"})
 }
 
-// StopDatabase สั่งหยุด Database
+// StopDatabase stops a managed database
 func StopDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -84,15 +84,15 @@ func StopDatabase(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "หยุดการทำงานของ Database สำเร็จ"})
+	c.JSON(http.StatusOK, gin.H{"message": "Database stopped successfully"})
 }
 
-// DeleteDatabase สั่งลบ Database
+// DeleteDatabase deletes a managed database
 func DeleteDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -101,15 +101,15 @@ func DeleteDatabase(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ลบ Database เรียบร้อยแล้ว"})
+	c.JSON(http.StatusOK, gin.H{"message": "Database deleted successfully"})
 }
 
-// QueryDatabase รันคำสั่ง SQL ใน Database
+// QueryDatabase executes an SQL query on the database
 func QueryDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -117,7 +117,7 @@ func QueryDatabase(c *gin.Context) {
 		Query string `json:"query"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Query) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุคำสั่ง SQL"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide an SQL query string"})
 		return
 	}
 
@@ -130,12 +130,12 @@ func QueryDatabase(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": output})
 }
 
-// GetDatabaseTables ดึงรายชื่อ Table
+// GetDatabaseTables fetches the list of tables in the database
 func GetDatabaseTables(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -148,12 +148,12 @@ func GetDatabaseTables(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tables": tables})
 }
 
-// BindDatabase ผูก Database เข้ากับคอนเทนเนอร์เป้าหมาย
+// BindDatabase binds a database to a target service container
 func BindDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -161,7 +161,7 @@ func BindDatabase(c *gin.Context) {
 		ContainerID string `json:"container_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.ContainerID) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ container_id ที่ต้องการผูก"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please specify the target container_id"})
 		return
 	}
 
@@ -179,32 +179,32 @@ func BindDatabase(c *gin.Context) {
 		utils.CreateNotification(wsID, "Database Attached", fmt.Sprintf("Database '%s' was bound to container and service restarted", db.Name), "info", db.Name)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ผูก Database เข้ากับเซิร์ฟเวอร์และรีสตาร์ตสำเร็จเรียบร้อยแล้ว!"})
+	c.JSON(http.StatusOK, gin.H{"message": "Database attached to service and container restarted successfully!"})
 }
 
-// BackupDatabase ดาวน์โหลดไฟล์ dump .sql
+// BackupDatabase downloads a database dump .sql file
 func BackupDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Database"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Database not found"})
 		return
 	}
 
 	if db.Status != "running" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ต้องอยู่ในสถานะ Running ก่อนทำ Backup"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database must be running to perform a backup"})
 		return
 	}
 
 	sqlDump, err := services.BackupDatabaseSQL(context.Background(), db)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ทำ Backup ล้มเหลว: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Backup failed: " + err.Error()})
 		return
 	}
 
@@ -220,48 +220,48 @@ func BackupDatabase(c *gin.Context) {
 	c.String(http.StatusOK, sqlDump)
 }
 
-// RestoreDatabase รับไฟล์ .sql แล้วกู้คืนข้อมูลเข้า Database
+// RestoreDatabase receives a .sql file and restores data to the database
 func RestoreDatabase(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Database"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Database not found"})
 		return
 	}
 
 	if db.Status != "running" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ต้องอยู่ในสถานะ Running ก่อนทำ Restore"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Database must be running to perform a restore"})
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาแนบไฟล์ .sql"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a valid .sql backup file"})
 		return
 	}
 
 	openedFile, err := file.Open()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "เปิดไฟล์ไม่สำเร็จ"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file"})
 		return
 	}
 	defer openedFile.Close()
 
 	contentBytes, err := io.ReadAll(openedFile)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "อ่านเนื้อหาไฟล์ไม่สำเร็จ"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file contents"})
 		return
 	}
 
 	output, err := services.RestoreDatabaseSQL(context.Background(), db, string(contentBytes))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Restore ล้มเหลว: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Restore failed: " + err.Error()})
 		return
 	}
 
@@ -272,17 +272,17 @@ func RestoreDatabase(c *gin.Context) {
 	utils.CreateNotification(wsID, "Database Restored", fmt.Sprintf("Database '%s' restored successfully from file '%s'", db.Name, file.Filename), "warning", db.Name)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "กู้คืนข้อมูล (Restore) สำเร็จเรียบร้อยแล้ว!",
+		"message": "Database restored successfully!",
 		"output":  output,
 	})
 }
 
-// CreateDatabaseSnapshot บันทึก Snapshot ลง Host Disk และสร้าง Record
+// CreateDatabaseSnapshot saves a database snapshot to host storage and creates a DB record
 func CreateDatabaseSnapshot(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -299,17 +299,17 @@ func CreateDatabaseSnapshot(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":  "สร้าง Snapshot สำเร็จเรียบร้อยแล้ว!",
+		"message":  "Snapshot created successfully!",
 		"snapshot": snapshot,
 	})
 }
 
-// GetDatabaseSnapshots ดึงประวัติ Snapshot ทั้งหมดของ Database
+// GetDatabaseSnapshots retrieves all snapshots for a given database
 func GetDatabaseSnapshots(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
@@ -322,19 +322,19 @@ func GetDatabaseSnapshots(c *gin.Context) {
 	c.JSON(http.StatusOK, snapshots)
 }
 
-// RestoreDatabaseSnapshot กู้คืนข้อมูลจาก Snapshot ID ที่ระบุ
+// RestoreDatabaseSnapshot restores database data from a specific snapshot ID
 func RestoreDatabaseSnapshot(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
 	snapParam := c.Param("snapshot_id")
 	snapID, err := strconv.ParseUint(snapParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid snapshot ID"})
 		return
 	}
 
@@ -345,24 +345,24 @@ func RestoreDatabaseSnapshot(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "กู้คืนข้อมูลจาก Snapshot สำเร็จเรียบร้อยแล้ว!",
+		"message": "Database restored from snapshot successfully!",
 		"output":  output,
 	})
 }
 
-// DownloadDatabaseSnapshot ดาวน์โหลดไฟล์ .sql จาก Snapshot
+// DownloadDatabaseSnapshot downloads the .sql file for a snapshot
 func DownloadDatabaseSnapshot(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
 	snapParam := c.Param("snapshot_id")
 	snapID, err := strconv.ParseUint(snapParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid snapshot ID"})
 		return
 	}
 
@@ -377,19 +377,19 @@ func DownloadDatabaseSnapshot(c *gin.Context) {
 	c.File(filePath)
 }
 
-// DeleteDatabaseSnapshot ลบ Snapshot
+// DeleteDatabaseSnapshot deletes a snapshot
 func DeleteDatabaseSnapshot(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Database ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
 		return
 	}
 
 	snapParam := c.Param("snapshot_id")
 	snapID, err := strconv.ParseUint(snapParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Snapshot ID ไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid snapshot ID"})
 		return
 	}
 
@@ -398,7 +398,7 @@ func DeleteDatabaseSnapshot(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ลบ Snapshot สำเร็จเรียบร้อยแล้ว"})
+	c.JSON(http.StatusOK, gin.H{"message": "Snapshot deleted successfully"})
 }
 
 

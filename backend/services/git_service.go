@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// BuildAuthenticatedGitURL จัดการ URL ให้พร้อมใช้งานทั้งกรณี Public และ Private Token
+// BuildAuthenticatedGitURL prepares the clone URL for both public and private token authentication
 func BuildAuthenticatedGitURL(repoURL string, gitToken ...string) (string, string) {
 	cloneURL := strings.TrimSpace(repoURL)
 	token := ""
@@ -25,69 +25,68 @@ func BuildAuthenticatedGitURL(repoURL string, gitToken ...string) (string, strin
 	return cloneURL, token
 }
 
-// TranslateGitError แปลง Error ดิบจากคำสั่ง Git ให้เป็นภาษาไทยที่กระชับและบอกวิธีแก้
+// TranslateGitError formats raw git CLI errors into concise, user-friendly English messages
 func TranslateGitError(rawError string, repoURL string, token string) error {
 	cleanMsg := rawError
 	if token != "" {
 		cleanMsg = strings.ReplaceAll(cleanMsg, token, "******")
 	}
 
-	// ลบ Path โฟลเดอร์ชั่วคราวที่ไม่จำเป็นออก เช่น "Cloning into '/var/folders/.../deploy-...'"
+	// Remove temporary directory path artifacts like "Cloning into '/var/folders/.../deploy-...'"
 	reCloning := regexp.MustCompile(`(?i)cloning into '[^']+'\.{3}\s*`)
 	cleanMsg = reCloning.ReplaceAllString(cleanMsg, "")
 	cleanMsg = strings.TrimSpace(cleanMsg)
 
 	lower := strings.ToLower(cleanMsg)
 
-	// 1. กรณีไม่พบ Repository (404 / Typo / ถูกลบ)
+	// 1. Repository not found (404 / Typo / Deleted)
 	if strings.Contains(lower, "not found") || strings.Contains(lower, "repository not found") || strings.Contains(lower, "does not exist") {
-		return fmt.Errorf("❌ ไม่พบ Repository บน Git: กรุณาตรวจสอบว่าสะกด URL ถูกต้อง หรือหากเป็น Private Repo ให้ระบุ Git Token ในเมนู Advanced Settings")
+		return fmt.Errorf("❌ Git repository not found: Please verify the URL or provide a Personal Access Token in Advanced Settings for private repositories")
 	}
 
-	// 2. กรณีสิทธิ์เข้าถึง (Private Repo หรือ Token ไม่ถูกต้อง)
+	// 2. Authentication / Permission errors
 	if strings.Contains(lower, "authentication failed") ||
 		strings.Contains(lower, "could not read username") ||
 		strings.Contains(lower, "permission denied") ||
 		strings.Contains(lower, "terminal prompts disabled") {
-		return fmt.Errorf("🔒 ไม่มีสิทธิ์เข้าถึง Repository: อาจเป็น Private Repo หรือ Git Token ไม่ถูกต้อง กรุณาระบุ Personal Access Token ในเมนู Advanced Settings")
+		return fmt.Errorf("🔒 Access denied: Please verify repository permissions or provide a valid Personal Access Token in Advanced Settings")
 	}
 
-	// 3. กรณี Network / DNS / Host
+	// 3. Network / DNS / Host
 	if strings.Contains(lower, "could not resolve host") ||
 		strings.Contains(lower, "connection timed out") ||
 		strings.Contains(lower, "failed to connect") ||
 		strings.Contains(lower, "network is unreachable") {
-		return fmt.Errorf("🌐 ไม่สามารถเชื่อมต่อกับ Git Server ได้: กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือ URL ของ Server")
+		return fmt.Errorf("🌐 Network connection error: Unable to connect to Git server. Please check internet connection or host URL")
 	}
 
-	// กรณีอื่นๆ ส่งข้อความที่ตัดทอนให้กระชับ
+	// Fallback
 	if cleanMsg == "" {
-		cleanMsg = "เกิดข้อผิดพลาดในการดึงโค้ดจาก Git"
+		cleanMsg = "Unknown error occurred while fetching code from Git"
 	}
-	return fmt.Errorf("Git Clone ไม่สำเร็จ: %s", cleanMsg)
+	return fmt.Errorf("Git clone failed: %s", cleanMsg)
 }
 
-// ValidateGitRepository ตรวจสอบความถูกต้องและการเข้าถึงของ Repo ล่วงหน้า (Pre-flight check) ภายในไม่กี่ร้อย millisecond
+// ValidateGitRepository performs a fast pre-flight check on repository access
 func ValidateGitRepository(repoURL string, gitToken ...string) error {
 	cleanRepoURL := strings.TrimSpace(repoURL)
 	if cleanRepoURL == "" {
-		return fmt.Errorf("กรุณาระบุ URL ของ Repository")
+		return fmt.Errorf("Repository URL is required")
 	}
 
 	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
-	// กำหนด Timeout ไม่เกิน 8 วินาที เพื่อไม่ให้ระบบค้าง
+	// Timeout within 8 seconds to prevent hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", authURL)
-	// ป้องกันไม่ให้ Git ค้างรอ prompt ถาม username/password บน terminal
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("⏳ หมดเวลาเชื่อมต่อ Git Server (Timeout): โปรดตรวจสอบ URL หรืออินเทอร์เน็ต")
+			return fmt.Errorf("⏳ Git connection timeout: Please verify repository URL or network")
 		}
 		return TranslateGitError(string(output), cleanRepoURL, token)
 	}
@@ -158,25 +157,25 @@ func GetRepoBranches(repoURL string, gitToken ...string) ([]string, string, erro
 	return branches, defaultBranch, nil
 }
 
-// CloneRepository ทำการดาวน์โหลด Repository โดยทำการ Pre-flight Validate ก่อนเสมอ และรองรับการเลือก Branch
+// CloneRepository clones the git repository after performing pre-flight validation
 func CloneRepository(repoURL string, branch string, gitToken ...string) (string, error) {
 	cleanRepoURL := strings.TrimSpace(repoURL)
 
-	// Step 1: Pre-flight Check ความมีอยู่และสิทธิ์ของ Repo ก่อนสร้างโฟลเดอร์หรือเปลืองเน็ต
+	// Step 1: Pre-flight check
 	if err := ValidateGitRepository(cleanRepoURL, gitToken...); err != nil {
 		return "", err
 	}
 
-	// Step 2: สร้าง Workspace ชั่วคราว
+	// Step 2: Temporary build directory
 	buildDir, err := os.MkdirTemp("", "deploy-*")
 	if err != nil {
-		return "", fmt.Errorf("สร้างพื้นที่ทำงานไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to create temporary workspace: %w", err)
 	}
 
 	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
-	fmt.Println("📂 สร้าง Workspace ที่:", buildDir)
-	fmt.Printf("⬇️ กำลังดาวน์โหลดโค้ดจาก: %s (Branch: %s)\n", cleanRepoURL, branch)
+	fmt.Println("📂 Created workspace at:", buildDir)
+	fmt.Printf("⬇️ Fetching source code from: %s (Branch: %s)\n", cleanRepoURL, branch)
 
 	args := []string{"clone"}
 	if strings.TrimSpace(branch) != "" {
@@ -188,7 +187,6 @@ func CloneRepository(repoURL string, branch string, gitToken ...string) (string,
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		// หาก Clone ผิดพลาด ให้ล้าง Workspace ทันที
 		os.RemoveAll(buildDir)
 		return "", TranslateGitError(string(output), cleanRepoURL, token)
 	}

@@ -182,24 +182,23 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 		Env:    envList,
 		Labels: labels,
 	}, &container.HostConfig{
-		NetworkMode: "ai-cloud-network", // พระเอก! จับมันยัดเข้าเครือข่ายเดียวกับ Traefik
+		NetworkMode: "ai-cloud-network",
 		RestartPolicy: container.RestartPolicy{
-			Name: "unless-stopped", // ถ้าดับเองเพราะ Crash หรือ Reboot ให้พยายามสตาร์ตกลับขึ้นมาใหม่อัตโนมัติ
+			Name: "unless-stopped",
 		},
 		Resources: container.Resources{
-			Memory: 512 * 1024 * 1024, // 512 MB เพื่อความเสถียรสำหรับ SSR และ Node.js
+			Memory: 512 * 1024 * 1024, // 512 MB for SSR and Node.js stability
 		},
 	}, networkConfig, nil, "")
 
 	if err != nil {
-		return "", "", fmt.Errorf("สร้าง Container ไม่สำเร็จ: %w", err)
+		return "", "", fmt.Errorf("failed to create container: %w", err)
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return "", "", fmt.Errorf("รัน Container ไม่สำเร็จ: %w", err)
+		return "", "", fmt.Errorf("failed to start container: %w", err)
 	}
 
-	// ไม่ต้องมานั่งหา Public Port แล้ว ส่งกลับเป็นชื่อ Domain เนมแทนเลย!
 	return resp.ID, domainName, nil
 }
 
@@ -318,7 +317,7 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 
 	inspect, err := cli.ContainerInspect(ctx, oldID)
 	if err != nil {
-		return "", fmt.Errorf("ไม่พบคอนเทนเนอร์เดิม: %w", err)
+		return "", fmt.Errorf("original container not found: %w", err)
 	}
 
 	imageName := inspect.Config.Image
@@ -337,17 +336,17 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 	}
 	customDomain := labels["ach.custom_domain"]
 
-	// ลบคอนเทนเนอร์เดิมทิ้ง
+	// Stop and remove old container
 	_ = cli.ContainerStop(ctx, oldID, container.StopOptions{})
 	_ = cli.ContainerRemove(ctx, oldID, container.RemoveOptions{Force: true})
 
-	// รันตัวใหม่ขึ้นมาแทนทันทีด้วย Image เดิม แต่ใส่ Env ใหม่
+	// Start new container with updated environment variables
 	newID, _, err := CreateAndStartContainer(ctx, imageName, newEnvVars, targetPort, wsID, customDomain)
 	if err != nil {
-		return "", fmt.Errorf("เริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to start new container: %w", err)
 	}
 
-	// ถ้ามีการผูก DATABASE_URL ให้ sync Prisma schema ลงฐานข้อมูลให้อัตโนมัติ (เช่น npx prisma db push)
+	// Auto-sync Prisma schema if DATABASE_URL is updated
 	if strings.Contains(newEnvVars, "DATABASE_URL=") {
 		AutoSyncPrismaSchema(newID)
 	}
@@ -355,7 +354,7 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 	return newID, nil
 }
 
-// UpdateContainerCustomDomain อัปเดตหรือผูก Custom Domain ให้กับ Container และให้ Traefik รัน Routing ทันที
+// UpdateContainerCustomDomain updates or binds a custom domain to a container
 func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain string, sslEnabled ...bool) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -365,7 +364,7 @@ func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain st
 
 	inspect, err := cli.ContainerInspect(ctx, oldID)
 	if err != nil {
-		return "", fmt.Errorf("ไม่พบคอนเทนเนอร์เดิม: %w", err)
+		return "", fmt.Errorf("original container not found: %w", err)
 	}
 
 	imageName := inspect.Config.Image
@@ -396,7 +395,7 @@ func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain st
 
 	newID, _, err := CreateAndStartContainer(ctx, imageName, envVars, targetPort, wsID, newDomain, sslParam)
 	if err != nil {
-		return "", fmt.Errorf("รีสตาร์ตคอนเทนเนอร์เพื่อผูกโดเมนใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to restart container with new domain: %w", err)
 	}
 
 	return newID, nil
@@ -552,7 +551,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 
 	buildDir, err := CloneRepository(cleanRepoURL, "", token)
 	if err != nil {
-		return "", fmt.Errorf("โหลดโค้ดใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
 	defer os.RemoveAll(buildDir)
 
@@ -564,7 +563,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 			activeDir = filepath.Join(buildDir, beDir)
 			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, activeDir, beDir)
 			if err != nil {
-				return "", fmt.Errorf("AI สร้าง Dockerfile Backend ไม่สำเร็จ: %w", err)
+				return "", fmt.Errorf("AI failed to generate backend Dockerfile: %w", err)
 			}
 			targetPort = port
 			os.WriteFile(filepath.Join(activeDir, "Dockerfile"), []byte(aiDocker), 0644)
@@ -574,7 +573,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 			backendEndpoint := fmt.Sprintf("%s:8080", backendName)
 			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, activeDir, feDir, backendEndpoint)
 			if err != nil {
-				return "", fmt.Errorf("AI สร้าง Dockerfile Frontend ไม่สำเร็จ: %w", err)
+				return "", fmt.Errorf("AI failed to generate frontend Dockerfile: %w", err)
 			}
 			targetPort = port
 			os.WriteFile(filepath.Join(activeDir, "Dockerfile"), []byte(aiDocker), 0644)
@@ -625,7 +624,7 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceAI {
 			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, buildDir, "")
 			if err != nil {
-				return "", fmt.Errorf("สร้าง Dockerfile ไม่สำเร็จ: %w", err)
+				return "", fmt.Errorf("failed to generate Dockerfile: %w", err)
 			}
 			targetPort = port
 			os.WriteFile(dockerfilePath, []byte(aiDocker), 0644)
@@ -640,23 +639,23 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 	}()
 	_, err = BuildImage(ctx, activeDir, logChan, imageName)
 	if err != nil {
-		return "", fmt.Errorf("สร้าง Image ใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to build image: %w", err)
 	}
 
 	newID, _, err := CreateAndStartContainer(ctx, imageName, oldEnvVars, targetPort, wsID, customDomain)
 	if err != nil {
-		return "", fmt.Errorf("เปิดเซิร์ฟเวอร์ใหม่ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to start new server container: %w", err)
 	}
 
 	cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
 
-	// ล้างขยะ Image เก่าที่ไม่ได้ใช้งานเบื้องหลังอัตโนมัติ
+	// Automatically prune unused dangling images in the background
 	go PruneUnusedImages(context.Background())
 
 	return newID, nil
 }
 
-// PruneUnusedImages สั่งลบ Dangling Docker Images ที่ไม่ได้ใช้งาน คืนพื้นที่ Disk Space
+// PruneUnusedImages cleans up dangling Docker images to reclaim disk space
 func PruneUnusedImages(ctx context.Context) (uint64, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -672,7 +671,7 @@ func PruneUnusedImages(ctx context.Context) (uint64, error) {
 	return report.SpaceReclaimed, nil
 }
 
-// RollbackToImage สลับ Container ไปใช้ Docker Image เวอร์ชันก่อนหน้าทันที (Zero rebuild time)
+// RollbackToImage switches container to previous image version immediately (zero rebuild time)
 func RollbackToImage(ctx context.Context, oldContainerID string, targetImage string, wsID string, customDomain string, sslEnabled bool) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -705,7 +704,7 @@ func RollbackToImage(ctx context.Context, oldContainerID string, targetImage str
 
 	newID, _, err := CreateAndStartContainer(ctx, targetImage, envVars, targetPort, wsID, customDomain, sslParam)
 	if err != nil {
-		return "", fmt.Errorf("สลับไปยัง image เก่าไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to rollback to previous image: %w", err)
 	}
 
 	return newID, nil

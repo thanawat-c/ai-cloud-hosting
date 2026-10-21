@@ -20,7 +20,7 @@ func generateAPIToken() string {
 	return "ach_live_" + hex.EncodeToString(b)
 }
 
-// GetTokens ดึงรายการ API Tokens ทั้งหมดของ Workspace
+// GetTokens retrieves all API tokens for the workspace
 func GetTokens(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 
@@ -34,14 +34,14 @@ func GetTokens(c *gin.Context) {
 		} else {
 			tokens[i].MaskedToken = "••••••••••••"
 		}
-		// ปิดไม่ให้ส่ง raw token ออกไปในการดึงรายการทั่วไป
+		// Redact raw token from general list response
 		tokens[i].Token = ""
 	}
 
 	c.JSON(http.StatusOK, tokens)
 }
 
-// CreateToken สร้าง API Token ใหม่สำหรับ Workspace
+// CreateToken creates a new API Token for the workspace
 func CreateToken(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 
@@ -49,13 +49,13 @@ func CreateToken(c *gin.Context) {
 		Name string `json:"name" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุชื่อ Token เช่น 'CI/CD Pipeline'"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a token name, e.g. 'CI/CD Pipeline'"})
 		return
 	}
 
 	trimmedName := strings.TrimSpace(req.Name)
 	if trimmedName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ชื่อ Token ห้ามเว้นว่าง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token name cannot be empty"})
 		return
 	}
 
@@ -68,7 +68,7 @@ func CreateToken(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&newToken).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง Token ล้มเหลว: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token: " + err.Error()})
 		return
 	}
 
@@ -77,13 +77,13 @@ func CreateToken(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"id":         newToken.ID,
 		"name":       newToken.Name,
-		"token":      rawToken, // ส่ง raw token ให้เห็นครั้งนี้ครั้งเดียว
+		"token":      rawToken, // Revealed only once upon creation
 		"created_at": newToken.CreatedAt,
-		"message":    "สร้าง API Token เรียบร้อยแล้ว กรุณาคัดลอกเก็บไว้ทันที",
+		"message":    "API Token generated successfully. Please copy and store it safely now.",
 	})
 }
 
-// RevokeToken ลบ/ยกเลิก Token
+// RevokeToken deletes/revokes an API Token
 func RevokeToken(c *gin.Context) {
 	wsID := utils.GetWorkspaceID(c)
 	tokenID := c.Param("id")
@@ -97,11 +97,11 @@ func RevokeToken(c *gin.Context) {
 
 	result := config.DB.Where("id = ? AND workspace_id = ?", tokenID, wsID).Delete(&models.APIToken{})
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Token หรือไม่มีสิทธิ์ลบ"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Token not found or unauthorized to delete"})
 		return
 	}
 
 	utils.CreateNotification(wsID, "API Token Revoked", fmt.Sprintf("API token '%s' was revoked and invalidated", tokenName), "warning", tokenName)
 
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("ยกเลิก Token #%s สำเร็จ", tokenID)})
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Token #%s revoked successfully", tokenID)})
 }

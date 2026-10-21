@@ -33,7 +33,7 @@ func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, erro
 
 	tempDir, err := os.MkdirTemp("", "inspect-*")
 	if err != nil {
-		return nil, fmt.Errorf("สร้าง workspace ชั่วคราวไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to create temporary workspace: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 

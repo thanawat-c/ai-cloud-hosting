@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetWorkspaces คืนรายการ Workspace ทั้งหมด พร้อมจำนวน Service และ DB ในแต่ละ workspace
+// GetWorkspaces returns all workspaces along with service and database counts
 func GetWorkspaces(c *gin.Context) {
 	var workspaces []models.Workspace
 	config.DB.Order("created_at asc").Find(&workspaces)
@@ -43,7 +43,7 @@ func GetWorkspaces(c *gin.Context) {
 	c.JSON(http.StatusOK, summaries)
 }
 
-// CreateWorkspace สร้าง Workspace ใหม่
+// CreateWorkspace creates a new workspace
 func CreateWorkspace(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
@@ -52,13 +52,13 @@ func CreateWorkspace(c *gin.Context) {
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง กรุณาระบุชื่อ Workspace"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Please provide a workspace name."})
 		return
 	}
 
 	trimmedName := strings.TrimSpace(req.Name)
 	if trimmedName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ชื่อ Workspace ห้ามเว้นว่าง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Workspace name cannot be empty"})
 		return
 	}
 
@@ -85,7 +85,7 @@ func CreateWorkspace(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&newWs).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ไม่สามารถสร้าง Workspace ได้ (อาจมีชื่อซ้ำ): " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to create workspace (name may already exist): " + err.Error()})
 		return
 	}
 

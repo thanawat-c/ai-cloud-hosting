@@ -381,20 +381,20 @@ func TestDeploy(c *gin.Context) {
 	}
 }
 
-// InspectRepo วิเคราะห์โค้ดและค้นหาตัวแปร Environment Variables ที่แอปต้องการ
+// InspectRepo analyzes the repository and detects framework and environment variables
 func InspectRepo(c *gin.Context) {
 	var req struct {
 		RepoURL  string `json:"repo_url"`
 		GitToken string `json:"git_token"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RepoURL) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ repo_url ให้ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a valid repository URL"})
 		return
 	}
 
 	result, err := services.InspectRepository(strings.TrimSpace(req.RepoURL), req.GitToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "สแกน Repo ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to inspect repository: " + err.Error()})
 		return
 	}
 

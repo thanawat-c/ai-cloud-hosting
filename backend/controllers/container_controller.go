@@ -339,7 +339,7 @@ func getDeploymentDisplayName(dep models.Deployment, fallback string) string {
 func StopContainer(c *gin.Context) {
 	id := c.Param("id")
 	if err := services.StopContainer(context.Background(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Stop ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stop container: " + err.Error()})
 		return
 	}
 	dep := findDeployment(id)
@@ -352,23 +352,23 @@ func StopContainer(c *gin.Context) {
 	serviceName := getDeploymentDisplayName(dep, id)
 	utils.CreateNotification(wsID, "Service Stopped", fmt.Sprintf("Service '%s' has been stopped", serviceName), "warning", serviceName)
 
-	c.JSON(http.StatusOK, gin.H{"message": "หยุดเซิร์ฟเวอร์เรียบร้อย"})
+	c.JSON(http.StatusOK, gin.H{"message": "Service stopped successfully"})
 }
 
 func StartContainer(c *gin.Context) {
 	id := c.Param("id")
 	ctx := context.Background()
 
-	// 1. สั่ง Docker ให้เริ่มรัน Container
+	// 1. Start container via Docker
 	if err := services.StartContainer(ctx, id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Docker เริ่มรัน Container ไม่สำเร็จ: " + err.Error(),
+			"error":   "Docker failed to start container: " + err.Error(),
 			"details": err.Error(),
 		})
 		return
 	}
 
-	// 2. หน่วงเวลา 1.2 วินาที เพื่อเช็คว่าเมื่อแอปพลิเคชันบูตขึ้นมาแล้ว อยู่รอด หรือ Crash ดับทันที
+	// 2. Wait 1.2s to detect immediate crash / reboot failure
 	time.Sleep(1200 * time.Millisecond)
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -377,11 +377,10 @@ func StartContainer(c *gin.Context) {
 		inspect, err := cli.ContainerInspect(ctx, id)
 		if err == nil && inspect.State != nil {
 			if inspect.State.Status != "running" || inspect.State.Restarting || inspect.State.ExitCode != 0 {
-				// แอปดับทันที! ดึง Error Log ล่าสุดมาแสดงผลให้ผู้ใช้ทราบสาเหตุชัดเจน
 				logs, _ := services.GetContainerLogs(ctx, id)
 				cleanLog := strings.TrimSpace(logs)
 				if cleanLog == "" {
-					cleanLog = fmt.Sprintf("แอปพลิเคชันปิดการทำงานทันที (Exit Code: %d)", inspect.State.ExitCode)
+					cleanLog = fmt.Sprintf("Application terminated unexpectedly (Exit Code: %d)", inspect.State.ExitCode)
 				}
 
 				dep := findDeployment(id)
@@ -393,7 +392,7 @@ func StartContainer(c *gin.Context) {
 				utils.CreateNotification(wsID, "Service Start Failed", fmt.Sprintf("Service '%s' failed to boot (Exit Code: %d)", serviceName, inspect.State.ExitCode), "error", serviceName)
 
 				c.JSON(http.StatusBadRequest, gin.H{
-					"error":   fmt.Sprintf("เริ่มเซิร์ฟเวอร์ไม่สำเร็จ! แอปพลิเคชันดับลงทันที (Exit Code: %d)", inspect.State.ExitCode),
+					"error":   fmt.Sprintf("Failed to start service: container crashed immediately (Exit Code: %d)", inspect.State.ExitCode),
 					"details": cleanLog,
 					"state":   "exited",
 				})
@@ -415,7 +414,7 @@ func StartContainer(c *gin.Context) {
 	serviceName := getDeploymentDisplayName(dep, id)
 	utils.CreateNotification(wsID, "Service Started", fmt.Sprintf("Service '%s' is now running", serviceName), "info", serviceName)
 
-	c.JSON(http.StatusOK, gin.H{"message": "เซิร์ฟเวอร์เริ่มทำงานเรียบร้อยแล้ว"})
+	c.JSON(http.StatusOK, gin.H{"message": "Service started successfully"})
 }
 
 func DeleteContainer(c *gin.Context) {
@@ -436,19 +435,19 @@ func DeleteContainer(c *gin.Context) {
 		serviceName := getDeploymentDisplayName(dep, id)
 		utils.CreateNotification(wsID, "Service Deleted", fmt.Sprintf("Service '%s' was deleted", serviceName), "warning", serviceName)
 
-		c.JSON(http.StatusOK, gin.H{"message": "ลบเซิร์ฟเวอร์เรียบร้อย"})
+		c.JSON(http.StatusOK, gin.H{"message": "Service deleted successfully"})
 		return
 	}
 
-	// 2. ถ้าหาใน Database ไม่เจอ ให้ลองลบจาก Docker โดยตรง
+	// 2. Fallback to delete directly via Docker if not found in Database
 	if err := services.DeleteContainer(ctx, id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ลบไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete container: " + err.Error()})
 		return
 	}
 	config.DB.Model(&models.Deployment{}).Where("container_id LIKE ?", id+"%").Update("status", "deleted")
 	wsID := utils.GetWorkspaceID(c)
 	utils.CreateNotification(wsID, "Service Deleted", fmt.Sprintf("Container %s was deleted", id), "warning", id)
-	c.JSON(http.StatusOK, gin.H{"message": "ลบเซิร์ฟเวอร์เรียบร้อย"})
+	c.JSON(http.StatusOK, gin.H{"message": "Service deleted successfully"})
 }
 
 func GetContainerLogs(c *gin.Context) {
@@ -456,10 +455,10 @@ func GetContainerLogs(c *gin.Context) {
 	ctx := context.Background()
 	logs, err := services.GetContainerLogs(ctx,id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ดึง Log ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch logs: " + err.Error()})
 		return
 	}
-	// ส่งค่า Log แบบตัวอักษรธรรมดา (Text) ให้ Frontend โชว์
+	// Return raw text logs for frontend terminal viewer
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.String(http.StatusOK, logs)
 }
@@ -470,7 +469,7 @@ func GetContainerStats(c *gin.Context){
 	ctx := context.Background()
 	stats, err := services.GetContainerStats(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ดึงข้อมูลไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch metrics: " + err.Error()})
 		return 
 	}
 
@@ -482,7 +481,7 @@ func RedeployContainer(c *gin.Context){
 	
 	var deploy models.Deployment
 	if err := config.DB.Where("container_id Like ?", id + "%").First(&deploy).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลเซิฟร์เวอร์นี้ในระบบ"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Service not found"})
 		return
 	}
 
@@ -532,24 +531,24 @@ func RedeployContainer(c *gin.Context){
 			})
 
 			utils.CreateNotification(wsID, "Service Redeployed", fmt.Sprintf("Service '%s' was rebuilt and is live on %s", serviceName, cleanID), "success", serviceName)
-			fmt.Println("Redeploy สำเร็จ! อัปเดต ID เซิฟร์เวอร์ใหม่เป็น", cleanID)
+			fmt.Println("Redeploy successful! Updated container ID to", cleanID)
 		}
 	}()
-	c.JSON(http.StatusOK, gin.H{"message": "กำลังดึงโค้ดและ Re-deploy"})
+	c.JSON(http.StatusOK, gin.H{"message": "Pulling latest code and redeploying..."})
 }
 
-// PruneImages สั่งลบ Image เก่าที่ไม่ได้ใช้งาน (Dangling) และคืนขนาดพื้นที่ว่าง
+// PruneImages cleans dangling images and frees disk space
 func PruneImages(c *gin.Context) {
 	ctx := context.Background()
 	reclaimedBytes, err := services.PruneUnusedImages(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ล้าง Image ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prune images: " + err.Error()})
 		return
 	}
 
 	reclaimedMB := float64(reclaimedBytes) / (1024 * 1024)
 	c.JSON(http.StatusOK, gin.H{
-		"message":               "ทำความสะอาด Docker Image เก่าเรียบร้อยแล้ว",
+		"message":               "Cleaned unused Docker images successfully",
 		"space_reclaimed_mb":    fmt.Sprintf("%.2f", reclaimedMB),
 		"space_reclaimed_bytes": reclaimedBytes,
 	})
@@ -560,7 +559,7 @@ func GetContainerEnv(c *gin.Context) {
 	ctx := context.Background()
 	envList, err := services.GetContainerEnv(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ดึง Env ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch environment variables: " + err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"env": envList})
@@ -572,20 +571,20 @@ func UpdateContainerEnv(c *gin.Context) {
 		EnvVars string `json:"env_vars"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
 	var deploy models.Deployment
 	if err := config.DB.Where("container_id LIKE ?", id+"%").First(&deploy).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลใน Database"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Deployment not found in database"})
 		return
 	}
 
 	ctx := context.Background()
 	newID, err := services.UpdateContainerEnv(ctx, deploy.ContainerID, req.EnvVars)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "อัปเดต Env ไม่สำเร็จ: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update environment variables: " + err.Error()})
 		return
 	}
 
@@ -606,7 +605,7 @@ func UpdateContainerEnv(c *gin.Context) {
 	serviceName := getDeploymentDisplayName(deploy, id)
 	utils.CreateNotification(wsID, "Environment Updated", fmt.Sprintf("Environment variables updated for service '%s'", serviceName), "info", serviceName)
 
-	c.JSON(http.StatusOK, gin.H{"message": "อัปเดต Environment Variables และรีสตาร์ตสำเร็จ!", "new_id": cleanID})
+	c.JSON(http.StatusOK, gin.H{"message": "Environment variables updated and service restarted successfully!", "new_id": cleanID})
 }
 
 func UpdateContainerDomain(c *gin.Context) {
@@ -759,13 +758,13 @@ func RollbackContainer(c *gin.Context) {
 		ReleaseID uint `json:"release_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ release_id ที่ต้องการย้อนกลับไป"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please specify release_id to rollback"})
 		return
 	}
 
 	var targetRelease models.DeploymentRelease
 	if err := config.DB.Where("id = ? AND deployment_id = ?", req.ReleaseID, deploy.ID).First(&targetRelease).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบ Release ที่ระบุ"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Specified release not found"})
 		return
 	}
 
@@ -777,7 +776,7 @@ func RollbackContainer(c *gin.Context) {
 
 	newID, err := services.RollbackToImage(ctx, deploy.ContainerID, targetRelease.ImageName, wsID, deploy.CustomDomain, deploy.SSLEnabled)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Rollback ล้มเหลว: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Rollback failed: " + err.Error()})
 		return
 	}
 
@@ -786,7 +785,7 @@ func RollbackContainer(c *gin.Context) {
 		cleanID = cleanID[:12]
 	}
 
-	// อัปเดตข้อมูล Deployment หลัก
+	// Update main Deployment record
 	config.DB.Model(&deploy).Updates(map[string]interface{}{
 		"container_id":   cleanID,
 		"status":         "running",
@@ -799,7 +798,7 @@ func RollbackContainer(c *gin.Context) {
 		"updated_at":     time.Now(),
 	})
 
-	// ปรับสถานะ Releases: ปลด release เดิม แล้วตั้งเป้าหมายเป็น IsActive = true
+	// Deactivate previous active release and activate target release
 	config.DB.Model(&models.DeploymentRelease{}).Where("deployment_id = ?", deploy.ID).Update("is_active", false)
 	config.DB.Model(&targetRelease).Updates(map[string]interface{}{
 		"is_active":    true,
@@ -814,7 +813,7 @@ func RollbackContainer(c *gin.Context) {
 	utils.CreateNotification(wsID, "Deployment Rolled Back", fmt.Sprintf("Service '%s' was rolled back to release %s in 1 second", serviceName, commitTag), "warning", serviceName)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":        fmt.Sprintf("ย้อนกลับ (Rollback) ไปยัง Release สำเร็จเรียบร้อย! คอนเทนเนอร์รันใหม่เป็น %s", cleanID),
+		"message":        fmt.Sprintf("Rolled back to release successfully! Container restarted as %s", cleanID),
 		"new_id":         cleanID,
 		"active_release": targetRelease,
 	})

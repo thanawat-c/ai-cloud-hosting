@@ -92,10 +92,10 @@ func FindAvailablePort(startPort int) (int, error) {
 
 		return port, nil
 	}
-	return 0, fmt.Errorf("ไม่พบพอร์ตที่ว่างสำหรับใช้งาน")
+	return 0, fmt.Errorf("no available host port found")
 }
 
-// EnsureNetworkExists ตรวจสอบและสร้าง network ถ้ายังไม่มี
+// EnsureNetworkExists verifies and creates docker network if missing
 func EnsureNetworkExists(ctx context.Context, cli *client.Client, networkName string) {
 	networks, err := cli.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
@@ -109,16 +109,16 @@ func EnsureNetworkExists(ctx context.Context, cli *client.Client, networkName st
 	_, _ = cli.NetworkCreate(ctx, networkName, types.NetworkCreate{})
 }
 
-// CreateManagedDatabase สร้าง Database Container ใหม่ (เช่น PostgreSQL)
+// CreateManagedDatabase provisions a new database container (e.g. PostgreSQL)
 func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest) (*models.ManagedDatabase, error) {
-	// 1. ตรวจสอบจำนวน Database สูงสุด
+	// 1. Check max database quota
 	var activeCount int64
 	config.DB.Model(&models.ManagedDatabase{}).Where("status != ?", "deleted").Count(&activeCount)
 	if activeCount >= MaxDatabases {
-		return nil, fmt.Errorf("คุณสร้าง Database ครบโควตาขีดจำกัด (%d ตัว) แล้วเพื่อป้องกันแรมเครื่องเต็ม", MaxDatabases)
+		return nil, fmt.Errorf("database quota limit reached (%d databases) to preserve system memory", MaxDatabases)
 	}
 
-	// 2. จัดการชื่อให้อยู่ในฟอร์แมตที่ Docker รองรับ (ตัวพิมพ์เล็ก, ขีดกลาง)
+	// 2. Sanitize database name for Docker
 	cleanName := strings.ToLower(strings.TrimSpace(req.Name))
 	reg := regexp.MustCompile("[^a-z0-9_-]+")
 	cleanName = reg.ReplaceAllString(cleanName, "-")
@@ -132,14 +132,14 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 		dbType = "postgres"
 	}
 
-	// 3. เชื่อมต่อ Docker
+	// 3. Connect to Docker
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return nil, fmt.Errorf("เชื่อมต่อ Docker ไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 	defer cli.Close()
 
-	// 4. เตรียม Network
+	// 4. Ensure network
 	networkName := "ai-cloud-network"
 	EnsureNetworkExists(ctx, cli, networkName)
 
@@ -166,23 +166,23 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 			fmt.Sprintf("POSTGRES_DB=%s", dbName),
 		}
 	default:
-		return nil, fmt.Errorf("ประเภท Database '%s' ยังไม่รองรับในปัจจุบัน", dbType)
+		return nil, fmt.Errorf("database type '%s' is not supported currently", dbType)
 	}
 
-	// 5. ดึง Image (ถ้ายังไม่มี)
+	// 5. Pull image if needed
 	reader, err := cli.ImagePull(ctx, imageName, image.PullOptions{})
 	if err == nil {
 		_, _ = io.Copy(io.Discard, reader)
 		_ = reader.Close()
 	}
 
-	// 6. สร้าง Persistent Volume
+	// 6. Create persistent volume
 	_, err = cli.VolumeCreate(ctx, volume.CreateOptions{Name: volumeName})
 	if err != nil {
-		return nil, fmt.Errorf("สร้าง Volume สำหรับเก็บข้อมูลไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to create data volume: %w", err)
 	}
 
-	// 7. หาพอร์ตภายนอก (Host Port) สำหรับให้คนใช้ DBeaver หรือ TablePlus ต่อเข้ามาได้
+	// 7. Find host port
 	hostPort, err := FindAvailablePort(5433)
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 		wsID = "personal"
 	}
 
-	// 8. สร้าง Container พร้อมจำกัด Resource (RAM 512MB, 1 CPU)
+	// 8. Create container with resource limits (RAM 512MB, 1 CPU)
 	containerConfig := &container.Config{
 		Image: imageName,
 		Env:   env,
@@ -235,13 +235,13 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 
 	resp, err := cli.ContainerCreate(ctx, containerConfig, hostConfig, networkConfig, nil, containerName)
 	if err != nil {
-		return nil, fmt.Errorf("สร้าง Database Container ไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to create database container: %w", err)
 	}
 
-	// 9. สตาร์ต Container
+	// 9. Start Container
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		_ = cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
-		return nil, fmt.Errorf("เริ่มรัน Database Container ไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to start database container: %w", err)
 	}
 
 	internalURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", username, password, containerName, internalPort, dbName)
@@ -268,7 +268,7 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 	}
 
 	if err := config.DB.Create(&dbRecord).Error; err != nil {
-		return nil, fmt.Errorf("บันทึกข้อมูล Database ลงฐานข้อมูลไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to save database record: %w", err)
 	}
 
 	utils.CreateNotification(wsID, "Database Provisioned", fmt.Sprintf("Dedicated PostgreSQL '%s' is ready on host port %d", cleanName, hostPort), "info", cleanName)
@@ -354,11 +354,11 @@ func ListManagedDatabases(ctx context.Context, workspaceID ...string) ([]models.
 	return databases, nil
 }
 
-// StopManagedDatabase สั่งหยุดชั่วคราว
+// StopManagedDatabase stops the database container temporarily
 func StopManagedDatabase(ctx context.Context, id uint) error {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		return fmt.Errorf("ไม่พบ Database: %w", err)
+		return fmt.Errorf("database not found: %w", err)
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -378,11 +378,11 @@ func StopManagedDatabase(ctx context.Context, id uint) error {
 	return nil
 }
 
-// StartManagedDatabase สั่งเริ่มทำงานใหม่
+// StartManagedDatabase resumes database container
 func StartManagedDatabase(ctx context.Context, id uint) error {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		return fmt.Errorf("ไม่พบ Database: %w", err)
+		return fmt.Errorf("database not found: %w", err)
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -392,7 +392,7 @@ func StartManagedDatabase(ctx context.Context, id uint) error {
 	defer cli.Close()
 
 	if err := cli.ContainerStart(ctx, db.ContainerID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("เริ่มรันไม่สำเร็จ: %w", err)
+		return fmt.Errorf("failed to start database: %w", err)
 	}
 	config.DB.Model(&db).Update("status", "running")
 	wsID := db.WorkspaceID
@@ -403,19 +403,17 @@ func StartManagedDatabase(ctx context.Context, id uint) error {
 	return nil
 }
 
-// DeleteManagedDatabase ลบ Database Container และ Volume
+// DeleteManagedDatabase removes database container and volume
 func DeleteManagedDatabase(ctx context.Context, id uint) error {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		return fmt.Errorf("ไม่พบ Database: %w", err)
+		return fmt.Errorf("database not found: %w", err)
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err == nil {
 		defer cli.Close()
-		// ลบ Container
 		_ = cli.ContainerRemove(ctx, db.ContainerID, container.RemoveOptions{Force: true})
-		// ลบ Volume เพื่อคืนพื้นที่ดิสก์
 		if db.VolumeName != "" {
 			_ = cli.VolumeRemove(ctx, db.VolumeName, true)
 		}
@@ -430,15 +428,15 @@ func DeleteManagedDatabase(ctx context.Context, id uint) error {
 	return nil
 }
 
-// ExecSQLInDatabase รันคำสั่ง SQL หรือ Script ใน PostgreSQL Container ผ่าน psql
+// ExecSQLInDatabase executes SQL query in PostgreSQL container via psql
 func ExecSQLInDatabase(ctx context.Context, id uint, sqlQuery string) (string, error) {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		return "", fmt.Errorf("ไม่พบ Database: %w", err)
+		return "", fmt.Errorf("database not found: %w", err)
 	}
 
 	if db.Status != "running" {
-		return "", fmt.Errorf("Database กำลังหยุดทำงาน กรุณากด Start ก่อนสั่งรัน SQL")
+		return "", fmt.Errorf("database is stopped. Please start the database before running queries")
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -447,7 +445,6 @@ func ExecSQLInDatabase(ctx context.Context, id uint, sqlQuery string) (string, e
 	}
 	defer cli.Close()
 
-	// เรียกใช้ psql ภายใน Container โดยตรง (ใช้ Tty: true เพื่อไม่ให้มี header ไบนารีของ Docker)
 	execConfig := types.ExecConfig{
 		AttachStdout: true,
 		AttachStderr: true,
@@ -462,18 +459,18 @@ func ExecSQLInDatabase(ctx context.Context, id uint, sqlQuery string) (string, e
 
 	execResp, err := cli.ContainerExecCreate(ctx, db.ContainerID, execConfig)
 	if err != nil {
-		return "", fmt.Errorf("สร้าง Exec ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to create exec process: %w", err)
 	}
 
 	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{Tty: true})
 	if err != nil {
-		return "", fmt.Errorf("Attach Exec ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to attach exec process: %w", err)
 	}
 	defer attachResp.Close()
 
 	outputBytes, err := io.ReadAll(attachResp.Reader)
 	if err != nil {
-		return "", fmt.Errorf("อ่านผลลัพธ์ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to read query output: %w", err)
 	}
 
 	outputStr := string(outputBytes)
@@ -481,11 +478,11 @@ func ExecSQLInDatabase(ctx context.Context, id uint, sqlQuery string) (string, e
 	return strings.TrimSpace(outputStr), nil
 }
 
-// ListDatabaseTables ดึงรายชื่อ Table ทั้งหมดใน Database
+// ListDatabaseTables retrieves all table names in the database
 func ListDatabaseTables(ctx context.Context, id uint) ([]string, error) {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, id).Error; err != nil {
-		return nil, fmt.Errorf("ไม่พบ Database: %w", err)
+		return nil, fmt.Errorf("database not found: %w", err)
 	}
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -536,16 +533,16 @@ func ListDatabaseTables(ctx context.Context, id uint) ([]string, error) {
 	return tables, nil
 }
 
-// BindDatabaseToContainer ผูก Database เข้ากับคอนเทนเนอร์เซิร์ฟเวอร์ที่รันอยู่แล้ว และสั่งรีสตาร์ตให้อัตโนมัติ
+// BindDatabaseToContainer binds a database to an active container and restarts it
 func BindDatabaseToContainer(ctx context.Context, dbID uint, targetContainerID string) error {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, dbID).Error; err != nil {
-		return fmt.Errorf("ไม่พบ Database: %w", err)
+		return fmt.Errorf("database not found: %w", err)
 	}
 
 	currentEnvs, err := GetContainerEnv(ctx, targetContainerID)
 	if err != nil {
-		return fmt.Errorf("ไม่สามารถอ่านตัวแปรของเซิร์ฟเวอร์เป้าหมาย: %w", err)
+		return fmt.Errorf("failed to retrieve target container environment: %w", err)
 	}
 
 	dbAliases := []string{
@@ -577,7 +574,7 @@ func BindDatabaseToContainer(ctx context.Context, dbID uint, targetContainerID s
 
 	newID, err := UpdateContainerEnv(ctx, targetContainerID, strings.Join(newEnvs, "\n"))
 	if err != nil {
-		return fmt.Errorf("อัปเดตและเริ่มคอนเทนเนอร์ใหม่ไม่สำเร็จ: %w", err)
+		return fmt.Errorf("failed to update and restart container: %w", err)
 	}
 
 	var deploy models.Deployment
@@ -753,26 +750,26 @@ func RestoreDatabaseSQL(ctx context.Context, db models.ManagedDatabase, sqlConte
 	return strings.TrimSpace(out), nil
 }
 
-// CreateDatabaseSnapshot ทำ Snapshot ข้อมูลของ PostgreSQL และบันทึกไฟล์ลงเซิร์ฟเวอร์
+// CreateDatabaseSnapshot takes a PostgreSQL snapshot and saves it to local disk
 func CreateDatabaseSnapshot(ctx context.Context, dbID uint, notes string, wsID string) (*models.DatabaseSnapshot, error) {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, dbID).Error; err != nil {
-		return nil, fmt.Errorf("ไม่พบฐานข้อมูล ID: %d", dbID)
+		return nil, fmt.Errorf("database not found (ID: %d)", dbID)
 	}
 
 	if db.Status != "running" {
-		return nil, fmt.Errorf("ฐานข้อมูลต้องอยู่ในสถานะ running ก่อนทำ Snapshot")
+		return nil, fmt.Errorf("database must be running to take a snapshot")
 	}
 
 	sqlDump, err := BackupDatabaseSQL(ctx, db)
 	if err != nil {
-		return nil, fmt.Errorf("dump ฐานข้อมูลไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to dump database: %w", err)
 	}
 
-	// โฟลเดอร์เก็บข้อมูล snapshot ใน data/backups/db_{id}
+	// Snapshot storage directory: data/backups/db_{id}
 	baseDir := filepath.Join("data", "backups", fmt.Sprintf("db_%d", dbID))
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, fmt.Errorf("สร้างโฟลเดอร์เก็บ snapshot ไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
 	timeTag := time.Now().Format("20060102-150405")
@@ -781,7 +778,7 @@ func CreateDatabaseSnapshot(ctx context.Context, dbID uint, notes string, wsID s
 	fullPath := filepath.Join(baseDir, fileName)
 
 	if err := os.WriteFile(fullPath, []byte(sqlDump), 0644); err != nil {
-		return nil, fmt.Errorf("บันทึกไฟล์ snapshot ไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to save snapshot file: %w", err)
 	}
 
 	sizeBytes := int64(len(sqlDump))
@@ -807,7 +804,7 @@ func CreateDatabaseSnapshot(ctx context.Context, dbID uint, notes string, wsID s
 	}
 
 	if err := config.DB.Create(&snapshot).Error; err != nil {
-		return nil, fmt.Errorf("บันทึกประวัติ snapshot ลงฐานข้อมูลไม่สำเร็จ: %w", err)
+		return nil, fmt.Errorf("failed to save snapshot record: %w", err)
 	}
 
 	utils.CreateNotification(wsID, "Database Snapshot Created", fmt.Sprintf("Created snapshot '%s' (%s) for database '%s'", fileName, formattedSize, db.Name), "success", db.Name)
@@ -815,7 +812,7 @@ func CreateDatabaseSnapshot(ctx context.Context, dbID uint, notes string, wsID s
 	return &snapshot, nil
 }
 
-// ListDatabaseSnapshots ดึงรายการ Snapshots ทั้งหมดของฐานข้อมูล
+// ListDatabaseSnapshots retrieves all snapshots for a database
 func ListDatabaseSnapshots(ctx context.Context, dbID uint) ([]models.DatabaseSnapshot, error) {
 	var snapshots []models.DatabaseSnapshot
 	if err := config.DB.Where("database_id = ?", dbID).Order("created_at desc").Find(&snapshots).Error; err != nil {
@@ -824,23 +821,23 @@ func ListDatabaseSnapshots(ctx context.Context, dbID uint) ([]models.DatabaseSna
 	return snapshots, nil
 }
 
-// RestoreDatabaseSnapshot คืนค่าฐานข้อมูลจาก Snapshot ID ที่ระบุ
+// RestoreDatabaseSnapshot restores database state from a specified snapshot ID
 func RestoreDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) (string, error) {
 	var db models.ManagedDatabase
 	if err := config.DB.First(&db, dbID).Error; err != nil {
-		return "", fmt.Errorf("ไม่พบฐานข้อมูล")
+		return "", fmt.Errorf("database not found")
 	}
 
 	if db.Status != "running" {
-		return "", fmt.Errorf("ฐานข้อมูลต้องอยู่ในสถานะ running ก่อนทำ Restore")
+		return "", fmt.Errorf("database must be running to perform a restore")
 	}
 
 	var snapshot models.DatabaseSnapshot
 	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
-		return "", fmt.Errorf("ไม่พบประวัติ snapshot นี้")
+		return "", fmt.Errorf("snapshot not found")
 	}
 
-	// Security: ตรวจสอบความปลอดภัย Path Traversal
+	// Security: Prevent path traversal
 	cleanPath := filepath.Clean(snapshot.FilePath)
 	if !strings.HasPrefix(cleanPath, filepath.Join("data", "backups")) {
 		return "", fmt.Errorf("security error: invalid snapshot file path")
@@ -848,12 +845,12 @@ func RestoreDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) (s
 
 	contentBytes, err := os.ReadFile(cleanPath)
 	if err != nil {
-		return "", fmt.Errorf("อ่านไฟล์ snapshot ไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to read snapshot file: %w", err)
 	}
 
 	output, err := RestoreDatabaseSQL(ctx, db, string(contentBytes))
 	if err != nil {
-		return "", fmt.Errorf("restore ฐานข้อมูลไม่สำเร็จ: %w", err)
+		return "", fmt.Errorf("failed to restore database: %w", err)
 	}
 
 	wsID := db.WorkspaceID
@@ -865,11 +862,11 @@ func RestoreDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) (s
 	return output, nil
 }
 
-// DeleteDatabaseSnapshot ลบไฟล์ Snapshot และลบ Record
+// DeleteDatabaseSnapshot removes snapshot file and database record
 func DeleteDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) error {
 	var snapshot models.DatabaseSnapshot
 	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
-		return fmt.Errorf("ไม่พบ snapshot")
+		return fmt.Errorf("snapshot not found")
 	}
 
 	// Security check
@@ -881,11 +878,11 @@ func DeleteDatabaseSnapshot(ctx context.Context, dbID uint, snapshotID uint) err
 	return config.DB.Delete(&snapshot).Error
 }
 
-// GetSnapshotFilePath ส่งออก Path และชื่อไฟล์สำหรับการดาวน์โหลด
+// GetSnapshotFilePath exports file path and name for downloading
 func GetSnapshotFilePath(dbID uint, snapshotID uint) (string, string, error) {
 	var snapshot models.DatabaseSnapshot
 	if err := config.DB.Where("id = ? AND database_id = ?", snapshotID, dbID).First(&snapshot).Error; err != nil {
-		return "", "", fmt.Errorf("ไม่พบ snapshot")
+		return "", "", fmt.Errorf("snapshot not found")
 	}
 
 	cleanPath := filepath.Clean(snapshot.FilePath)
