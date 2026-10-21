@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   RefreshCw,
   ExternalLink,
@@ -83,6 +85,46 @@ const DeploymentTableRow = ({
   const isDbStopped = isRunning && !isFrontend && item.is_db_stopped;
   const isDbMissing = isRunning && !isFrontend && (item.is_missing_db || (item.db_warning && !item.linked_db_name));
   const shortName = getShortAppName(item.name, item.clean_name);
+
+  const menuButtonRef = useRef(null);
+  const [menuCoords, setMenuCoords] = useState(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      setMenuCoords(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!menuButtonRef.current) return;
+      const rect = menuButtonRef.current.getBoundingClientRect();
+      const menuHeight = 440;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+      const right = Math.max(12, window.innerWidth - rect.right);
+      const maxHeight = openUp
+        ? Math.max(220, rect.top - 16)
+        : Math.max(220, window.innerHeight - rect.bottom - 16);
+
+      setMenuCoords({
+        top: openUp ? undefined : rect.bottom + 6,
+        bottom: openUp ? window.innerHeight - rect.top + 6 : undefined,
+        right,
+        maxHeight,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isMenuOpen]);
 
   const description =
     item.service_type === 'backend' || item.name?.includes('(Backend)')
@@ -364,6 +406,7 @@ const DeploymentTableRow = ({
           {/* 3-dots Menu Button */}
           <div className="relative">
             <button
+              ref={menuButtonRef}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -379,16 +422,27 @@ const DeploymentTableRow = ({
               <MoreHorizontal className="w-4 h-4" />
             </button>
 
-            {/* Vercel Dropdown Menu */}
-            {isMenuOpen && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`absolute right-0 ${
-                  containers.indexOf(item) >= containers.length - 2 && containers.length > 2
-                    ? 'bottom-full mb-1.5'
-                    : 'top-full mt-1.5'
-                } w-48 bg-[#0a0a0a] border border-neutral-800 rounded-lg shadow-2xl z-50 py-1 text-left animate-in fade-in zoom-in-95 duration-100`}
-              >
+            {/* Vercel Dropdown Menu rendered via Portal to prevent table overflow clipping */}
+            {isMenuOpen && menuCoords && createPortal(
+              <>
+                <div
+                  className="fixed inset-0 z-[9990]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenuId(null);
+                  }}
+                />
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'fixed',
+                    top: menuCoords.top !== undefined ? `${menuCoords.top}px` : 'auto',
+                    bottom: menuCoords.bottom !== undefined ? `${menuCoords.bottom}px` : 'auto',
+                    right: `${menuCoords.right}px`,
+                    maxHeight: `${menuCoords.maxHeight}px`,
+                  }}
+                  className="w-48 bg-[#0a0a0a] border border-neutral-800 rounded-lg shadow-2xl z-[9999] py-1 text-left overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                >
                 {item.domain_name && isRunning && (
                   <a
                     href={`http://${item.domain_name}`}
@@ -538,7 +592,9 @@ const DeploymentTableRow = ({
                   <span>Delete Service</span>
                 </button>
               </div>
-            )}
+            </>,
+            document.body
+          )}
           </div>
         </div>
       </td>
