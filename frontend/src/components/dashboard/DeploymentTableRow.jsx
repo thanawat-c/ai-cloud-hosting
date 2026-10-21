@@ -64,6 +64,7 @@ const DeploymentTableRow = ({
   containers,
   handleOpenDomainModal,
   handleOpenEnv,
+  handleOpenProjectSettings,
   handleOpenReleasesModal,
   handleOpenWebhookModal,
   handleOpenMetrics,
@@ -447,6 +448,18 @@ const DeploymentTableRow = ({
                 >
                   <Settings className="w-3.5 h-3.5 text-neutral-400" />
                   <span>Environment Variables</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMenuId(null);
+                    handleOpenProjectSettings(item);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-neutral-400" />
+                  <span>Build & Settings</span>
                 </button>
 
                 <button

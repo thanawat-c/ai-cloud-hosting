@@ -11,4 +11,5 @@ export { ContainerLogsModal } from './ContainerLogsModal';
 export { ErrorDetailsModal } from './ErrorDetailsModal';
 export { WebhookModal } from './WebhookModal';
 export { LiveMetricsModal } from './LiveMetricsModal';
+export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { default as DeployProgressModal } from './DeployProgressModal';

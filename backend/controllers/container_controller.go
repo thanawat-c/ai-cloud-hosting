@@ -302,6 +302,13 @@ func GetContainers(c *gin.Context) {
 			"is_db_stopped":  isDBStopped,
 			"is_missing_db":  isMissingDB,
 			"db_warning":     dbWarning,
+			"root_dir":       d.RootDir,
+			"build_cmd":      d.BuildCmd,
+			"install_cmd":    d.InstallCmd,
+			"start_cmd":      d.StartCmd,
+			"output_dir":     d.OutputDir,
+			"node_version":   d.NodeVersion,
+			"auto_deploy":    d.AutoDeploy,
 			"webhook_secret": d.WebhookSecret,
 			"webhook_url":    fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),
 		})

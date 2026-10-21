@@ -17,6 +17,7 @@ import {
   ErrorDetailsModal,
   WebhookModal,
   LiveMetricsModal,
+  ProjectSettingsModal,
 } from '../components/modals';
 import {
   DashboardSubnav,
@@ -288,6 +289,15 @@ const DashboardHome = () => {
     setSslEnabledInput(container.ssl_enabled !== false);
     setSslForceRedirectInput(container.ssl_force_redirect !== false);
     setDomainModalOpen(true);
+  };
+
+  // Project Settings Modal State
+  const [projectSettingsModalOpen, setProjectSettingsModalOpen] = useState(false);
+  const [projectSettingsContainer, setProjectSettingsContainer] = useState(null);
+
+  const handleOpenProjectSettings = (container) => {
+    setProjectSettingsContainer(container);
+    setProjectSettingsModalOpen(true);
   };
 
   const handleSaveCustomDomain = async () => {
@@ -1354,6 +1364,7 @@ const DashboardHome = () => {
                       containers={containers}
                       handleOpenDomainModal={handleOpenDomainModal}
                       handleOpenEnv={handleOpenEnv}
+                      handleOpenProjectSettings={handleOpenProjectSettings}
                       handleOpenReleasesModal={handleOpenReleasesModal}
                       handleOpenWebhookModal={handleOpenWebhookModal}
                       handleOpenMetrics={handleOpenMetrics}
@@ -1541,6 +1552,13 @@ const DashboardHome = () => {
         setSslForceRedirectInput={setSslForceRedirectInput}
         handleSaveCustomDomain={handleSaveCustomDomain}
         savingDomain={savingDomain}
+      />
+
+      <ProjectSettingsModal
+        isOpen={projectSettingsModalOpen}
+        onClose={() => setProjectSettingsModalOpen(false)}
+        container={projectSettingsContainer}
+        onUpdated={fetchContainers}
       />
 
       <UniversalConfirmModal

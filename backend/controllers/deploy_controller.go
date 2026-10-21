@@ -116,8 +116,25 @@ func TestDeploy(c *gin.Context) {
 		// Auto execute repository SQL schemas if connected to database
 		services.AutoExecuteRepoSQL(ctx, buildDir, req.EnvVars, logChan)
 
-		// Detect if repository is a monorepo
-		isMonorepo, feDirName, beDirName := services.DetectMonorepoServices(ctx, buildDir)
+		// Apply Custom Root Directory if specified
+		targetBuildDir := buildDir
+		if strings.TrimSpace(req.RootDir) != "" {
+			cleanRoot := strings.Trim(strings.TrimSpace(req.RootDir), "/")
+			customDir := filepath.Join(buildDir, cleanRoot)
+			if info, err := os.Stat(customDir); err == nil && info.IsDir() {
+				targetBuildDir = customDir
+				logChan <- fmt.Sprintf("📁 Custom Root Directory activated: '%s/'\n", cleanRoot)
+			} else {
+				logChan <- fmt.Sprintf("⚠️ Specified Root Directory '%s' not found, defaulting to repository root\n", cleanRoot)
+			}
+		}
+
+		// Detect if repository is a monorepo (only if root directory is not explicitly customized)
+		isMonorepo := false
+		var feDirName, beDirName string
+		if strings.TrimSpace(req.RootDir) == "" {
+			isMonorepo, feDirName, beDirName = services.DetectMonorepoServices(ctx, buildDir)
+		}
 
 		if isMonorepo {
 			logChan <- fmt.Sprintf("⚡ Fullstack Monorepo detected: (Backend: '%s/', Frontend: '%s/')\nDeploying 2 independent microservices automatically...\n", beDirName, feDirName)
@@ -173,6 +190,12 @@ func TestDeploy(c *gin.Context) {
 				CommitMessage: gitMeta.CommitMessage,
 				AuthorName:    gitMeta.AuthorName,
 				AuthorAvatar:  gitMeta.AuthorAvatar,
+				RootDir:       beDirName,
+				BuildCmd:      req.BuildCmd,
+				InstallCmd:    req.InstallCmd,
+				StartCmd:      req.StartCmd,
+				OutputDir:     req.OutputDir,
+				NodeVersion:   req.NodeVersion,
 			})
 			logChan <- fmt.Sprintf("✅ Backend service live at: http://%s\n", beDomainName)
 
@@ -290,6 +313,12 @@ func TestDeploy(c *gin.Context) {
 				CommitMessage: gitMeta.CommitMessage,
 				AuthorName:    gitMeta.AuthorName,
 				AuthorAvatar:  gitMeta.AuthorAvatar,
+				RootDir:       feDirName,
+				BuildCmd:      req.BuildCmd,
+				InstallCmd:    req.InstallCmd,
+				StartCmd:      req.StartCmd,
+				OutputDir:     req.OutputDir,
+				NodeVersion:   req.NodeVersion,
 			})
 
 			// Prune old unused images in background
@@ -303,7 +332,7 @@ func TestDeploy(c *gin.Context) {
 		}
 
 		// --- Single standalone service ---
-		dockerfilePath := filepath.Join(buildDir, "Dockerfile")
+		dockerfilePath := filepath.Join(targetBuildDir, "Dockerfile")
 		targetPort := "80"
 
 		if _, err := os.Stat(dockerfilePath); err == nil && !req.ForceAI {
@@ -314,7 +343,7 @@ func TestDeploy(c *gin.Context) {
 			} else {
 				logChan <- "No Dockerfile found. Analyzing codebase and generating Dockerfile...\n"
 			}
-			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, buildDir, "")
+			aiDocker, port, err := services.GenerateDockerfile(ctx, req.RepoURL, targetBuildDir, "")
 			if err != nil {
 				logChan <- "Error: " + err.Error() + "\n"
 				utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Dockerfile generation error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
@@ -326,7 +355,7 @@ func TestDeploy(c *gin.Context) {
 		}
 
 		// โยนท่อส่งเข้าไปให้ BuildImage นำไปใช้
-		imageName, err := services.BuildImage(ctx, buildDir, logChan)
+		imageName, err := services.BuildImage(ctx, targetBuildDir, logChan)
 		if err != nil {
 			logChan <- "Error: " + err.Error() + "\n"
 			utils.CreateNotification(wsID, "Deployment Failed", fmt.Sprintf("Build image error for %s: %s", repoCleanName, err.Error()), "error", repoCleanName)
@@ -356,6 +385,12 @@ func TestDeploy(c *gin.Context) {
 			CommitMessage: gitMeta.CommitMessage,
 			AuthorName:    gitMeta.AuthorName,
 			AuthorAvatar:  gitMeta.AuthorAvatar,
+			RootDir:       req.RootDir,
+			BuildCmd:      req.BuildCmd,
+			InstallCmd:    req.InstallCmd,
+			StartCmd:      req.StartCmd,
+			OutputDir:     req.OutputDir,
+			NodeVersion:   req.NodeVersion,
 		}
 
 		if err := config.DB.Create(&newDeploy).Error; err != nil {

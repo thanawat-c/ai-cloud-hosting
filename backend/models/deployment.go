@@ -27,6 +27,15 @@ type Deployment struct {
 	SSLStatus         string    `gorm:"type:varchar(50);default:'inactive'" json:"ssl_status"` // inactive, local, active
 	SSLForceRedirect  bool      `gorm:"default:true" json:"ssl_force_redirect"`         // บังคับเปลี่ยนเส้นทาง HTTP ไปยัง HTTPS
 	LastError         string    `gorm:"type:text"`           // บันทึก Error ล่าสุดถ้าระบบพัง
+
+	// Build & Project Configuration (Monorepo, Custom Scripts)
+	RootDir           string    `gorm:"type:varchar(255);default:''" json:"root_dir"`       // โฟลเดอร์ราก (Monorepo support)
+	BuildCmd          string    `gorm:"type:text;default:''" json:"build_cmd"`              // คำสั่ง Custom Build เช่น npm run build
+	InstallCmd        string    `gorm:"type:text;default:''" json:"install_cmd"`            // คำสั่ง Custom Install เช่น pnpm install
+	StartCmd          string    `gorm:"type:text;default:''" json:"start_cmd"`              // คำสั่ง Custom Start เช่น node server.js
+	OutputDir         string    `gorm:"type:varchar(255);default:''" json:"output_dir"`     // โฟลเดอร์ Output เช่น dist, build
+	NodeVersion       string    `gorm:"type:varchar(20);default:'20'" json:"node_version"`  // Runtime version เช่น 18, 20, 22
+
 	CreatedAt     time.Time `gorm:"autoCreateTime"`      // วันเวลาที่ Deploy
 	UpdatedAt     time.Time `gorm:"autoUpdateTime"`      // วันเวลาที่แก้ไขสถานะล่าสุด
 }

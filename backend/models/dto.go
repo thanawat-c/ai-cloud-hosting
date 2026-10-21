@@ -9,6 +9,22 @@ type DeployRequest struct {
     GitToken     string `json:"git_token"`
     AutoCreateDB bool   `json:"auto_create_db"`
     WorkspaceID  string `json:"workspace_id"`
+    RootDir      string `json:"root_dir"`
+    BuildCmd     string `json:"build_cmd"`
+    InstallCmd   string `json:"install_cmd"`
+    StartCmd     string `json:"start_cmd"`
+    OutputDir    string `json:"output_dir"`
+    NodeVersion  string `json:"node_version"`
+}
+
+type UpdateProjectSettingsRequest struct {
+    RootDir     string `json:"root_dir"`
+    BuildCmd    string `json:"build_cmd"`
+    InstallCmd  string `json:"install_cmd"`
+    StartCmd    string `json:"start_cmd"`
+    OutputDir   string `json:"output_dir"`
+    NodeVersion string `json:"node_version"`
+    AutoDeploy  *bool  `json:"auto_deploy"`
 }
 
 
