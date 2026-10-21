@@ -1,4 +1,3 @@
-import React from 'react';
 import { Globe, X, Shield } from 'lucide-react';
 
 export const CustomDomainModal = ({

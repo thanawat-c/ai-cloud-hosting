@@ -52,10 +52,10 @@ func UpdateContainerDomain(c *gin.Context) {
 	}
 
 	config.DB.Model(&deploy).Updates(map[string]interface{}{
-		"custom_domain":       cleanDomain,
-		"ssl_enabled":         sslEnabled,
-		"ssl_status":          sslStatus,
-		"ssl_force_redirect":  req.SSLForceRedirect,
+		"custom_domain":      cleanDomain,
+		"ssl_enabled":        sslEnabled,
+		"ssl_status":         sslStatus,
+		"ssl_force_redirect": req.SSLForceRedirect,
 	})
 
 	newID := deploy.ContainerID

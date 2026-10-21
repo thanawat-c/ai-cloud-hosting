@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Settings, X, Folder, Terminal, Play, Package, Cpu, RefreshCw, Save, Check, GitBranch, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Settings, X, Folder, Terminal, Play, Package, Cpu, RefreshCw, Save, GitBranch, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) => {
@@ -15,20 +15,7 @@ export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) 
   const [nodeVersion, setNodeVersion] = useState('20');
   const [autoDeploy, setAutoDeploy] = useState(true);
 
-  useEffect(() => {
-    if (isOpen && container) {
-      setRootDir(container.root_dir || '');
-      setBuildCmd(container.build_cmd || '');
-      setInstallCmd(container.install_cmd || '');
-      setStartCmd(container.start_cmd || '');
-      setOutputDir(container.output_dir || '');
-      setNodeVersion(container.node_version || '20');
-      setAutoDeploy(container.auto_deploy !== false);
-      fetchSettings();
-    }
-  }, [isOpen, container]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!container?.id) return;
     setLoading(true);
     try {
@@ -48,7 +35,23 @@ export const ProjectSettingsModal = ({ isOpen, onClose, container, onUpdated }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [container]);
+
+  useEffect(() => {
+    if (isOpen && container) {
+      const timer = setTimeout(() => {
+        setRootDir(container.root_dir || '');
+        setBuildCmd(container.build_cmd || '');
+        setInstallCmd(container.install_cmd || '');
+        setStartCmd(container.start_cmd || '');
+        setOutputDir(container.output_dir || '');
+        setNodeVersion(container.node_version || '20');
+        setAutoDeploy(container.auto_deploy !== false);
+        fetchSettings();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, container, fetchSettings]);
 
   const handleSave = async (triggerRedeploy = false) => {
     if (!container?.id) return;

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Webhook, X, Check, Copy, ExternalLink } from 'lucide-react';
 
 export const WebhookModal = ({

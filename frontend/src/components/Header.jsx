@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock, User, LogOut, Activity } from 'lucide-react';
+import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, LogOut, Activity } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -66,17 +66,20 @@ const Header = ({ setIsSidebarOpen }) => {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unread_count || 0);
       }
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   }, [activeWorkspaceId]);
 
   useEffect(() => {
-    fetchNotifications();
+    const timer = setTimeout(fetchNotifications, 0);
     const handleRefresh = () => fetchNotifications();
     window.addEventListener('notification-refresh', handleRefresh);
     const interval = setInterval(() => {
       if (!document.hidden) fetchNotifications();
     }, 5000);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('notification-refresh', handleRefresh);
       clearInterval(interval);
     };
@@ -90,7 +93,9 @@ const Header = ({ setIsSidebarOpen }) => {
       });
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   };
 
   const handleClearNotifications = async () => {
@@ -102,7 +107,9 @@ const Header = ({ setIsSidebarOpen }) => {
       setNotifications([]);
       setUnreadCount(0);
       toast.success('All notifications cleared');
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   };
 
   const quickNavItems = [

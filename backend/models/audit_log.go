@@ -8,7 +8,7 @@ type AuditLog struct {
 	WorkspaceID  string    `gorm:"type:varchar(50);index;not null" json:"workspace_id"`
 	ActorName    string    `gorm:"type:varchar(100)" json:"actor_name"`
 	ActorEmail   string    `gorm:"type:varchar(100)" json:"actor_email"`
-	Action       string    `gorm:"type:varchar(50);index;not null" json:"action"` // e.g. deploy.create, container.restart, member.invite
+	Action       string    `gorm:"type:varchar(50);index;not null" json:"action"`        // e.g. deploy.create, container.restart, member.invite
 	ResourceType string    `gorm:"type:varchar(50);index;not null" json:"resource_type"` // deployment, database, volume, member, token, system
 	ResourceID   string    `gorm:"type:varchar(100)" json:"resource_id"`
 	ResourceName string    `gorm:"type:varchar(255)" json:"resource_name"`

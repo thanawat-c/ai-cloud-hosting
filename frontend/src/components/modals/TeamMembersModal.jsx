@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Users, X, UserPlus, Shield, Trash2, Check, RefreshCw, Mail, Crown } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, X, UserPlus, Trash2, RefreshCw, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -14,7 +14,7 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [role, setRole] = useState('member');
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
@@ -30,16 +30,19 @@ export const TeamMembersModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchMembers();
-      setEmail('');
-      setName('');
-      setRole('member');
+      const timer = setTimeout(() => {
+        fetchMembers();
+        setEmail('');
+        setName('');
+        setRole('member');
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, activeWorkspaceId]);
+  }, [isOpen, fetchMembers]);
 
   const handleInvite = async (e) => {
     e.preventDefault();

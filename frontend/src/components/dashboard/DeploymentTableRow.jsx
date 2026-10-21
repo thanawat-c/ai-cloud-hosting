@@ -63,7 +63,6 @@ const DeploymentTableRow = ({
   item,
   isMenuOpen,
   setActiveMenuId,
-  containers,
   handleOpenDomainModal,
   handleOpenEnv,
   handleOpenProjectSettings,
@@ -91,8 +90,8 @@ const DeploymentTableRow = ({
 
   useEffect(() => {
     if (!isMenuOpen) {
-      setMenuCoords(null);
-      return;
+      const timer = setTimeout(() => setMenuCoords(null), 0);
+      return () => clearTimeout(timer);
     }
 
     const updatePosition = () => {

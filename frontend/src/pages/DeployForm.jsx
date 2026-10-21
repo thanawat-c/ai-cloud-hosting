@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
-  Search, Key, Eye, EyeOff, Lock, ChevronDown, SlidersHorizontal, 
-  FileText, Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw,
-  Sparkles, Loader2, Clock, Layers, Box, ShieldCheck, Folder, Settings, Cpu, Play, Package
+  Eye, EyeOff, ChevronDown, SlidersHorizontal, 
+  Database, Check, Copy, LayoutDashboard, X, AlertTriangle, RefreshCw,
+  Sparkles, Loader2, Folder, Cpu, Play, Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -13,7 +13,7 @@ import { BulkEnvEditor } from '../components/common/BulkEnvEditor';
 
 const DeployForm = () => {
   const navigate = useNavigate();
-  const { activeWorkspaceId, currentWorkspace, refreshWorkspaces } = useWorkspace();
+  const { activeWorkspaceId, refreshWorkspaces } = useWorkspace();
   const resultRef = useRef(null);
   const logsEndRef = useRef(null);
   const terminalBoxRef = useRef(null);
@@ -166,9 +166,11 @@ const DeployForm = () => {
   useEffect(() => {
     const trimmed = repoUrl.trim();
     if (!trimmed || !trimmed.startsWith('http') || !trimmed.includes('github.com')) {
-      setInspectResult(null);
-      setInspectError('');
-      return;
+      const timer = setTimeout(() => {
+        setInspectResult(null);
+        setInspectError('');
+      }, 0);
+      return () => clearTimeout(timer);
     }
     const timer = setTimeout(() => {
       handleInspectRepo(trimmed);

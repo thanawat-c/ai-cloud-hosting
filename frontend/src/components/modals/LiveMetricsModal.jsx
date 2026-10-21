@@ -1,4 +1,3 @@
-import React from 'react';
 import { Activity, X, Cpu, HardDrive } from 'lucide-react';
 
 export const LiveMetricsModal = ({

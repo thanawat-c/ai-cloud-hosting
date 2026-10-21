@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { History, X, Rocket, Database, HardDrive, Users, Settings, Shield, RefreshCw, Clock, Filter, Key } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { History, X, Rocket, Database, HardDrive, Users, Shield, RefreshCw, Clock, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -9,7 +9,7 @@ export const AuditLogModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState('all');
 
-  const fetchLogs = async (type = filterType) => {
+  const fetchLogs = useCallback(async (type = filterType) => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
@@ -28,13 +28,14 @@ export const AuditLogModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeWorkspaceId, filterType]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchLogs(filterType);
+      const timer = setTimeout(() => fetchLogs(filterType), 0);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, activeWorkspaceId, filterType]);
+  }, [isOpen, fetchLogs, filterType]);
 
   if (!isOpen) return null;
 

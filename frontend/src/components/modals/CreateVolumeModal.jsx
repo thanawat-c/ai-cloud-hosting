@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { HardDrive, X, Plus, Folder, Server, Check, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { HardDrive, X, Plus, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -10,19 +10,8 @@ export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
   const [containerId, setContainerId] = useState('');
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fetchingContainers, setFetchingContainers] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setName('');
-      setMountPath('/app/uploads');
-      setContainerId('');
-      fetchContainers();
-    }
-  }, [isOpen, activeWorkspaceId]);
-
-  const fetchContainers = async () => {
-    setFetchingContainers(true);
+  const fetchContainers = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:8080/api/containers', {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
@@ -33,10 +22,20 @@ export const CreateVolumeModal = ({ isOpen, onClose, onCreated }) => {
       }
     } catch {
       // ignore
-    } finally {
-      setFetchingContainers(false);
     }
-  };
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        setName('');
+        setMountPath('/app/uploads');
+        setContainerId('');
+        fetchContainers();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, fetchContainers]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

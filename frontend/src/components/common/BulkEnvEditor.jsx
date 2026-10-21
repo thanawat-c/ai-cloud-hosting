@@ -11,9 +11,7 @@ import {
   EyeOff, 
   Plus, 
   Database, 
-  AlertTriangle, 
-  Sparkles,
-  Key
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -107,9 +105,12 @@ export const BulkEnvEditor = ({
   // Sync rows when raw text changes outside
   useEffect(() => {
     if (mode === 'table') {
-      setRows(parseEnvToRows(value));
+      const timer = setTimeout(() => {
+        setRows(parseEnvToRows(value));
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [mode]);
+  }, [mode, value]);
 
   const handleModeChange = (newMode) => {
     if (newMode === 'table') {

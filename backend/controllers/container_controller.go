@@ -32,7 +32,7 @@ func GetContainers(c *gin.Context) {
 
 	// 2. ดึงสถานะปัจจุบันของ Container ที่รันอยู่ใน Docker จริงๆ ทั้งหมด
 	dockerContainers, _ := services.ListContainers(context.Background())
-	
+
 	// ดึงรายการ Managed Database ทั้งหมดของ Workspace นี้ (รวมถึงที่ถูกลบไปแล้ว เพื่อเช็คว่า Service เดิมเคยผูกกับ DB ที่ถูกลบหรือไม่)
 	var allDBs []models.ManagedDatabase
 	dbQuery := config.DB.Model(&models.ManagedDatabase{})
@@ -275,45 +275,45 @@ func GetContainers(c *gin.Context) {
 		}
 
 		results = append(results, map[string]interface{}{
-			"id":             d.ContainerID,
-			"deployment_id":  d.ID,
-			"name":           d.RepoURL, 
-			"clean_name":     cleanName,
-			"service_type":   serviceType,
-			"image":          d.ImageName,
-			"state":          actualState,
-			"status":         "Deployed: " + deployedAt.Format("02 Jan 15:04"),
-			"created_at":     d.CreatedAt.Format(time.RFC3339),
-			"updated_at":     d.UpdatedAt.Format(time.RFC3339),
-			"deployed_at":    deployedAt.Format(time.RFC3339),
-			"domain_name":         d.DomainName,
-			"custom_domain":       d.CustomDomain,
-			"ssl_enabled":         d.SSLEnabled,
-			"ssl_status":          d.SSLStatus,
-			"ssl_force_redirect":  d.SSLForceRedirect,
-			"last_error":          lastError,
-			"branch":         branch,
-			"commit_hash":    commitHash,
-			"commit_message": d.CommitMessage,
-			"author_name":    authorName,
-			"author_avatar":  authorAvatar,
-			"linked_db_name": linkedDBName,
-			"linked_db_id":   linkedDBID,
-			"is_db_stopped":  isDBStopped,
-			"is_missing_db":  isMissingDB,
-			"db_warning":     dbWarning,
-			"root_dir":       d.RootDir,
-			"build_cmd":      d.BuildCmd,
-			"install_cmd":    d.InstallCmd,
-			"start_cmd":      d.StartCmd,
-			"output_dir":     d.OutputDir,
-			"node_version":   d.NodeVersion,
-			"auto_deploy":    d.AutoDeploy,
-			"webhook_secret": d.WebhookSecret,
-			"webhook_url":    fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),
+			"id":                 d.ContainerID,
+			"deployment_id":      d.ID,
+			"name":               d.RepoURL,
+			"clean_name":         cleanName,
+			"service_type":       serviceType,
+			"image":              d.ImageName,
+			"state":              actualState,
+			"status":             "Deployed: " + deployedAt.Format("02 Jan 15:04"),
+			"created_at":         d.CreatedAt.Format(time.RFC3339),
+			"updated_at":         d.UpdatedAt.Format(time.RFC3339),
+			"deployed_at":        deployedAt.Format(time.RFC3339),
+			"domain_name":        d.DomainName,
+			"custom_domain":      d.CustomDomain,
+			"ssl_enabled":        d.SSLEnabled,
+			"ssl_status":         d.SSLStatus,
+			"ssl_force_redirect": d.SSLForceRedirect,
+			"last_error":         lastError,
+			"branch":             branch,
+			"commit_hash":        commitHash,
+			"commit_message":     d.CommitMessage,
+			"author_name":        authorName,
+			"author_avatar":      authorAvatar,
+			"linked_db_name":     linkedDBName,
+			"linked_db_id":       linkedDBID,
+			"is_db_stopped":      isDBStopped,
+			"is_missing_db":      isMissingDB,
+			"db_warning":         dbWarning,
+			"root_dir":           d.RootDir,
+			"build_cmd":          d.BuildCmd,
+			"install_cmd":        d.InstallCmd,
+			"start_cmd":          d.StartCmd,
+			"output_dir":         d.OutputDir,
+			"node_version":       d.NodeVersion,
+			"auto_deploy":        d.AutoDeploy,
+			"webhook_secret":     d.WebhookSecret,
+			"webhook_url":        fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),
 		})
 	}
-	
+
 	c.JSON(http.StatusOK, results)
 }
 
@@ -431,11 +431,11 @@ func DeleteContainer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Service deleted successfully"})
 }
 
-func RedeployContainer(c *gin.Context){
+func RedeployContainer(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	var deploy models.Deployment
-	if err := config.DB.Where("container_id Like ?", id + "%").First(&deploy).Error; err != nil {
+	if err := config.DB.Where("container_id Like ?", id+"%").First(&deploy).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Service not found"})
 		return
 	}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, X, Cpu, HardDrive, Server, Trash2, RefreshCw, CheckCircle2, AlertTriangle, Layers, Clock, Zap } from 'lucide-react';
+import { Activity, X, Cpu, HardDrive, Server, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const HostHealthModal = ({ isOpen, onClose }) => {
@@ -24,9 +24,12 @@ export const HostHealthModal = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      fetchHealth(true);
+      const timer = setTimeout(() => fetchHealth(true), 0);
       const interval = setInterval(() => fetchHealth(false), 3000);
-      return () => clearInterval(interval);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
   }, [isOpen]);
 
@@ -61,12 +64,6 @@ export const HostHealthModal = ({ isOpen, onClose }) => {
     if (d > 0) return `${d}d ${h}h ${m}m`;
     if (h > 0) return `${h}h ${m}m`;
     return `${m}m`;
-  };
-
-  const getUsageColor = (pct) => {
-    if (pct >= 85) return 'text-rose-400 bg-rose-500';
-    if (pct >= 65) return 'text-amber-400 bg-amber-500';
-    return 'text-emerald-400 bg-emerald-500';
   };
 
   return (

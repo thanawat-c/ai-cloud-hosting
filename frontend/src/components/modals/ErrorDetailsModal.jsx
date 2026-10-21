@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertTriangle, X, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -78,6 +77,7 @@ export const ErrorDetailsModal = ({
               </button>
             </div>
             <div className="p-4 rounded-lg bg-black text-neutral-300 font-mono text-xs leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap break-words border border-neutral-800 shadow-inner">
+              {/* eslint-disable-next-line no-control-regex */}
               {activeErrorDetails?.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '') || 'No details available'}
             </div>
           </div>

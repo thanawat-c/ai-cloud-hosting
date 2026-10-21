@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"ai-cloud-api/routes"
 	"ai-cloud-api/config"
+	"ai-cloud-api/routes"
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"

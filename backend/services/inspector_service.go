@@ -292,13 +292,13 @@ func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 
 	// 1. Regex สแกนหาตัวแปร Frontend ยอดนิยมจากทุก Framework
 	rePatterns := []*regexp.Regexp{
-		regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`),             // Vite (React/Vue/Svelte)
-		regexp.MustCompile(`import\.meta\.env\[['"]([A-Za-z0-9_]+)['"]\]`),  // Vite bracket syntax
-		regexp.MustCompile(`process\.env\.(NEXT_PUBLIC_[A-Za-z0-9_]+)`),      // Next.js
-		regexp.MustCompile(`process\.env\.(REACT_APP_[A-Za-z0-9_]+)`),       // Create React App
+		regexp.MustCompile(`import\.meta\.env\.([A-Za-z0-9_]+)`),                   // Vite (React/Vue/Svelte)
+		regexp.MustCompile(`import\.meta\.env\[['"]([A-Za-z0-9_]+)['"]\]`),         // Vite bracket syntax
+		regexp.MustCompile(`process\.env\.(NEXT_PUBLIC_[A-Za-z0-9_]+)`),            // Next.js
+		regexp.MustCompile(`process\.env\.(REACT_APP_[A-Za-z0-9_]+)`),              // Create React App
 		regexp.MustCompile(`(?:process\.env\.|env\.)?(NUXT_PUBLIC_[A-Za-z0-9_]+)`), // Nuxt
-		regexp.MustCompile(`process\.env\.([A-Za-z0-9_]+)`),                 // General process.env
-		regexp.MustCompile(`process\.env\[['"]([A-Za-z0-9_]+)['"]\]`),       // General bracket syntax
+		regexp.MustCompile(`process\.env\.([A-Za-z0-9_]+)`),                        // General process.env
+		regexp.MustCompile(`process\.env\[['"]([A-Za-z0-9_]+)['"]\]`),              // General bracket syntax
 	}
 
 	isAPIKeyword := func(key string) bool {
@@ -383,4 +383,3 @@ func DetectFrontendAPIEnvKeys(frontendDir string) []string {
 	}
 	return result
 }
-

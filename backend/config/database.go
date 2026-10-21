@@ -29,8 +29,8 @@ func ConnectDatabase() {
 	// GORM Auto Migrate tables
 	err = database.AutoMigrate(
 		&models.User{},
-		&models.Workspace{}, 
-		&models.Deployment{}, 
+		&models.Workspace{},
+		&models.Deployment{},
 		&models.ManagedDatabase{},
 		&models.Notification{},
 		&models.APIToken{},

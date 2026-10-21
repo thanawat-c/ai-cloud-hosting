@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const UniversalConfirmModal = ({ confirmModal, onClose }) => {

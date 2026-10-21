@@ -4,8 +4,8 @@ import "time"
 
 // Workspace โมเดลสำหรับแบ่งสิทธิ์และแยกพื้นที่ทำงาน (Multi-Tenancy)
 type Workspace struct {
-	ID          string    `gorm:"primaryKey;type:varchar(50)" json:"id"`        // e.g. "personal", "engineering"
-	Name        string    `gorm:"type:varchar(100);not null" json:"name"`       // e.g. "Personal (Pro)", "Engineering Team"
+	ID          string    `gorm:"primaryKey;type:varchar(50)" json:"id"`  // e.g. "personal", "engineering"
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"` // e.g. "Personal (Pro)", "Engineering Team"
 	Slug        string    `gorm:"type:varchar(50);uniqueIndex" json:"slug"`
 	Type        string    `gorm:"type:varchar(20);default:'personal'" json:"type"` // personal, team
 	Plan        string    `gorm:"type:varchar(20);default:'Pro'" json:"plan"`

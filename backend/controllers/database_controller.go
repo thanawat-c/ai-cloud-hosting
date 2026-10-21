@@ -400,5 +400,3 @@ func DeleteDatabaseSnapshot(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Snapshot deleted successfully"})
 }
-
-

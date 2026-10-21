@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Webhook, X, Plus, Trash2, Send, Power, CheckCircle2, AlertTriangle, ExternalLink, HelpCircle, Sparkles, Radio } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Webhook, X, Plus, Trash2, Send, Power, HelpCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -18,7 +18,7 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
   const [events, setEvents] = useState('all');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchWebhooks = async () => {
+  const fetchWebhooks = useCallback(async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
@@ -34,14 +34,17 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchWebhooks();
-      setShowAddForm(false);
+      const timer = setTimeout(() => {
+        fetchWebhooks();
+        setShowAddForm(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, activeWorkspaceId]);
+  }, [isOpen, fetchWebhooks]);
 
   if (!isOpen) return null;
 
@@ -130,7 +133,7 @@ export const WebhooksModal = ({ isOpen, onClose }) => {
         toast.error(data.error || 'Failed to send test alert');
       }
     } catch (err) {
-      toast.error('Network error testing webhook');
+      toast.error('Network error testing webhook', { description: err?.message });
     } finally {
       setTestingId(null);
     }

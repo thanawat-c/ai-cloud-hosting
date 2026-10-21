@@ -1,4 +1,3 @@
-import React from 'react';
 import { Terminal, X } from 'lucide-react';
 
 export const ContainerLogsModal = ({

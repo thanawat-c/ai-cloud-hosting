@@ -41,4 +41,3 @@ func GetWorkspaceID(c *gin.Context) string {
 	// 4. Default to personal
 	return "personal"
 }
-

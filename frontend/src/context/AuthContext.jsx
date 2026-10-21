@@ -55,7 +55,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    checkAuth();
+    const timer = setTimeout(checkAuth, 0);
+    return () => clearTimeout(timer);
   }, [checkAuth]);
 
   // Login handler
@@ -114,7 +115,9 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     try {
       fetch('http://localhost:8080/api/auth/logout', { method: 'POST' }).catch(() => {});
-    } catch {}
+    } catch (err) {
+      void err;
+    }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setToken(null);
@@ -140,6 +143,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

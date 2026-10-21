@@ -1,5 +1,4 @@
-import React from 'react';
-import { Settings, X, AlertCircle, CheckCircle2, Database } from 'lucide-react';
+import { Settings, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { BulkEnvEditor } from '../common/BulkEnvEditor';
 
 export const EnvVariablesModal = ({

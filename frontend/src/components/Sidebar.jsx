@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Rocket, X, Database, Plus, Terminal, Check, ChevronsUpDown, Users, LogOut, Key, Copy, Trash2, Shield, Code, Sparkles, History, Webhook } from 'lucide-react';
+import { LayoutDashboard, Rocket, X, Database, Plus, Check, ChevronsUpDown, Users, LogOut, Key, Copy, Trash2, Code, Sparkles, History, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  const fetchTokens = async () => {
+  const fetchTokens = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:8080/api/tokens', {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
@@ -33,16 +33,21 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         const data = await res.json();
         setTokens(data || []);
       }
-    } catch {}
-  };
+    } catch (err) {
+      void err;
+    }
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (tokenModalOpen) {
-      fetchTokens();
-      setGeneratedToken(null);
-      setCopiedToken(false);
+      const timer = setTimeout(() => {
+        fetchTokens();
+        setGeneratedToken(null);
+        setCopiedToken(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [tokenModalOpen, activeWorkspaceId]);
+  }, [tokenModalOpen, fetchTokens]);
 
   const handleCreateToken = async (e) => {
     e.preventDefault();
@@ -90,7 +95,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       } else {
         toast.error('Failed to revoke token');
       }
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   };
 
   return (

@@ -25,7 +25,8 @@ export const WorkspaceProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchWorkspaces();
+    const timer = setTimeout(fetchWorkspaces, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const switchWorkspace = (id) => {
@@ -64,6 +65,7 @@ export const WorkspaceProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWorkspace = () => {
   const ctx = useContext(WorkspaceContext);
   if (!ctx) {

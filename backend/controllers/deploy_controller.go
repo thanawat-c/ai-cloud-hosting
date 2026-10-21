@@ -412,7 +412,7 @@ func TestDeploy(c *gin.Context) {
 	for msg := range logChan {
 		// พ่นข้อความไปให้ Frontend ทันที
 		c.Writer.Write([]byte(msg))
-		c.Writer.Flush() 
+		c.Writer.Flush()
 	}
 }
 
@@ -435,4 +435,3 @@ func InspectRepo(c *gin.Context) {
 
 	c.JSON(http.StatusOK, result)
 }
-

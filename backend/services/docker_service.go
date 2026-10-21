@@ -164,7 +164,7 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 
 	labels := map[string]string{
 		"traefik.enable": "true",
-		"traefik.http.routers." + routerName + ".rule": rule,
+		"traefik.http.routers." + routerName + ".rule":                      rule,
 		"traefik.http.services." + routerName + ".loadbalancer.server.port": targetPort,
 		"ach.workspace": wsID,
 		"ach.type":      "service",
@@ -201,7 +201,6 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 
 	return resp.ID, domainName, nil
 }
-
 
 func ListContainers(ctx context.Context) ([]models.ContainerDTO, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -477,7 +476,7 @@ type ContainerStatsData struct {
 	} `json:"precpu_stats"`
 }
 
-func GetContainerStats( ctx context.Context, containerID string) (map[string]interface{}, error) {
+func GetContainerStats(ctx context.Context, containerID string) (map[string]interface{}, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
@@ -486,7 +485,7 @@ func GetContainerStats( ctx context.Context, containerID string) (map[string]int
 
 	stats, err := cli.ContainerStats(ctx, containerID, false)
 
-	if	err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -502,7 +501,6 @@ func GetContainerStats( ctx context.Context, containerID string) (map[string]int
 	memUsageMB := data.MemoryStats.Usage / 1024 / 1024
 	memLimitMB := data.MemoryStats.Limit / 1024 / 1024
 
-	
 	cpuDelta := data.CPUStats.CPUUsage.TotalUsage - data.PreCPUStats.CPUUsage.TotalUsage
 	systemDelta := data.CPUStats.SystemCPUUsage - data.PreCPUStats.SystemCPUUsage
 	cpuPercent := 0.0
@@ -512,9 +510,9 @@ func GetContainerStats( ctx context.Context, containerID string) (map[string]int
 
 	// แพ็กข้อมูลส่งกลับไป
 	return map[string]interface{}{
-		"cpu_percent":    cpuPercent,
-		"memory_mb":      memUsageMB,
-		"memory_limit":   memLimitMB,
+		"cpu_percent":  cpuPercent,
+		"memory_mb":    memUsageMB,
+		"memory_limit": memLimitMB,
 	}, nil
 }
 

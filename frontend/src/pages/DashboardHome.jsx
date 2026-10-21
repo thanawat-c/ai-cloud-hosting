@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Server, Play, Square, Trash2, ExternalLink, Activity, Box, Terminal, FileText, X, Cpu, HardDrive, RefreshCw, AlertTriangle, Settings, AlertCircle, CheckCircle2, Layers, Globe, Database, Bell, BellRing, Sparkles, Copy, Check, Plus, Link2, Table, Code, Search, Download, Upload, GitBranch, Webhook, Clock, Send, MoreHorizontal, ArrowUpRight, GitCommit, Archive, History, Shield, RotateCcw } from 'lucide-react';
+import { Server, Play, Box, X, Bell, BellRing, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import {
@@ -54,16 +54,6 @@ const getGitCommitUrl = (repoUrl, commitHash) => {
   return null;
 };
 
-// Helper to get GitHub branch link
-const getGitBranchUrl = (repoUrl, branch) => {
-  if (!repoUrl || !branch) return null;
-  const clean = repoUrl.replace(/\.git\/?$/, '').replace(/\s*\((Backend|Frontend)\)$/, '').trim();
-  if (clean.includes('github.com')) {
-    return `${clean}/tree/${branch}`;
-  }
-  return null;
-};
-
 // Calculate relative time ago, e.g., 'just now', '2m ago', '1h ago'
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return '-';
@@ -91,6 +81,7 @@ const formatTimeAgo = (dateStr) => {
 // Extract key error message / root cause from stack trace
 const extractCrashRootCause = (logText) => {
   if (!logText) return 'No error details recorded';
+  // eslint-disable-next-line no-control-regex
   const clean = logText.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '');
   const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
   
@@ -112,21 +103,8 @@ const extractCrashRootCause = (logText) => {
   return lines[0] || 'Unknown runtime error';
 };
 
-// Format full date and time
-const formatDateTime = (dateStr) => {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
 const DashboardHome = () => {
-  const { activeWorkspaceId, currentWorkspace, refreshWorkspaces } = useWorkspace();
+  const { activeWorkspaceId, refreshWorkspaces } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'storage' ? 'storage' : 'deployments';
   const [containers, setContainers] = useState([]);
@@ -242,7 +220,6 @@ const DashboardHome = () => {
   const [metricsModalOpen, setMetricsModalOpen] = useState(false);
   const [metricsContainer, setMetricsContainer] = useState(null);
   const [metricsData, setMetricsData] = useState(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
 
   const fetchMetrics = async (id) => {
     try {
@@ -253,15 +230,12 @@ const DashboardHome = () => {
       }
     } catch (e) {
       console.error('Failed to fetch container metrics:', e);
-    } finally {
-      setMetricsLoading(false);
     }
   };
 
   const handleOpenMetrics = (container) => {
     setMetricsContainer(container);
     setMetricsModalOpen(true);
-    setMetricsLoading(true);
     fetchMetrics(container.id);
   };
 
@@ -314,11 +288,14 @@ const DashboardHome = () => {
         const data = await res.json();
         setVolumes(data || []);
       }
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   }, [activeWorkspaceId]);
 
   useEffect(() => {
-    fetchVolumes();
+    const timer = setTimeout(fetchVolumes, 0);
+    return () => clearTimeout(timer);
   }, [fetchVolumes]);
 
   const handleDeleteVolume = async (volId, volName) => {
@@ -334,8 +311,8 @@ const DashboardHome = () => {
       } else {
         toast.error('Failed to delete volume');
       }
-    } catch {
-      toast.error('Network error deleting volume');
+    } catch (err) {
+      toast.error('Network error deleting volume', { description: err?.message });
     }
   };
 
@@ -349,7 +326,9 @@ const DashboardHome = () => {
         toast.success('Volume detached');
         fetchVolumes();
       }
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   };
 
   const handleSaveCustomDomain = async () => {
@@ -375,7 +354,7 @@ const DashboardHome = () => {
         toast.error(data.error || 'Failed to update custom domain');
       }
     } catch (err) {
-      toast.error('Network error saving domain');
+      toast.error('Network error saving domain', { description: err?.message });
     } finally {
       setSavingDomain(false);
     }
@@ -535,7 +514,9 @@ const DashboardHome = () => {
                   const statData = await statRes.json();
                   setStats(prev => ({ ...prev, [db.container_id]: statData }));
                 }
-              } catch (err) {}
+              } catch (err) {
+                void err;
+              }
             }
           });
         }
@@ -547,19 +528,22 @@ const DashboardHome = () => {
 
   useEffect(() => {
     const isStorageTab = activeTab === 'storage';
-    // Initial fetch
-    fetchContainers();
-    fetchDatabases(isStorageTab);
+    const timer = setTimeout(() => {
+      fetchContainers();
+      fetchDatabases(isStorageTab);
+    }, 0);
     
     const interval = setInterval(() => {
-      // Pause polling when browser tab is inactive / backgrounded
       if (document.hidden) return;
 
       fetchContainers();
       fetchDatabases(activeTab === 'storage');
     }, 6000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchContainers, fetchDatabases, activeTab]);
 
   const handleCreateDatabase = async (e) => {
@@ -658,13 +642,6 @@ const DashboardHome = () => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     toast.success('Connection URL copied!', { description: 'Ready to paste into .env or database client' });
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const handleCopyApiUrl = (url, key) => {
-    navigator.clipboard.writeText(url);
-    setCopiedKey(key);
-    toast.success('API endpoint copied', { description: url });
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -1105,7 +1082,6 @@ const DashboardHome = () => {
           await fetchContainers();
           refreshWorkspaces();
         } catch (error) {
-          console.log("Deletion failed", error);
           toast.error("Server connection failed", { id: toastId, description: error.message });
           await fetchContainers();
           refreshWorkspaces();
@@ -1454,6 +1430,7 @@ const DashboardHome = () => {
           handleOpenSnapshotModal={handleOpenSnapshotModal}
           handleBackupDb={handleBackupDb}
           backingUpId={backingUpId}
+          handleOpenRestoreModal={handleOpenRestoreModal}
           handleCopyUrl={handleCopyUrl}
           copiedKey={copiedKey}
         />
