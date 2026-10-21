@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Rocket, X, Database, Plus, Terminal, Check, ChevronsUpDown, Users, LogOut, Key, Copy, Trash2, Shield, Code, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const { workspaces, activeWorkspaceId, currentWorkspace, switchWorkspace } = useWorkspace();
 
@@ -249,7 +252,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 type="button"
                 onClick={() => {
                   setWorkspaceMenuOpen(false);
-                  toast.success('Signed out. Local session refreshed.');
+                  logout();
+                  navigate('/login');
                 }}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-rose-950/40 text-rose-400 transition-colors cursor-pointer"
               >

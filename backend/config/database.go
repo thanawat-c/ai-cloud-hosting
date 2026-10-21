@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"ai-cloud-api/models"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -27,6 +28,7 @@ func ConnectDatabase() {
 
 	// GORM Auto Migrate tables
 	err = database.AutoMigrate(
+		&models.User{},
 		&models.Workspace{}, 
 		&models.Deployment{}, 
 		&models.ManagedDatabase{},
@@ -39,8 +41,9 @@ func ConnectDatabase() {
 		log.Fatal("❌ Auto-migration failed: ", err)
 	}
 
-	// Seed default workspaces
+	// Seed default workspaces and admin user
 	seedWorkspaces(database)
+	seedAdminUser(database)
 
 	// Backfill existing records with empty workspace_id to 'personal'
 	database.Model(&models.Deployment{}).Where("workspace_id = '' OR workspace_id IS NULL").Update("workspace_id", "personal")
@@ -48,6 +51,25 @@ func ConnectDatabase() {
 
 	fmt.Println("✅ Database connected and migrated successfully!")
 	DB = database
+}
+
+func seedAdminUser(db *gorm.DB) {
+	var count int64
+	db.Model(&models.User{}).Count(&count)
+	if count == 0 {
+		hashed, err := bcrypt.GenerateFromPassword([]byte("admin1234"), bcrypt.DefaultCost)
+		if err == nil {
+			admin := models.User{
+				Email:        "admin@aicloud.dev",
+				PasswordHash: string(hashed),
+				Name:         "Admin User",
+				Role:         "admin",
+				AvatarURL:    "https://api.dicebear.com/7.x/identicon/svg?seed=admin@aicloud.dev",
+			}
+			db.Create(&admin)
+			fmt.Println("🔑 Default Admin user seeded: admin@aicloud.dev (password: admin1234)")
+		}
+	}
 }
 
 func seedWorkspaces(db *gorm.DB) {

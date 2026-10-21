@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock } from 'lucide-react';
+import { Menu, Bell, Search, Command, X, Rocket, Database, LayoutDashboard, Sparkles, RefreshCw, Trash2, ArrowRight, CheckCircle2, AlertTriangle, AlertCircle, Key, Globe, Check, Clock, User, LogOut } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ setIsSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname === '/' ? 'overview' : location.pathname.replace('/', '');
   const { activeWorkspaceId, currentWorkspace } = useWorkspace();
+  const { user, logout } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -293,6 +296,61 @@ const Header = ({ setIsSidebarOpen }) => {
                 </>
               )}
             </div>
+
+            {/* User Profile Avatar & Menu */}
+            {user && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen(prev => !prev)}
+                  className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-neutral-700 transition-all cursor-pointer"
+                  title={user.name || user.email}
+                >
+                  {user.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name}
+                      className="w-7 h-7 rounded-full bg-neutral-800 border border-neutral-700 object-cover"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-xs flex items-center justify-center font-bold">
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                  )}
+                </button>
+
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-[#0a0a0a] border border-neutral-800 rounded-xl shadow-2xl z-40 p-1.5 text-xs font-mono animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-2.5 border-b border-neutral-900 mb-1">
+                        <div className="font-semibold text-white truncate">{user.name || 'Developer'}</div>
+                        <div className="text-[11px] text-neutral-400 truncate mt-0.5">{user.email}</div>
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                            {user.role || 'developer'}
+                          </span>
+                          <span className="text-[9px] text-neutral-500">Local Cluster</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          logout();
+                          navigate('/login');
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors cursor-pointer text-left"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>

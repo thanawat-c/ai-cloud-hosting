@@ -2,6 +2,7 @@ package routes
 
 import (
 	"ai-cloud-api/controllers"
+	"ai-cloud-api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -9,7 +10,17 @@ import (
 // SetupRoutes กำหนด Routing ทั้งหมดของ API
 func SetupRoutes(r *gin.Engine) {
 	api := r.Group("/api")
+	api.Use(middleware.ExtractUserContext())
 	{
+		// Authentication (User Accounts)
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", controllers.Register)
+			auth.POST("/login", controllers.Login)
+			auth.POST("/logout", controllers.Logout)
+			auth.GET("/me", middleware.RequireAuth(), controllers.GetCurrentUser)
+		}
+
 		api.POST("/test-deploy", controllers.TestDeploy)
 		api.POST("/inspect-repo", controllers.InspectRepo)
 		api.GET("/containers", controllers.GetContainers)
