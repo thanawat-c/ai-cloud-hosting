@@ -108,8 +108,15 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	}
 
 	cleanBaseImage := strings.Split(imageName, ":")[0]
-	// Generate local domain name from base image name (e.g. app-deploy.localhost)
-	domainName := cleanBaseImage + ".localhost"
+	// Generate domain name from base image name and configured domain suffix (default .localhost)
+	domainSuffix := os.Getenv("APP_DOMAIN_SUFFIX")
+	if domainSuffix == "" {
+		domainSuffix = os.Getenv("PLATFORM_DOMAIN")
+	}
+	if domainSuffix == "" {
+		domainSuffix = "localhost"
+	}
+	domainName := fmt.Sprintf("%s.%s", cleanBaseImage, strings.TrimPrefix(domainSuffix, "."))
 
 	var envList []string
 	if envVars != "" {
@@ -567,7 +574,16 @@ func RedeployApp(ctx context.Context, id string, rawRepoURL string, imageName st
 		} else if isFrontend {
 			activeDir = filepath.Join(buildDir, feDir)
 			backendName := strings.TrimSuffix(imageName, "-frontend") + "-backend"
-			backendEndpoint := fmt.Sprintf("%s:8080", backendName)
+			backendPort := os.Getenv("BACKEND_PORT")
+			if backendPort == "" && beDir != "" {
+				if _, detectedPort, err := GenerateDockerfile(ctx, cleanRepoURL, filepath.Join(buildDir, beDir), beDir); err == nil && detectedPort != "" {
+					backendPort = detectedPort
+				}
+			}
+			if backendPort == "" {
+				backendPort = "8080"
+			}
+			backendEndpoint := fmt.Sprintf("%s:%s", backendName, backendPort)
 			aiDocker, port, err := GenerateDockerfile(ctx, cleanRepoURL, activeDir, feDir, backendEndpoint)
 			if err != nil {
 				return "", fmt.Errorf("AI failed to generate frontend Dockerfile: %w", err)

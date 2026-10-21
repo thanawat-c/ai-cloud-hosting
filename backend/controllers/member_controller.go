@@ -28,7 +28,12 @@ func GetWorkspaceMembers(c *gin.Context) {
 			userName = "Workspace Owner"
 		}
 
-		avatar := fmt.Sprintf("https://github.com/%s.png?size=64", "thanawat-c")
+		cleanEmail := strings.ToLower(strings.TrimSpace(userEmail))
+		avatar := fmt.Sprintf("https://api.dicebear.com/7.x/identicon/svg?seed=%s", cleanEmail)
+		var existingUser models.User
+		if err := config.DB.Where("email = ?", cleanEmail).First(&existingUser).Error; err == nil && existingUser.AvatarURL != "" {
+			avatar = existingUser.AvatarURL
+		}
 		initialOwner := models.WorkspaceMember{
 			WorkspaceID: wsID,
 			Email:       strings.ToLower(userEmail),

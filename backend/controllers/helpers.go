@@ -1,11 +1,15 @@
 package controllers
 
 import (
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"ai-cloud-api/config"
 	"ai-cloud-api/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 // findDeployment finds a deployment record by numeric ID or container ID prefix
@@ -32,4 +36,35 @@ func getDeploymentDisplayName(dep models.Deployment, fallback string) string {
 		return dep.ImageName
 	}
 	return fallback
+}
+
+// GetPublicAPIBase dynamically resolves the base API URL using env vars, request headers, or default port
+func GetPublicAPIBase(c *gin.Context) string {
+	if envURL := os.Getenv("PUBLIC_API_URL"); envURL != "" {
+		return strings.TrimRight(envURL, "/")
+	}
+	if envURL := os.Getenv("API_URL"); envURL != "" {
+		return strings.TrimRight(envURL, "/")
+	}
+
+	if c != nil && c.Request != nil {
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		host := c.GetHeader("X-Forwarded-Host")
+		if host == "" {
+			host = c.Request.Host
+		}
+		if host != "" {
+			return fmt.Sprintf("%s://%s/api", scheme, host)
+		}
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	port = strings.TrimPrefix(port, ":")
+	return fmt.Sprintf("http://localhost:%s/api", port)
 }

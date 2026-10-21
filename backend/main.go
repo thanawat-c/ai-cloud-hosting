@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func main() {
@@ -36,9 +37,12 @@ func main() {
 
 	r := gin.Default()
 
-	corsOrigin := "http://localhost:5173"
-	if envOrigin := os.Getenv("CORS_ALLOWED_ORIGIN"); envOrigin != "" {
-		corsOrigin = envOrigin
+	corsOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = os.Getenv("CORS_ORIGIN")
+	}
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:5173"
 	}
 
 	// Enable CORS for frontend clients
@@ -46,8 +50,19 @@ func main() {
 		origin := c.Request.Header.Get("Origin")
 		if corsOrigin == "*" {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		} else if origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" || origin == corsOrigin {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		} else if origin != "" {
+			allowed := false
+			for _, allowedOrigin := range strings.Split(corsOrigin, ",") {
+				if origin == strings.TrimSpace(allowedOrigin) {
+					allowed = true
+					break
+				}
+			}
+			if allowed || origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			} else {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+			}
 		} else {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", corsOrigin)
 		}
@@ -63,6 +78,14 @@ func main() {
 	// Setup Routes
 	routes.SetupRoutes(r)
 
-	fmt.Println("🚀 Backend server running on port :8080")
-	r.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+
+	fmt.Printf("🚀 Backend server running on port %s\n", port)
+	r.Run(port)
 }

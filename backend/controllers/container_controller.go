@@ -310,7 +310,7 @@ func GetContainers(c *gin.Context) {
 			"node_version":       d.NodeVersion,
 			"auto_deploy":        d.AutoDeploy,
 			"webhook_secret":     d.WebhookSecret,
-			"webhook_url":        fmt.Sprintf("http://localhost:8080/api/webhooks/deploy/%d", d.ID),
+			"webhook_url":        fmt.Sprintf("%s/webhooks/deploy/%d", GetPublicAPIBase(c), d.ID),
 		})
 	}
 

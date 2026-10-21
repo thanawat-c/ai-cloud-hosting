@@ -245,7 +245,17 @@ func CreateManagedDatabase(ctx context.Context, req models.CreateDatabaseRequest
 	}
 
 	internalURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", username, password, containerName, internalPort, dbName)
-	externalURL := fmt.Sprintf("postgres://%s:%s@localhost:%d/%s", username, password, hostPort, dbName)
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = os.Getenv("PUBLIC_HOST")
+	}
+	if dbHost == "" {
+		dbHost = os.Getenv("HOST_IP")
+	}
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	externalURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", username, password, dbHost, hostPort, dbName)
 
 	dbRecord := models.ManagedDatabase{
 		WorkspaceID:   wsID,

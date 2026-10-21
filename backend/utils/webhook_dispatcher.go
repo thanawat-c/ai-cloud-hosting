@@ -57,6 +57,20 @@ func getBrandConfig() (string, string) {
 	return brandName, brandIcon
 }
 
+// getDashboardURL retrieves the dashboard frontend URL from environment variables or defaults to localhost:5173.
+func getDashboardURL() string {
+	if url := os.Getenv("DASHBOARD_URL"); url != "" {
+		return strings.TrimRight(url, "/")
+	}
+	if url := os.Getenv("FRONTEND_URL"); url != "" {
+		return strings.TrimRight(url, "/")
+	}
+	if url := os.Getenv("APP_URL"); url != "" {
+		return strings.TrimRight(url, "/")
+	}
+	return "http://localhost:5173"
+}
+
 // DispatchWebhooks dispatches notifications to all active webhooks in the workspace asynchronously.
 func DispatchWebhooks(workspaceID, title, message, notifType, resourceName string) {
 	if config.DB == nil {
@@ -143,7 +157,7 @@ func sendWebhookNotification(wh models.WebhookAlert, title, message, notifType, 
 						"icon_url": brandIcon,
 					},
 					"title":       title,
-					"url":         "http://localhost:5173",
+					"url":         getDashboardURL(),
 					"description": message,
 					"color":       style.Color,
 					"thumbnail": map[string]interface{}{
