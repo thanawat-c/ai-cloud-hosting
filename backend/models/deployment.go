@@ -22,8 +22,11 @@ type Deployment struct {
 	CommitMessage string    `gorm:"type:text" json:"commit_message"`                // ข้อความ Commit ล่าสุด
 	AuthorName    string    `gorm:"type:varchar(100)" json:"author_name"`           // ชื่อผู้ Commit หรือ Deployer
 	AuthorAvatar  string    `gorm:"type:varchar(255)" json:"author_avatar"`         // URL รูป Avatar ของ Deployer
-	CustomDomain  string    `gorm:"type:varchar(255)" json:"custom_domain"`         // โดเมนเนมที่ผู้ใช้กำหนดเอง
-	LastError     string    `gorm:"type:text"`           // บันทึก Error ล่าสุดถ้าระบบพัง
+	CustomDomain      string    `gorm:"type:varchar(255)" json:"custom_domain"`         // โดเมนเนมที่ผู้ใช้กำหนดเอง
+	SSLEnabled        bool      `gorm:"default:false" json:"ssl_enabled"`               // สถานะการเปิดใช้งาน SSL / HTTPS
+	SSLStatus         string    `gorm:"type:varchar(50);default:'inactive'" json:"ssl_status"` // inactive, local, active
+	SSLForceRedirect  bool      `gorm:"default:true" json:"ssl_force_redirect"`         // บังคับเปลี่ยนเส้นทาง HTTP ไปยัง HTTPS
+	LastError         string    `gorm:"type:text"`           // บันทึก Error ล่าสุดถ้าระบบพัง
 	CreatedAt     time.Time `gorm:"autoCreateTime"`      // วันเวลาที่ Deploy
 	UpdatedAt     time.Time `gorm:"autoUpdateTime"`      // วันเวลาที่แก้ไขสถานะล่าสุด
 }

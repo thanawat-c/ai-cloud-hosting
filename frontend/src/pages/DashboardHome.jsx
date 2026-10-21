@@ -246,14 +246,19 @@ const DashboardHome = () => {
   }, [metricsModalOpen, metricsContainer]);
 
   // Custom Domain Modal State
+  // Custom Domain & SSL State
   const [domainModalOpen, setDomainModalOpen] = useState(false);
   const [domainContainer, setDomainContainer] = useState(null);
   const [customDomainInput, setCustomDomainInput] = useState('');
+  const [sslEnabledInput, setSslEnabledInput] = useState(true);
+  const [sslForceRedirectInput, setSslForceRedirectInput] = useState(true);
   const [savingDomain, setSavingDomain] = useState(false);
 
   const handleOpenDomainModal = (container) => {
     setDomainContainer(container);
     setCustomDomainInput(container.custom_domain || '');
+    setSslEnabledInput(container.ssl_enabled !== false);
+    setSslForceRedirectInput(container.ssl_force_redirect !== false);
     setDomainModalOpen(true);
   };
 
@@ -264,11 +269,15 @@ const DashboardHome = () => {
       const res = await fetch(`http://localhost:8080/api/containers/${domainContainer.id}/domain`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_domain: customDomainInput }),
+        body: JSON.stringify({ 
+          custom_domain: customDomainInput,
+          ssl_enabled: sslEnabledInput,
+          ssl_force_redirect: sslForceRedirectInput,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Custom domain saved successfully!');
+        toast.success('Custom domain & SSL settings saved successfully!');
         setDomainModalOpen(false);
         fetchContainers();
         window.dispatchEvent(new CustomEvent('notification-refresh'));
@@ -1364,6 +1373,17 @@ const DashboardHome = () => {
                                     UI
                                   </span>
                                 ) : null}
+                                {item.custom_domain && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDomainModal(item)}
+                                    title={`Domain: ${item.custom_domain} (${item.ssl_enabled ? 'HTTPS Active' : 'HTTP'})`}
+                                    className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 inline-flex items-center gap-1 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                                  >
+                                    <Shield className={`w-2.5 h-2.5 ${item.ssl_enabled ? 'text-emerald-400' : 'text-neutral-400'}`} />
+                                    <span className="truncate max-w-[120px]">{item.custom_domain}</span>
+                                  </button>
+                                )}
                               </div>
                               {/* Mobile helper under title */}
                               <div className="sm:hidden flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 mt-0.5 truncate">
@@ -3293,14 +3313,77 @@ const DashboardHome = () => {
                 />
               </div>
 
+              {/* Auto SSL & TLS Controls */}
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-mono font-semibold text-white">SSL / TLS Configuration</span>
+                  </div>
+                  {customDomainInput ? (
+                    customDomainInput.endsWith('.localhost') ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-950/80 text-blue-400 border border-blue-800">
+                        Local Dev SSL
+                      </span>
+                    ) : sslEnabledInput ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/80 text-emerald-400 border border-emerald-800">
+                        Let's Encrypt Active
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800">
+                        HTTP Only
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-[10px] font-mono text-neutral-500">No domain</span>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-mono text-neutral-300 group-hover:text-white transition-colors">
+                        Enable Auto SSL (Let's Encrypt)
+                      </div>
+                      <div className="text-[10px] text-neutral-500 font-sans">
+                        Auto-provisions TLS certificate via Traefik ACME challenge
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={sslEnabledInput}
+                      onChange={(e) => setSslEnabledInput(e.target.checked)}
+                      className="w-4 h-4 rounded bg-neutral-900 border-neutral-700 text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-mono text-neutral-300 group-hover:text-white transition-colors">
+                        Force HTTPS (Auto 301 Redirect)
+                      </div>
+                      <div className="text-[10px] text-neutral-500 font-sans">
+                        Automatically redirect all HTTP requests to HTTPS
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={sslForceRedirectInput}
+                      onChange={(e) => setSslForceRedirectInput(e.target.checked)}
+                      className="w-4 h-4 rounded bg-neutral-900 border-neutral-700 text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                    />
+                  </label>
+                </div>
+              </div>
+
               {/* DNS Configuration Helper Note */}
               <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-mono text-neutral-400 space-y-1">
                 <div className="flex items-center gap-1.5 text-neutral-300 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                  <span>DNS Configuration Tip</span>
+                  <span>DNS & ACME Tip</span>
                 </div>
                 <p className="text-neutral-500 leading-relaxed">
-                  Point a <strong className="text-neutral-300">CNAME</strong> record for your domain to your cluster host, or an <strong className="text-neutral-300">A Record</strong> to <code className="text-neutral-300">127.0.0.1</code> or public server IP.
+                  Point a <strong className="text-neutral-300">CNAME</strong> record to your host or an <strong className="text-neutral-300">A Record</strong> to your server public IP. Traefik will negotiate SSL certificates automatically.
                 </p>
               </div>
             </div>

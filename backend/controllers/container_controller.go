@@ -42,10 +42,13 @@ func GetContainers(c *gin.Context) {
 	}
 	dbQuery.Find(&allDBs)
 
-	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร
+	// สร้างสมุดจด (Map) เพื่อให้ค้นหาได้รวดเร็ว ว่า Container รหัสไหน มีสถานะเป็นอะไร (รองรับทั้ง short 12-char และ full 64-char ID)
 	dockerStateMap := make(map[string]string)
 	for _, dc := range dockerContainers {
 		dockerStateMap[dc.ID] = dc.State // "running" หรือ "exited"
+		if len(dc.ID) >= 12 {
+			dockerStateMap[dc.ID[:12]] = dc.State
+		}
 	}
 
 	var results []map[string]interface{}
@@ -57,7 +60,14 @@ func GetContainers(c *gin.Context) {
 		actualState := d.Status
 		lastError := d.LastError
 		if d.ContainerID != "" {
-			state, exists := dockerStateMap[d.ContainerID]
+			cleanCID := d.ContainerID
+			if len(cleanCID) > 12 {
+				cleanCID = cleanCID[:12]
+			}
+			state, exists := dockerStateMap[cleanCID]
+			if !exists {
+				state, exists = dockerStateMap[d.ContainerID]
+			}
 			if exists {
 				actualState = state
 				if d.Status != actualState {
@@ -277,9 +287,12 @@ func GetContainers(c *gin.Context) {
 			"created_at":     d.CreatedAt.Format(time.RFC3339),
 			"updated_at":     d.UpdatedAt.Format(time.RFC3339),
 			"deployed_at":    deployedAt.Format(time.RFC3339),
-			"domain_name":    d.DomainName,
-			"custom_domain":  d.CustomDomain,
-			"last_error":     lastError,
+			"domain_name":         d.DomainName,
+			"custom_domain":       d.CustomDomain,
+			"ssl_enabled":         d.SSLEnabled,
+			"ssl_status":          d.SSLStatus,
+			"ssl_force_redirect":  d.SSLForceRedirect,
+			"last_error":          lastError,
 			"branch":         branch,
 			"commit_hash":    commitHash,
 			"commit_message": d.CommitMessage,
@@ -583,7 +596,9 @@ func UpdateContainerEnv(c *gin.Context) {
 func UpdateContainerDomain(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
-		CustomDomain string `json:"custom_domain"`
+		CustomDomain     string `json:"custom_domain"`
+		SSLEnabled       bool   `json:"ssl_enabled"`
+		SSLForceRedirect bool   `json:"ssl_force_redirect"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
@@ -601,14 +616,39 @@ func UpdateContainerDomain(c *gin.Context) {
 		return
 	}
 
-	config.DB.Model(&deploy).Update("custom_domain", cleanDomain)
+	sslStatus := "inactive"
+	sslEnabled := req.SSLEnabled
+	if cleanDomain != "" {
+		if strings.HasSuffix(cleanDomain, ".localhost") {
+			sslStatus = "local"
+			sslEnabled = true
+		} else if req.SSLEnabled {
+			sslStatus = "active"
+		}
+	} else {
+		sslEnabled = false
+	}
+
+	config.DB.Model(&deploy).Updates(map[string]interface{}{
+		"custom_domain":       cleanDomain,
+		"ssl_enabled":         sslEnabled,
+		"ssl_status":          sslStatus,
+		"ssl_force_redirect":  req.SSLForceRedirect,
+	})
 
 	newID := deploy.ContainerID
 	if deploy.ContainerID != "" {
-		updatedID, err := services.UpdateContainerCustomDomain(context.Background(), deploy.ContainerID, cleanDomain)
+		updatedID, err := services.UpdateContainerCustomDomain(context.Background(), deploy.ContainerID, cleanDomain, sslEnabled)
 		if err == nil && updatedID != "" {
 			newID = updatedID
-			config.DB.Model(&deploy).Update("container_id", updatedID)
+			cleanID := updatedID
+			if len(cleanID) > 12 {
+				cleanID = cleanID[:12]
+			}
+			config.DB.Model(&deploy).Updates(map[string]interface{}{
+				"container_id": cleanID,
+				"status":       "running",
+			})
 		}
 	}
 
@@ -623,14 +663,21 @@ func UpdateContainerDomain(c *gin.Context) {
 	}
 	serviceName := getDeploymentDisplayName(deploy, id)
 	if cleanDomain != "" {
-		utils.CreateNotification(wsID, "Custom Domain Attached", fmt.Sprintf("Domain '%s' was attached to service '%s'", cleanDomain, serviceName), "info", serviceName)
+		sslDesc := "with SSL disabled"
+		if sslEnabled {
+			sslDesc = "with Auto SSL (Let's Encrypt / TLS) enabled"
+		}
+		utils.CreateNotification(wsID, "Custom Domain Attached", fmt.Sprintf("Domain '%s' was attached to service '%s' %s", cleanDomain, serviceName, sslDesc), "info", serviceName)
 	} else {
 		utils.CreateNotification(wsID, "Custom Domain Removed", fmt.Sprintf("Custom domain removed from service '%s'", serviceName), "info", serviceName)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "Custom domain updated successfully",
-		"custom_domain": cleanDomain,
-		"new_id":        cleanID,
+		"message":            "Custom domain & SSL updated successfully",
+		"custom_domain":      cleanDomain,
+		"ssl_enabled":        sslEnabled,
+		"ssl_status":         sslStatus,
+		"ssl_force_redirect": req.SSLForceRedirect,
+		"new_id":             cleanID,
 	})
 }

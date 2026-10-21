@@ -25,12 +25,30 @@ while true; do
       port="80"
     fi
     
+    tls=$(docker inspect -f '{{index .Config.Labels "traefik.http.routers.'$name'.tls"}}' $container 2>/dev/null)
+    tls_config=""
+    if [ "$tls" = "true" ]; then
+      tls_config="
+      tls: {}"
+    fi
+
     if [ ! -z "$rule" ] && [ ! -z "$ip" ] && [ "$rule" != "<no value>" ]; then
       SEEN_NAMES="$SEEN_NAMES$name "
-      ROUTERS="$ROUTERS
+      if [ "$tls" = "true" ]; then
+        ROUTERS="$ROUTERS
+    $name:
+      rule: \"$rule\"
+      service: $name
+    $name-tls:
+      rule: \"$rule\"
+      service: $name
+      tls: {}"
+      else
+        ROUTERS="$ROUTERS
     $name:
       rule: \"$rule\"
       service: $name"
+      fi
       
       SERVICES="$SERVICES
     $name:

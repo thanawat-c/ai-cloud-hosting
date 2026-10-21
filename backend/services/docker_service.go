@@ -98,6 +98,10 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	if len(workspaceID) > 1 && strings.TrimSpace(workspaceID[1]) != "" {
 		customDomain = strings.TrimSpace(workspaceID[1])
 	}
+	sslEnabled := true
+	if len(workspaceID) > 2 && strings.TrimSpace(workspaceID[2]) == "false" {
+		sslEnabled = false
+	}
 
 	if targetPort == "" {
 		targetPort = "80"
@@ -166,6 +170,10 @@ func CreateAndStartContainer(ctx context.Context, imageName string, envVars stri
 	}
 	if customDomain != "" {
 		labels["ach.custom_domain"] = customDomain
+		if sslEnabled {
+			labels["ach.ssl"] = "true"
+			labels["traefik.http.routers."+routerName+".tls"] = "true"
+		}
 	}
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
@@ -347,7 +355,7 @@ func UpdateContainerEnv(ctx context.Context, oldID string, newEnvVars string) (s
 }
 
 // UpdateContainerCustomDomain อัปเดตหรือผูก Custom Domain ให้กับ Container และให้ Traefik รัน Routing ทันที
-func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain string) (string, error) {
+func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain string, sslEnabled ...bool) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", err
@@ -380,7 +388,12 @@ func UpdateContainerCustomDomain(ctx context.Context, oldID string, newDomain st
 	_ = cli.ContainerStop(ctx, oldID, container.StopOptions{})
 	_ = cli.ContainerRemove(ctx, oldID, container.RemoveOptions{Force: true})
 
-	newID, _, err := CreateAndStartContainer(ctx, imageName, envVars, targetPort, wsID, newDomain)
+	sslParam := "true"
+	if len(sslEnabled) > 0 && !sslEnabled[0] {
+		sslParam = "false"
+	}
+
+	newID, _, err := CreateAndStartContainer(ctx, imageName, envVars, targetPort, wsID, newDomain, sslParam)
 	if err != nil {
 		return "", fmt.Errorf("รีสตาร์ตคอนเทนเนอร์เพื่อผูกโดเมนใหม่ไม่สำเร็จ: %w", err)
 	}
