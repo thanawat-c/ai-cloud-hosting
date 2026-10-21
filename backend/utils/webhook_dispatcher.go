@@ -25,22 +25,22 @@ var alertStyles = map[string]AlertStyle{
 	"success": {
 		Color:       0x10b981, // Emerald Green
 		StatusLabel: "SUCCESS",
-		IconURL:     "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/check-circle.png",
+		IconURL:     "https://img.icons8.com/color/96/ok--v1.png",
 	},
 	"error": {
 		Color:       0xef4444, // Red
 		StatusLabel: "FAILED",
-		IconURL:     "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/alert-circle.png",
+		IconURL:     "https://img.icons8.com/color/96/cancel--v1.png",
 	},
 	"warning": {
 		Color:       0xf59e0b, // Amber
 		StatusLabel: "WARNING",
-		IconURL:     "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/alert-triangle.png",
+		IconURL:     "https://img.icons8.com/color/96/warning-shield.png",
 	},
 	"info": {
 		Color:       0x3b82f6, // Blue
 		StatusLabel: "INFO",
-		IconURL:     "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/info.png",
+		IconURL:     "https://img.icons8.com/color/96/info--v1.png",
 	},
 }
 
@@ -52,7 +52,7 @@ func getBrandConfig() (string, string) {
 	}
 	brandIcon := os.Getenv("ACH_BRAND_ICON_URL")
 	if brandIcon == "" {
-		brandIcon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/cloud.png"
+		brandIcon = "https://img.icons8.com/color/96/cloud.png"
 	}
 	return brandName, brandIcon
 }
@@ -143,6 +143,7 @@ func sendWebhookNotification(wh models.WebhookAlert, title, message, notifType, 
 						"icon_url": brandIcon,
 					},
 					"title":       title,
+					"url":         "http://localhost:5173",
 					"description": message,
 					"color":       style.Color,
 					"thumbnail": map[string]interface{}{

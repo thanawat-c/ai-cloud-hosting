@@ -327,6 +327,9 @@ export const BulkEnvEditor = ({
             >
               <Database className="w-3 h-3 text-purple-400" />
               <span>{db.name}</span>
+              {db.host_port && (
+                <span className="text-[10px] text-purple-400/70 font-mono">(:{db.host_port})</span>
+              )}
             </button>
           ))}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Rocket, GitBranch, Terminal, CheckCircle2, XCircle, ExternalLink, 
@@ -123,21 +123,7 @@ const DeployForm = () => {
       .catch(err => console.error('Failed to load databases in deploy form:', err));
   }, [activeWorkspaceId]);
 
-  // Debounced Auto-Inspect on URL change / paste
-  useEffect(() => {
-    const trimmed = repoUrl.trim();
-    if (!trimmed || !trimmed.startsWith('http') || !trimmed.includes('github.com')) {
-      setInspectResult(null);
-      setInspectError('');
-      return;
-    }
-    const timer = setTimeout(() => {
-      handleInspectRepo(trimmed);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [repoUrl, gitToken]);
-
-  const handleInspectRepo = async (targetUrl) => {
+  const handleInspectRepo = useCallback(async (targetUrl) => {
     const url = (targetUrl || repoUrl).trim();
     if (!url) return;
     setInspecting(true);
@@ -174,7 +160,21 @@ const DeployForm = () => {
     } finally {
       setInspecting(false);
     }
-  };
+  }, [repoUrl, gitToken, selectedBranch, selectedDbId, envVars]);
+
+  // Debounced Auto-Inspect on URL change / paste
+  useEffect(() => {
+    const trimmed = repoUrl.trim();
+    if (!trimmed || !trimmed.startsWith('http') || !trimmed.includes('github.com')) {
+      setInspectResult(null);
+      setInspectError('');
+      return;
+    }
+    const timer = setTimeout(() => {
+      handleInspectRepo(trimmed);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [repoUrl, gitToken, handleInspectRepo]);
 
   const handleSelectDatabase = (dbId) => {
     setSelectedDbId(dbId);
