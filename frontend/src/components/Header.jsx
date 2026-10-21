@@ -4,6 +4,7 @@ import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
+import { HostHealthModal } from './modals';
 
 const Header = ({ setIsSidebarOpen }) => {
   const location = useLocation();
@@ -21,6 +22,9 @@ const Header = ({ setIsSidebarOpen }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Host Health Modal State
+  const [hostHealthModalOpen, setHostHealthModalOpen] = useState(false);
 
   // Listen for Cmd+K or Ctrl+K shortcut
   useEffect(() => {
@@ -185,6 +189,18 @@ const Header = ({ setIsSidebarOpen }) => {
                 <Command className="w-2.5 h-2.5" />
                 <span>K</span>
               </div>
+            </button>
+
+            {/* Host Health Status Button */}
+            <button
+              type="button"
+              onClick={() => setHostHealthModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono text-neutral-300 hover:text-white bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 transition-colors cursor-pointer"
+              title="Host System Health & Docker Status"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden md:inline text-[11px] text-neutral-400">Node Healthy</span>
             </button>
 
             {/* Interactive Notification Popover */}
@@ -490,6 +506,12 @@ const Header = ({ setIsSidebarOpen }) => {
           </div>
         </div>
       )}
+
+      {/* Host Health & Docker Metrics Modal */}
+      <HostHealthModal
+        isOpen={hostHealthModalOpen}
+        onClose={() => setHostHealthModalOpen(false)}
+      />
     </>
   );
 };

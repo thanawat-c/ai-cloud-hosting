@@ -38,7 +38,9 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/containers/:id/rollback", controllers.RollbackContainer)
 		api.GET("/containers/:id/settings", controllers.GetContainerSettings)
 		api.POST("/containers/:id/settings", controllers.UpdateContainerSettings)
-		api.POST("/system/prune", controllers.PruneImages)
+		// System Host Health & Maintenance
+		api.GET("/system/health", controllers.GetSystemHealth)
+		api.POST("/system/prune", controllers.PruneDockerSystem)
 
 		// Managed Databases
 		api.GET("/databases", controllers.GetDatabases)

@@ -13,4 +13,5 @@ export { WebhookModal } from './WebhookModal';
 export { LiveMetricsModal } from './LiveMetricsModal';
 export { ProjectSettingsModal } from './ProjectSettingsModal';
 export { TeamMembersModal } from './TeamMembersModal';
+export { HostHealthModal } from './HostHealthModal';
 export { default as DeployProgressModal } from './DeployProgressModal';
