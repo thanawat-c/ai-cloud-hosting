@@ -36,6 +36,7 @@ func ConnectDatabase() {
 		&models.APIToken{},
 		&models.DatabaseSnapshot{},
 		&models.DeploymentRelease{},
+		&models.WorkspaceMember{},
 	)
 	if err != nil {
 		log.Fatal("❌ Auto-migration failed: ", err)

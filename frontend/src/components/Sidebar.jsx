@@ -4,6 +4,7 @@ import { LayoutDashboard, Rocket, X, Database, Plus, Terminal, Check, ChevronsUp
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
+import { TeamMembersModal } from './modals';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
@@ -14,6 +15,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
   // API Tokens Modal State
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [tokens, setTokens] = useState([]);
   const [newTokenName, setNewTokenName] = useState('');
   const [generatedToken, setGeneratedToken] = useState(null);
@@ -240,6 +242,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 type="button"
                 onClick={() => {
                   setWorkspaceMenuOpen(false);
+                  setTeamModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <Users className="w-3.5 h-3.5 text-purple-400" />
+                <span>Team Members</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspaceMenuOpen(false);
                   setTokenModalOpen(true);
                 }}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
@@ -426,6 +440,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </div>
         </div>
       )}
+
+      {/* Team Members & Permissions Modal */}
+      <TeamMembersModal
+        isOpen={teamModalOpen}
+        onClose={() => setTeamModalOpen(false)}
+      />
     </>
   );
 };
