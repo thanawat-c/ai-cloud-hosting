@@ -1,5 +1,17 @@
+import { Readable } from 'stream';
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+    responseLimit: false,
+  },
+  maxDuration: 60,
+};
+
 export default async function handler(req, res) {
-  // Normalize backend base URL (handles with or without /api suffix)
+  // Normalize backend base URL
   let backendBase = (
     process.env.BACKEND_API_URL ||
     process.env.BACKEND_URL ||
@@ -10,7 +22,7 @@ export default async function handler(req, res) {
     backendBase = `${backendBase}/api`;
   }
 
-  // Parse relative subpath directly from req.url (e.g. /api/auth/login -> auth/login)
+  // Parse relative subpath directly from req.url
   const urlObj = new URL(req.url, 'http://localhost');
   const subPath = urlObj.pathname.replace(/^\/api\/?/, '').replace(/^\[\.\.\.path\]\/?/, '');
   const search = urlObj.search || '';
@@ -18,27 +30,28 @@ export default async function handler(req, res) {
   const targetUrl = `${backendBase}/${subPath}${search}`;
 
   try {
-    const headers = { ...req.headers };
-    delete headers.host;
-    delete headers.connection;
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      const lower = key.toLowerCase();
+      if (!['host', 'connection', 'content-length', 'content-encoding', 'transfer-encoding'].includes(lower)) {
+        headers[key] = value;
+      }
+    }
+    headers['x-forwarded-host'] = req.headers.host || '';
 
     const options = {
       method: req.method,
-      headers: {
-        ...headers,
-        'x-forwarded-host': req.headers.host || '',
-      },
+      headers,
     };
 
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.body) {
       options.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      if (!options.headers['content-type']) {
-        options.headers['content-type'] = 'application/json';
+      if (!headers['content-type']) {
+        headers['content-type'] = 'application/json';
       }
     }
 
     const response = await fetch(targetUrl, options);
-    const data = await response.arrayBuffer();
 
     res.status(response.status);
     response.headers.forEach((val, key) => {
@@ -48,7 +61,12 @@ export default async function handler(req, res) {
       }
     });
 
-    return res.send(Buffer.from(data));
+    if (response.body) {
+      const nodeStream = Readable.fromWeb(response.body);
+      return nodeStream.pipe(res);
+    } else {
+      return res.end();
+    }
   } catch (error) {
     console.error('Vercel API Proxy Error:', error);
     return res.status(502).json({
