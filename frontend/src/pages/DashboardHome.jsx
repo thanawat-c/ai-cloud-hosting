@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Server, Play, Box, X, Bell, BellRing, Plus } from 'lucide-react';
+import { Server, Box, Bell, BellRing, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiFetch, API_BASE_URL } from '../api/client';
@@ -25,6 +25,7 @@ import {
   DashboardSubnav,
   DeploymentTableRow,
   StorageSection,
+  DashboardAlertBanners,
 } from '../components/dashboard';
 
 // Extract short repository name, e.g. mock-api-server from git URL

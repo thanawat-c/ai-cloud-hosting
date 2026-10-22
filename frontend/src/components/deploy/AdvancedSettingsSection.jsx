@@ -1,4 +1,3 @@
-import React from 'react';
 import { SlidersHorizontal, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { BulkEnvEditor } from '../common/BulkEnvEditor';
 

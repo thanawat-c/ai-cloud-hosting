@@ -1,4 +1,3 @@
-import React from 'react';
 import { Folder, Terminal, Package, Play, Cpu, ChevronDown } from 'lucide-react';
 
 /**

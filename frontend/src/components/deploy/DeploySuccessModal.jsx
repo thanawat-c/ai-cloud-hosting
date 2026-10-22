@@ -1,4 +1,3 @@
-import React from 'react';
 import { Rocket, ExternalLink, Copy, Check, LayoutDashboard, X } from 'lucide-react';
 
 /**

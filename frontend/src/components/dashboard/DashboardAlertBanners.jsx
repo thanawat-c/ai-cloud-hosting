@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, Play } from 'lucide-react';
 
 /**
