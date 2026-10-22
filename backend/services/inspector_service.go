@@ -24,12 +24,15 @@ type InspectResult struct {
 // InspectRepository shallow-clones (--depth 1) a repository to scan framework and environment variables.
 func InspectRepository(repoURL string, gitToken ...string) (*InspectResult, error) {
 	cleanRepoURL := strings.TrimSpace(repoURL)
-	if err := ValidateGitRepository(cleanRepoURL, gitToken...); err != nil {
-		return nil, err
+	if cleanRepoURL == "" {
+		return nil, fmt.Errorf("Please provide a valid repository URL")
 	}
 
-	// Fetch remote branches quickly
-	branches, defBranch, _ := GetRepoBranches(cleanRepoURL, gitToken...)
+	// Fetch remote branches directly (validates repository access in 1 network call)
+	branches, defBranch, err := GetRepoBranches(cleanRepoURL, gitToken...)
+	if err != nil && len(branches) == 0 {
+		return nil, err
+	}
 
 	tempDir, err := os.MkdirTemp("", "inspect-*")
 	if err != nil {
