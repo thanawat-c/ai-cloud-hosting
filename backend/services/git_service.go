@@ -76,8 +76,8 @@ func ValidateGitRepository(repoURL string, gitToken ...string) error {
 
 	authURL, token := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
-	// Timeout within 8 seconds to prevent hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	// Timeout within 30 seconds to allow cloud VPS network handshakes to GitHub
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", authURL)
@@ -103,7 +103,7 @@ func GetRepoBranches(repoURL string, gitToken ...string) ([]string, string, erro
 
 	authURL, _ := BuildAuthenticatedGitURL(cleanRepoURL, gitToken...)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", authURL)
@@ -183,11 +183,17 @@ func CloneRepository(repoURL string, branch string, gitToken ...string) (string,
 	}
 	args = append(args, authURL, buildDir)
 
-	cmd := exec.Command("git", args...)
+	cloneCtx, cloneCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cloneCancel()
+
+	cmd := exec.CommandContext(cloneCtx, "git", args...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		os.RemoveAll(buildDir)
+		if cloneCtx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("⏳ Git clone timed out after 3 minutes: Please check repository size and network")
+		}
 		return "", TranslateGitError(string(output), cleanRepoURL, token)
 	}
 
