@@ -1,22 +1,21 @@
 export default async function handler(req, res) {
-  // Read backend API URL securely from Vercel server environment
-  const backendBase = (
+  // Normalize backend base URL (handles with or without /api suffix)
+  let backendBase = (
     process.env.BACKEND_API_URL ||
     process.env.BACKEND_URL ||
-    'http://localhost:8080/api'
+    'http://20.48.16.226:8080'
   ).replace(/\/+$/, '');
 
-  // Extract path parts from [...path]
-  const { path } = req.query;
-  const targetPath = Array.isArray(path) ? path.join('/') : (path || '');
+  if (!backendBase.endsWith('/api')) {
+    backendBase = `${backendBase}/api`;
+  }
 
-  // Preserve query parameters except the internal 'path'
+  // Parse relative subpath directly from req.url (e.g. /api/auth/login -> auth/login)
   const urlObj = new URL(req.url, 'http://localhost');
-  const searchParams = new URLSearchParams(urlObj.search);
-  searchParams.delete('path');
-  const queryString = searchParams.toString() ? `?${searchParams.toString()}` : '';
+  const subPath = urlObj.pathname.replace(/^\/api\/?/, '').replace(/^\[\.\.\.path\]\/?/, '');
+  const search = urlObj.search || '';
 
-  const targetUrl = `${backendBase}/${targetPath}${queryString}`;
+  const targetUrl = `${backendBase}/${subPath}${search}`;
 
   try {
     const headers = { ...req.headers };
