@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"ai-cloud-api/models"
+	"strings"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -20,8 +21,13 @@ func ConnectDatabase() {
 		log.Fatal("❌ DB_URL environment variable is missing in .env or environment!")
 	}
 
-	// Connect to PostgreSQL
-	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// Connect to PostgreSQL (configured with PreferSimpleProtocol for Supabase / PgBouncer pooler compatibility)
+	database, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{
+		PrepareStmt: false,
+	})
 	if err != nil {
 		log.Fatal("❌ Failed to connect to Database: ", err)
 	}
@@ -42,7 +48,11 @@ func ConnectDatabase() {
 		&models.WebhookAlert{},
 	)
 	if err != nil {
-		log.Fatal("❌ Auto-migration failed: ", err)
+		if strings.Contains(err.Error(), "already exists") {
+			fmt.Println("⚠️ Tables already exist, continuing startup:", err)
+		} else {
+			log.Fatal("❌ Auto-migration failed: ", err)
+		}
 	}
 
 	// Seed default workspaces and admin user
