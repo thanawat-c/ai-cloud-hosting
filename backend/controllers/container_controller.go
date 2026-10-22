@@ -50,7 +50,7 @@ func GetContainers(c *gin.Context) {
 		}
 	}
 
-	var results []map[string]interface{}
+	results := []map[string]interface{}{}
 	for _, d := range deployments {
 		if d.Status == "deleted" {
 			continue

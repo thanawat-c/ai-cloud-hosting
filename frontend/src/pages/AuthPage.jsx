@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const AuthPage = ({ initialMode = 'login' }) => {
@@ -61,13 +61,6 @@ const AuthPage = ({ initialMode = 'login' }) => {
     }
   };
 
-  const handleFillDemoAdmin = () => {
-    setMode('login');
-    setEmail('admin@aicloud.dev');
-    setPassword('admin1234');
-    setErrorMsg('');
-  };
-
   return (
     <div className="min-h-screen bg-black text-neutral-100 flex flex-col justify-between selection:bg-neutral-800 selection:text-white relative overflow-hidden font-sans">
       {/* Subtle Ambient Background Gradient */}
@@ -84,16 +77,6 @@ const AuthPage = ({ initialMode = 'login' }) => {
           </div>
           <span className="text-sm font-semibold text-white tracking-tight font-mono">AI Cloud</span>
         </div>
-
-        <button
-          type="button"
-          onClick={handleFillDemoAdmin}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 border border-neutral-800 text-[11px] text-neutral-300 font-mono transition-colors cursor-pointer"
-          title="Autofill default admin credentials"
-        >
-          <Sparkles className="w-3 h-3 text-emerald-400" />
-          <span>Demo Admin</span>
-        </button>
       </header>
 
       {/* Main Auth Container */}
@@ -237,29 +220,6 @@ const AuthPage = ({ initialMode = 'login' }) => {
                 )}
               </button>
             </form>
-
-            {/* Quick Demo Credentials Footer inside card */}
-            <div className="mt-6 pt-5 border-t border-neutral-900/80">
-              <div className="p-3 rounded-xl bg-neutral-950/80 border border-neutral-900 text-[11px] text-neutral-400 font-mono">
-                <div className="flex items-center justify-between text-neutral-300 font-medium mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    Pre-seeded Admin
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleFillDemoAdmin}
-                    className="text-emerald-400 hover:text-emerald-300 text-[10px] underline cursor-pointer"
-                  >
-                    Click to fill
-                  </button>
-                </div>
-                <div className="space-y-0.5 text-[10px] text-neutral-500">
-                  <div>Email: <code className="text-neutral-300 select-all">admin@aicloud.dev</code></div>
-                  <div>Password: <code className="text-neutral-300 select-all">admin1234</code></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </main>
