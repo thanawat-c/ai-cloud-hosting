@@ -6,6 +6,9 @@
 </p>
 
 <p align="center">
+  <a href="https://ai-cloud-hosting.vercel.app/login">
+    <img src="https://img.shields.io/badge/Status-100%25_Production_Ready-10b981?style=for-the-badge&logo=vercel&logoColor=white" alt="Production Status" />
+  </a>
   <img src="https://img.shields.io/badge/Verification_Suite-23%2F23_PASS-10b981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Verification Suite" />
   <img src="https://img.shields.io/badge/Golang-1.22+-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
@@ -16,18 +19,34 @@
 </p>
 
 <p align="center">
-  <a href="https://ai-cloud-hosting.vercel.app"><strong>🌐 Live Dashboard (Vercel)</strong></a> •
+  <a href="https://ai-cloud-hosting.vercel.app/login"><strong>🚀 Live Production Demo</strong></a> •
   <a href="#-architecture"><strong>🏗️ Architecture</strong></a> •
-  <a href="#-key-features"><strong>✨ Features</strong></a> •
-  <a href="#-quick-start-guide"><strong>🚀 Quick Start</strong></a> •
-  <a href="#-rest-api-reference"><strong>📡 API Reference</strong></a>
+  <a href="#-key-features"><strong>✨ Key Features</strong></a> •
+  <a href="#-quick-start-guide"><strong>⚡ Quick Start</strong></a> •
+  <a href="#-rest-api-reference"><strong>📡 API Reference</strong></a> •
+  <a href="#-security-and-best-practices"><strong>🔒 Security</strong></a>
 </p>
+
+---
+
+## 🌐 Live Production Demo
+
+The entire platform is deployed and running **24/7 on multi-cloud infrastructure** with zero downtime:
+
+- **Frontend URL:** [https://ai-cloud-hosting.vercel.app/login](https://ai-cloud-hosting.vercel.app/login)
+- **API Gateway (HTTPS):** `https://ai-cloud-kan.japaneast.cloudapp.azure.com/api`
+- **Default Admin Demo Account:**
+  - **Email:** `admin@aicloud.dev`
+  - **Password:** `admin1234`
+- *(Or register your own new account directly from the Sign Up page)*
+
+> 💡 **Cost Efficiency:** Running 100% free ($0/month) utilizing student cloud benefits (GitHub Student Developer Pack, Microsoft Azure for Students, Supabase Managed PostgreSQL Free Tier, and Vercel Global Edge Network).
 
 ---
 
 ## 📖 Overview
 
-**AI Cloud Hosting** is an open-source, developer-first **Platform-as-a-Service (PaaS)** built for modern self-hosting on cloud virtual machines (Azure, AWS, DigitalOcean) or bare-metal servers. It automates container builds, multi-framework monorepo deployments, managed database provisioning, automated snapshot backups, and persistent storage — completely eliminating hardcoded environments and vendor lock-in.
+**AI Cloud Hosting** is an open-source, developer-first **Platform-as-a-Service (PaaS)** built for seamless self-hosting on cloud virtual machines (Azure, AWS, DigitalOcean) or on-premise bare-metal servers. It automates container builds, multi-framework monorepo deployments, managed database provisioning, automated snapshot backups, and persistent storage — completely eliminating hardcoded environments and vendor lock-in.
 
 Powered by **Google Gemini 2.5 Flash**, the platform autonomously inspects raw Git repositories, identifies project architectures, synthesizes production-grade Dockerfiles, and manages dynamic Traefik reverse-proxy routing without requiring manual `docker-compose.yml` boilerplate from the developer.
 
@@ -37,38 +56,33 @@ Powered by **Google Gemini 2.5 Flash**, the platform autonomously inspects raw G
 
 The platform follows a decoupled, resilient architecture designed for high availability and zero-touch continuous deployment:
 
+```mermaid
+flowchart TD
+    User([🌐 Developer / User]) -->|HTTPS / CDN| Vercel[Frontend UI: React 19 + Vite\nHosted on Vercel Global Edge]
+    Vercel -->|Direct HTTPS API Requests| Caddy[Caddy Reverse Proxy + Auto-TLS\nJapan East Azure VM :443]
+    Caddy -->|Reverse Proxy :8080| Backend[Backend API: Go 1.22 + Gin\nAutomated Lifecycle Daemon]
+    
+    Backend -->|Native Docker Socket| Docker[Docker Engine Daemon\nContainer Runtime & Storage]
+    Backend -->|Postgres Connection Pooler| Supabase[(Primary DB: Supabase\nPostgreSQL 16 Multi-Tenant)]
+    Backend -->|AI Synthesis Engine| Gemini[Google Gemini 2.5 Flash\nAuto Dockerfile & Monorepo Engine]
+
+    Docker --> AppContainers[Deployed Application Pods\nReact, Go, Node, Python, Next.js]
+    Docker --> ManagedDBs[Managed PostgreSQL Containers\nDedicated App Databases]
+    Docker --> Traefik[Traefik v3 Dynamic Gateway\nDynamic Reverse Proxy Routing]
 ```
-               ┌────────────────────────┐      ┌────────────────────────┐
-               │    Frontend UI         │      │     Backend API        │
-               │  (React 19 + Vite)     │◄────►│   (Golang 1.22 + Gin)  │
-               │   Hosted on Vercel     │      │   Hosted on Azure VM   │
-               └────────────────────────┘      └───────────┬────────────┘
-                                                           │
-                                ┌──────────────────────────┼──────────────────────────┐
-                                │                          │                          │
-                                ▼                          ▼                          ▼
-                     ┌────────────────────┐     ┌────────────────────┐     ┌────────────────────┐
-                     │   Docker Engine    │     │   Gemini AI API    │     │  Primary Postgres  │
-                     │  (Container SDK)   │     │ (Dockerfile Gen)   │     │ (GORM & Metadata)  │
-                     └─────────┬──────────┘     └────────────────────┘     └────────────────────┘
-                               │
-            ┌──────────────────┴──────────────────┐
-            ▼                                     ▼
-┌──────────────────────┐              ┌──────────────────────┐
-│  Deployed App Pods   │              │  Managed Postgres DB │
-│ (Nginx / Node / Go)  │              │ (Automated Snapshots)│
-└──────────┬───────────┘              └──────────────────────┘
-           │
-           ▼
-┌──────────────────────┐
-│   Traefik v3 Proxy   │◄────────────── Dynamic Router Sync Daemon
-│ (Reverse Gateway :80)│
-└──────────────────────┘
-```
+
+### Infrastructure Topology
+| Component | Hosting Provider | Specifications & Role |
+|---|---|---|
+| **Frontend UI** | **Vercel** | Global Edge CDN, React 19 SPA, zero-downtime deployments |
+| **Backend API** | **Microsoft Azure** | Standard B-series Ubuntu 24.04 LTS (Japan East), Go daemon |
+| **Container Engine** | **Azure Host Docker** | Native `/var/run/docker.sock`, multi-stage builds, isolated bridges |
+| **Primary Database** | **Supabase** | Managed PostgreSQL 16, transaction pooling via PgBouncer |
+| **TLS & Gateway** | **Caddy Server** | Automatic Let's Encrypt SSL certificates, HTTP/2, reverse proxy |
 
 ---
 
-## ✨ Key Features & Capabilities
+## ✨ Key Features & Capabilities (The 19 Subsystems)
 
 ### 1. 🤖 AI-Powered Intelligent Deployments
 - **Zero-Config Monorepo & Single-Repo Support:** Intelligently detects React, Vite, Next.js, Nuxt 3, Vue, Node.js, Golang, Python, FastAPI, and more. Automatically provisions separate microservices for frontend and backend in fullstack repositories.
@@ -89,7 +103,11 @@ The platform follows a decoupled, resilient architecture designed for high avail
 - **Workspace Scoping:** All resources (deployments, databases, volumes, tokens) are strictly isolated by `X-Workspace-Id`.
 - **4-Tier RBAC:** Granular role-based access control (`Owner`, `Admin`, `Member`, `Viewer`) with audit trail logging for security compliance.
 
-### 5. 🎨 Developer Experience (Vercel-Inspired UI)
+### 5. 🔔 Webhooks & Alerting Engine
+- **Discord & Slack Integrations:** Register webhooks to receive rich, color-coded embed notifications when deployments start, succeed, or fail.
+- **Toggle & Test Endpoints:** Test webhook connectivity directly from the UI with zero broken image links.
+
+### 6. 🎨 Developer Experience (Vercel-Inspired UI)
 - **Minimalist Dark Aesthetics:** Sleek `#000000` / `#0a0a0a` theme with high-contrast typography and subtle ambient accents.
 - **Real-Time Log Streaming:** Live server-sent build and deployment logs with intelligent root-cause error extraction.
 - **Bulk `.env` Management:** Key-value table editor with 1-click database connection injection (`DATABASE_URL`).
@@ -100,101 +118,87 @@ The platform follows a decoupled, resilient architecture designed for high avail
 
 | Layer | Technologies & Tools |
 |---|---|
-| **Frontend** | React 19, Vite 8, Tailwind CSS, Lucide React, Zustand, Sonner Toasts |
+| **Frontend** | React 19, Vite 8, Tailwind CSS, Lucide Icons, Sonner Toasts |
 | **Backend** | Go (Golang) 1.22+, Gin Web Framework, GORM ORM, Docker Go SDK, JWT v5, gopsutil |
-| **Database** | PostgreSQL 16 (Platform Metadata & Managed Database Containers) |
-| **Reverse Proxy** | Traefik v3 Dynamic Reverse Proxy, Nginx (container internal routing) |
+| **Database** | PostgreSQL 16 (Supabase Cloud + Managed Docker Containers) |
+| **Web Server / TLS** | Caddy v2 (Automatic HTTPS / Let's Encrypt), Traefik v3 (Container Gateway) |
 | **AI Inference** | Google Gemini 2.5 Flash API |
-| **Deployment** | Vercel (Edge Frontend), Azure Virtual Machines (Compute & Docker Daemon) |
+| **Hosting** | Vercel (Frontend), Microsoft Azure Virtual Machines (Backend & Docker Engine) |
 
 ---
 
-## 🚀 Quick Start Guide
+## ⚡ Quick Start Guide
 
-### Prerequisites
-- [Go 1.22+](https://go.dev/dl/) installed
-- [Node.js 18+](https://nodejs.org/) and `npm` installed
-- [Docker Engine](https://docs.docker.com/engine/install/) & Docker CLI running
-- PostgreSQL instance running locally or in the cloud (e.g. Supabase, Render, Azure)
+### Local Development
 
----
-
-### 1. Clone Repository
+#### 1. Clone Repository
 ```bash
 git clone https://github.com/thanawat-c/ai-cloud-hosting.git
 cd ai-cloud-hosting
 ```
 
----
-
-### 2. Configure Backend Environment
-Copy the environment template and fill in your credentials:
+#### 2. Setup Backend
 ```bash
-cp backend/.env.example backend/.env
+cd backend
+cp .env.example .env
 ```
-
-Edit `backend/.env`:
+Fill in your credentials in `backend/.env`:
 ```ini
 PORT=8080
-DB_URL=host=localhost user=postgres password=postgres dbname=ai_cloud_db port=5432 sslmode=disable
+DB_URL=postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres?sslmode=require
 GEMINI_API_KEY=your_gemini_api_key_here
 DOCKER_HOST=unix:///var/run/docker.sock
 JWT_SECRET=your_super_secret_jwt_key
-APP_DOMAIN_SUFFIX=20.48.16.226.nip.io
+PLATFORM_DOMAIN=localhost
+PUBLIC_HOST=localhost
+PUBLIC_API_URL=http://localhost:8080/api
+CORS_ALLOWED_ORIGIN=http://localhost:5173
 ```
-
-Run the backend server:
+Run the Go backend:
 ```bash
-cd backend
 go run main.go
 ```
-*The backend automatically runs GORM migrations, seeds the initial admin user (`admin@aicloud.dev` / `admin1234`), and launches the Traefik route sync daemon.*
 
----
-
-### 3. Configure Frontend Environment
+#### 3. Setup Frontend
 In a new terminal window:
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
-
-Open your browser at `http://localhost:5173`.  
-Log in with default credentials:
-- **Email:** `admin@aicloud.dev`
-- **Password:** `admin1234`
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
 ## 🧪 Comprehensive Verification Suite
 
-The repository includes an end-to-end automated verification script covering **all 19 subsystems** and 23 platform assertions:
+The platform includes an automated end-to-end verification script testing **all 19 subsystems** across 23 assertions:
 
 ```bash
 ./scripts/verify_features.sh
 ```
 
-### Verified Subsystems:
-1. `[PASS]` Server Host Health & System Metrics
-2. `[PASS]` Authentication & User Accounts (JWT)
-3. `[PASS]` Workspaces & Multi-tenancy Scoping (`X-Workspace-Id`)
-4. `[PASS]` Team Members & 4-Tier RBAC Permissions
-5. `[PASS]` Git Inspection & Remote Branch Detection
-6. `[PASS]` Git Error Handling & Non-Crash Translation
-7. `[PASS]` Persistent Storage & Host Docker Volumes
-8. `[PASS]` Managed Databases Engine
-9. `[PASS]` Database Snapshots & Backup Engine
-10. `[PASS]` Web SQL Studio & Schema Introspection
-11. `[PASS]` Containers & Microservices Registry
-12. `[PASS]` Project Configuration & Build Settings
-13. `[PASS]` Environment Variables Management
-14. `[PASS]` Outgoing Webhook Alerts (Discord / Slack)
-15. `[PASS]` Central Audit Log & Activity Trail
-16. `[PASS]` In-App Notifications & Unread Counter
-17. `[PASS]` API Tokens (Personal Access Keys)
-18. `[PASS]` Frontend Dual-Mode Bulk `.env` Editor
-19. `[PASS]` Frontend Production Compilation (`npm run build`)
+### Verification Matrix
+- `[PASS]` Server Host Health & System Metrics
+- `[PASS]` Authentication & User Accounts (JWT)
+- `[PASS]` Workspaces & Multi-tenancy Scoping (`X-Workspace-Id`)
+- `[PASS]` Team Members & 4-Tier RBAC Permissions
+- `[PASS]` Git Inspection & Remote Branch Detection
+- `[PASS]` Git Error Handling & Non-Crash Translation
+- `[PASS]` Persistent Storage & Host Docker Volumes
+- `[PASS]` Managed Databases Engine
+- `[PASS]` Database Snapshots & Backup Engine
+- `[PASS]` Web SQL Studio & Schema Introspection
+- `[PASS]` Containers & Microservices Registry
+- `[PASS]` Project Configuration & Build Settings
+- `[PASS]` Environment Variables Management
+- `[PASS]` Outgoing Webhook Alerts (Discord / Slack)
+- `[PASS]` Central Audit Log & Activity Trail
+- `[PASS]` In-App Notifications & Unread Counter
+- `[PASS]` API Tokens (Personal Access Keys)
+- `[PASS]` Frontend Dual-Mode Bulk `.env` Editor
+- `[PASS]` Frontend Production Compilation (`npm run build`)
 
 ---
 
@@ -211,7 +215,7 @@ The repository includes an end-to-end automated verification script covering **a
 | `GET` | `/api/containers` | List all running service containers | Bearer Token |
 | `POST` | `/api/containers/:id/stop` | Stop running container | Bearer Token |
 | `POST` | `/api/containers/:id/start`| Start stopped container | Bearer Token |
-| `DELETE`| `/api/containers/:id` | Purge container and Traefik routes | Bearer Token |
+| `DELETE`| `/api/containers/:id` | Purge container and gateway routes | Bearer Token |
 | `GET` | `/api/databases` | List managed database instances | Bearer Token |
 | `POST` | `/api/databases` | Provision new managed PostgreSQL DB | Bearer Token |
 | `POST` | `/api/databases/:id/snapshots` | Take point-in-time database snapshot | Bearer Token |
@@ -226,12 +230,12 @@ The repository includes an end-to-end automated verification script covering **a
 
 ---
 
-## 🔒 Security Best Practices
+## 🔒 Security and Best Practices
 
-- **Zero Hardcoding Policy:** All hosts, ports, tokens, and endpoints are derived dynamically from environment variables or request headers.
-- **Tenant Isolation:** Every request to resource endpoints validates `X-Workspace-Id` against the user's membership.
-- **Input Sanitization:** Git URLs, branches, environment keys, and SQL queries are thoroughly sanitized to prevent injection.
-- **Secret Obfuscation:** Database passwords and sensitive credentials are encrypted and omitted from client-side network payloads.
+- **Zero Hardcoding Policy:** All hosts, ports, tokens, and endpoints are derived dynamically from environment variables and request contexts.
+- **Tenant Isolation:** Every request to resource endpoints validates `X-Workspace-Id` against the user's workspace membership and RBAC role.
+- **Direct HTTPS Communication:** Production clients connect directly to `https://ai-cloud-kan.japaneast.cloudapp.azure.com/api` over TLS v1.3 with automatic Let's Encrypt certificate issuance.
+- **Sensitive Credential Scrubbing:** Database passwords, JWT keys, and tokens are encrypted and filtered out from client-facing payloads.
 
 ---
 

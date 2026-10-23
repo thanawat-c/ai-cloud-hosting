@@ -155,7 +155,7 @@ func GenerateDockerfile(ctx context.Context, repoURL string, buildDir string, ta
     COPY go.mod go.sum* ./
     RUN go mod download
     COPY . ./
-    RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
+    RUN MAIN_DIR=$(find . -name "main.go" -not -path "*/vendor/*" -exec dirname {} \; | head -n 1); CGO_ENABLED=0 go build -ldflags="-s -w" -o /app/server ${MAIN_DIR:-.}
     FROM alpine:latest
     WORKDIR /app
     COPY --from=builder /app/server .
@@ -682,7 +682,8 @@ CMD ["nginx", "-g", "daemon off;"]
 ENV GOTOOLCHAIN=auto
 WORKDIR /app
 %sCOPY %s ./
-RUN CGO_ENABLED=0 go build -o /app/server . || CGO_ENABLED=0 go build -o /app/server ./cmd/...
+RUN MAIN_DIR=$(find . -name "main.go" -not -path "*/vendor/*" -exec dirname {} \; | head -n 1); \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /app/server ${MAIN_DIR:-.}
 
 FROM alpine:latest
 WORKDIR /app
