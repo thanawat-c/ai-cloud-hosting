@@ -1,3 +1,4 @@
+import { formatExternalUrl } from "../utils/url";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -658,7 +659,7 @@ const DeployForm = () => {
                                 )}
                               </button>
                               <a 
-                                href={`http://${publicPort}`} 
+                                href={formatExternalUrl(publicPort)} 
                                 target="_blank" 
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm shadow-emerald-500/20 cursor-pointer"

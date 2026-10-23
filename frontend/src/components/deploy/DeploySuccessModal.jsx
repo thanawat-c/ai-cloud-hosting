@@ -1,3 +1,4 @@
+import { formatExternalUrl } from "../../utils/url";
 import { Rocket, ExternalLink, Copy, Check, LayoutDashboard, X } from 'lucide-react';
 
 /**
@@ -102,7 +103,7 @@ export const DeploySuccessModal = ({
           <div className="w-full space-y-2.5">
             {publicPort && (
               <a
-                href={`http://${publicPort}`}
+                href={formatExternalUrl(publicPort)}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white hover:bg-neutral-200 text-black border border-white rounded-md font-medium text-xs transition-colors cursor-pointer"

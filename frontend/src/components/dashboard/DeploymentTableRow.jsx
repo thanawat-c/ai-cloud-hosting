@@ -1,3 +1,4 @@
+import { formatExternalUrl } from "../../utils/url";
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -146,7 +147,7 @@ const DeploymentTableRow = ({
             <div className="flex items-center gap-1.5 min-w-0">
               {item.domain_name && isRunning ? (
                 <a
-                  href={`http://${item.domain_name}`}
+                  href={formatExternalUrl(item.domain_name)}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={shortName}
@@ -392,7 +393,7 @@ const DeploymentTableRow = ({
           </div>
           {item.domain_name && isRunning && (
             <a
-              href={`http://${item.domain_name}`}
+              href={formatExternalUrl(item.domain_name)}
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent hover:border-neutral-800 rounded-md transition-colors"
@@ -444,7 +445,7 @@ const DeploymentTableRow = ({
                 >
                 {item.domain_name && isRunning && (
                   <a
-                    href={`http://${item.domain_name}`}
+                    href={formatExternalUrl(item.domain_name)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setActiveMenuId(null)}

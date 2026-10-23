@@ -1,3 +1,4 @@
+import { formatExternalUrl } from "../../utils/url";
 import {
   X,
   Clock,
@@ -206,7 +207,7 @@ const DeployProgressModal = ({
 
             <div className="flex items-center gap-2">
               <a
-                href={`http://${publicPort}`}
+                href={formatExternalUrl(publicPort)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-white hover:bg-neutral-200 text-black text-xs font-semibold transition-colors"
