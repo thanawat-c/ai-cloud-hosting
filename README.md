@@ -15,78 +15,33 @@
   <img src="https://img.shields.io/badge/License-MIT-gray?style=for-the-badge" alt="License" />
 </p>
 
+<p align="center">
+  <a href="https://ai-cloud-hosting.vercel.app"><strong>🌐 Live Dashboard (Vercel)</strong></a> •
+  <a href="#-architecture"><strong>🏗️ Architecture</strong></a> •
+  <a href="#-key-features"><strong>✨ Features</strong></a> •
+  <a href="#-quick-start-guide"><strong>🚀 Quick Start</strong></a> •
+  <a href="#-rest-api-reference"><strong>📡 API Reference</strong></a>
+</p>
+
 ---
 
 ## 📖 Overview
 
-**AI Cloud Hosting** is an open-source, developer-first **Platform-as-a-Service (PaaS)** designed to run on your own infrastructure (VPS, Bare Metal, or Local Machine). It automates container builds, multi-framework monorepo deployments, managed database provisioning, automated snapshot backups, and persistent storage — completely eliminating hardcoded environments and vendor lock-in.
+**AI Cloud Hosting** is an open-source, developer-first **Platform-as-a-Service (PaaS)** built for modern self-hosting on cloud virtual machines (Azure, AWS, DigitalOcean) or bare-metal servers. It automates container builds, multi-framework monorepo deployments, managed database provisioning, automated snapshot backups, and persistent storage — completely eliminating hardcoded environments and vendor lock-in.
 
-Powered by **Google Gemini AI**, the platform autonomously analyzes raw source repositories, infers project frameworks, generates production-grade Dockerfiles, and configures Traefik reverse-proxy routing without requiring complex `docker-compose.yml` boilerplate from the developer.
-
----
-
-## ✨ Key Features & Capabilities
-
-### 1. 🤖 AI-Powered Intelligent Deployments
-- **Zero-Config Monorepo & Single-Repo Support:** Automatically detects React, Vite, Next.js, Vue, Node.js, Golang, Python, FastAPI, and more.
-- **Dynamic Dockerfile Synthesis:** Gemini AI inspects dependencies and synthesizes optimized, multi-stage production Dockerfiles and Nginx reverse proxies on the fly.
-- **Git Push Webhooks & Auto-Deploy:** Full GitHub push webhook integration (`/api/webhooks/deploy/:id`) with HMAC SHA-256 signature verification for zero-touch CI/CD.
-- **Rollback Engine & Release History:** Immutable deployment release history with instant zero-downtime rollback to any prior release version.
-
-### 2. 🗄️ Managed Databases & Web SQL Studio
-- **On-Demand PostgreSQL 16 Instances:** Provision isolated database containers in seconds with automatic port allocation and secure credentials.
-- **Automated Point-in-Time Snapshots:** Create binary database dumps (`.dump` / `.sql`) on demand, download backups, or perform one-click state restoration.
-- **Built-in Web SQL Studio:** Native schema introspection, table structure inspection, and interactive SQL query runner right inside the browser.
-
-### 3. 💾 Persistent Storage & Docker Volumes
-- **Host-Level Volume Provisioning:** Manage Docker volumes directly from the UI with real-time mount tracking and container association.
-- **Host Reclamation:** Detect orphaned storage volumes and safely prune or reclaim host disk space.
-
-### 4. 🏢 Multi-Tenancy & Workspaces
-- **Workspace Scoping:** Complete workspace isolation via `X-Workspace-Id` headers and API tokens. All deployments, databases, and logs are strictly scoped.
-- **Role-Based Access Control (RBAC):** 4-tier granular permissions (`owner`, `admin`, `member`, `viewer`).
-  - Viewers can monitor metrics and logs but are prohibited from mutating services or deleting databases (`403 Forbidden`).
-
-### 5. 🔔 Multi-Channel Alerting & Webhooks
-- **Discord & Slack Embeds:** Real-time push notifications for deployments, build failures, container stops, and database operations.
-- **Non-Breaking CDN Icons:** Embedded alerts utilize CDN icons and configurable brand metadata (`ACH_BRAND_NAME`, `ACH_BRAND_ICON_URL`).
-- **Interactive Webhook Tester:** Built-in test dispatcher to verify endpoints before enabling alerts.
-
-### 6. 🛡️ Security, Audit Logs & API Tokens
-- **Personal Access Tokens:** Generate fine-grained bearer tokens with automated last-used tracking for CLI and API automation.
-- **Central Activity Audit Trail:** Immutable activity log tracking actor, IP address, resource type, and timestamp.
-- **Non-Leaking Secrets:** Environment variables and database credentials are automatically masked from frontend bundles and logs.
-
-### 7. 🩺 Server Telemetry & Host Health
-- **Live Host Telemetry:** Real-time CPU core usage, RAM allocation, NVMe/Disk consumption, and Docker Engine daemon stats.
-- **One-Click System Cleanup:** Clean unused dangling images, stopped containers, and build cache with one click.
-
-### 8. 🎨 Premium Developer Experience (UX/UI)
-- **Vercel-Inspired Dark Mode:** Built with Tailwind CSS, Lucide Icons, and Sonner toast notifications.
-- **Dual-Mode Bulk .env Editor:** Toggle between interactive Key-Value Table and Raw `.env` editor with single-click import/export and value obfuscation.
-- **Viewport-Aware Menus:** Intelligent portal-rendered menus that never clip across screens or mobile viewports.
+Powered by **Google Gemini 2.5 Flash**, the platform autonomously inspects raw Git repositories, identifies project architectures, synthesizes production-grade Dockerfiles, and manages dynamic Traefik reverse-proxy routing without requiring manual `docker-compose.yml` boilerplate from the developer.
 
 ---
 
-## 🏗 Architecture
+## 🏗 System Architecture
+
+The platform follows a decoupled, resilient architecture designed for high availability and zero-touch continuous deployment:
 
 ```
-                          ┌─────────────────────────────────────┐
-                          │     User / CI-CD / Webhook Push     │
-                          └──────────────────┬──────────────────┘
-                                             │
-                                             ▼
-                          ┌─────────────────────────────────────┐
-                          │     Traefik Edge Reverse Proxy      │
-                          │   (Dynamic Domain Routing & SSL)    │
-                          └───────┬─────────────────────┬───────┘
-                                  │                     │
-                     http://localhost:5173              │
-                                  │                     │
-                                  ▼                     ▼
                ┌────────────────────────┐      ┌────────────────────────┐
                │    Frontend UI         │      │     Backend API        │
                │  (React 19 + Vite)     │◄────►│   (Golang 1.22 + Gin)  │
+               │   Hosted on Vercel     │      │   Hosted on Azure VM   │
                └────────────────────────┘      └───────────┬────────────┘
                                                            │
                                 ┌──────────────────────────┼──────────────────────────┐
@@ -102,8 +57,42 @@ Powered by **Google Gemini AI**, the platform autonomously analyzes raw source r
 ┌──────────────────────┐              ┌──────────────────────┐
 │  Deployed App Pods   │              │  Managed Postgres DB │
 │ (Nginx / Node / Go)  │              │ (Automated Snapshots)│
-└──────────────────────┘              └──────────────────────┘
+└──────────┬───────────┘              └──────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│   Traefik v3 Proxy   │◄────────────── Dynamic Router Sync Daemon
+│ (Reverse Gateway :80)│
+└──────────────────────┘
 ```
+
+---
+
+## ✨ Key Features & Capabilities
+
+### 1. 🤖 AI-Powered Intelligent Deployments
+- **Zero-Config Monorepo & Single-Repo Support:** Intelligently detects React, Vite, Next.js, Nuxt 3, Vue, Node.js, Golang, Python, FastAPI, and more. Automatically provisions separate microservices for frontend and backend in fullstack repositories.
+- **Dynamic Dockerfile Synthesis:** Gemini AI inspects dependencies and synthesizes optimized, multi-stage production Dockerfiles and Nginx reverse proxies on the fly.
+- **Git Push Webhooks & Auto-Deploy:** Full GitHub push webhook integration (`/api/webhooks/deploy/:id`) with HMAC SHA-256 signature verification for zero-touch CI/CD.
+- **Rollback Engine & Release History:** Immutable deployment release history with instant zero-downtime rollback to any prior release version.
+
+### 2. 🗄️ Managed Databases & Web SQL Studio
+- **On-Demand PostgreSQL 16 Instances:** Provision isolated database containers in seconds with automatic port allocation and secure credentials.
+- **Automated Point-in-Time Snapshots:** Create binary database dumps (`.dump` / `.sql`) on demand, download backups, or perform one-click state restoration.
+- **Built-in Web SQL Studio:** Native schema introspection, table structure inspection, and interactive SQL query runner right inside the browser.
+
+### 3. 💾 Persistent Storage & Docker Volumes
+- **Host-Level Volume Provisioning:** Manage Docker volumes directly from the UI with real-time mount tracking and container association.
+- **Host Reclamation:** Detect orphaned storage volumes and safely prune or reclaim host disk space.
+
+### 4. 🏢 Multi-Tenancy & Workspaces
+- **Workspace Scoping:** All resources (deployments, databases, volumes, tokens) are strictly isolated by `X-Workspace-Id`.
+- **4-Tier RBAC:** Granular role-based access control (`Owner`, `Admin`, `Member`, `Viewer`) with audit trail logging for security compliance.
+
+### 5. 🎨 Developer Experience (Vercel-Inspired UI)
+- **Minimalist Dark Aesthetics:** Sleek `#000000` / `#0a0a0a` theme with high-contrast typography and subtle ambient accents.
+- **Real-Time Log Streaming:** Live server-sent build and deployment logs with intelligent root-cause error extraction.
+- **Bulk `.env` Management:** Key-value table editor with 1-click database connection injection (`DATABASE_URL`).
 
 ---
 
@@ -111,12 +100,12 @@ Powered by **Google Gemini AI**, the platform autonomously analyzes raw source r
 
 | Layer | Technologies & Tools |
 |---|---|
-| **Frontend** | React 19, Vite 8, Tailwind CSS 4, Lucide React, Zustand, Sonner, ESLint |
+| **Frontend** | React 19, Vite 8, Tailwind CSS, Lucide React, Zustand, Sonner Toasts |
 | **Backend** | Go (Golang) 1.22+, Gin Web Framework, GORM ORM, Docker Go SDK, JWT v5, gopsutil |
-| **Database** | PostgreSQL 16 (Primary platform metadata & Managed DB containers) |
-| **Reverse Proxy** | Traefik Dynamic Reverse Proxy, Nginx (frontend container internal routing) |
+| **Database** | PostgreSQL 16 (Platform Metadata & Managed Database Containers) |
+| **Reverse Proxy** | Traefik v3 Dynamic Reverse Proxy, Nginx (container internal routing) |
 | **AI Inference** | Google Gemini 2.5 Flash API |
-| **Operating System** | macOS, Linux (Ubuntu/Debian/Alpine), Docker Engine 24+ |
+| **Deployment** | Vercel (Edge Frontend), Azure Virtual Machines (Compute & Docker Daemon) |
 
 ---
 
@@ -126,7 +115,7 @@ Powered by **Google Gemini AI**, the platform autonomously analyzes raw source r
 - [Go 1.22+](https://go.dev/dl/) installed
 - [Node.js 18+](https://nodejs.org/) and `npm` installed
 - [Docker Engine](https://docs.docker.com/engine/install/) & Docker CLI running
-- PostgreSQL installed and running locally, or a remote PostgreSQL instance
+- PostgreSQL instance running locally or in the cloud (e.g. Supabase, Render, Azure)
 
 ---
 
@@ -151,6 +140,7 @@ DB_URL=host=localhost user=postgres password=postgres dbname=ai_cloud_db port=54
 GEMINI_API_KEY=your_gemini_api_key_here
 DOCKER_HOST=unix:///var/run/docker.sock
 JWT_SECRET=your_super_secret_jwt_key
+APP_DOMAIN_SUFFIX=20.48.16.226.nip.io
 ```
 
 Run the backend server:
@@ -158,7 +148,7 @@ Run the backend server:
 cd backend
 go run main.go
 ```
-*The backend automatically runs GORM migrations, seeds the initial admin user (`admin@aicloud.dev` / `admin1234`), and launches the Traefik sync daemon.*
+*The backend automatically runs GORM migrations, seeds the initial admin user (`admin@aicloud.dev` / `admin1234`), and launches the Traefik route sync daemon.*
 
 ---
 
@@ -166,7 +156,6 @@ go run main.go
 In a new terminal window:
 ```bash
 cd frontend
-cp .env.example .env
 npm install
 npm run dev
 ```
@@ -218,7 +207,7 @@ The repository includes an end-to-end automated verification script covering **a
 | `GET` | `/api/auth/me` | Retrieve authenticated user profile | Bearer Token |
 | `GET` | `/api/workspaces` | List accessible workspaces | Bearer Token |
 | `POST` | `/api/inspect-repo` | Inspect remote Git repository & branches | Bearer Token |
-| `POST` | `/api/deploy` | Trigger single-repo or monorepo deployment | Bearer Token |
+| `POST` | `/api/test-deploy` | Trigger single-repo or monorepo deployment | Bearer Token |
 | `GET` | `/api/containers` | List all running service containers | Bearer Token |
 | `POST` | `/api/containers/:id/stop` | Stop running container | Bearer Token |
 | `POST` | `/api/containers/:id/start`| Start stopped container | Bearer Token |
